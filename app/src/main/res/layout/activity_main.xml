@@ -36,6 +36,20 @@
             android:text="@string/map_hint"
             android:textColor="#212121"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/mapStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_map_hint"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp"
+            android:text="@string/map_status_loading"
+            android:textColor="#B3261E"
+            android:textSize="12sp"
+            android:visibility="gone" />
     </FrameLayout>
 
     <LinearLayout

@@ -4,10 +4,6 @@
     <color name="brand_on_primary">#FFFFFF</color>
     <color name="brand_primary_container">#B5F2BB</color>
     <color name="brand_secondary">#52634F</color>
-    <color name="surface_muted">#F3F5F2</color>
-    <color name="track_line">#1B5E20</color>
-    <color name="track_vertex">#0D47A1</color>
-    <color name="track_start">#E65100</color>
     <color name="state_running">#1B5E20</color>
     <color name="state_paused">#8D6E00</color>
     <color name="state_error">#B3261E</color>

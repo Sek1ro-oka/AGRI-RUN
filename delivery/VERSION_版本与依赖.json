@@ -2,8 +2,8 @@
   "application": {
     "name": "路线工坊",
     "packageName": "org.localroute.app",
-    "versionName": "0.1.0",
-    "versionCode": 1,
+    "versionName": "0.1.1",
+    "versionCode": 2,
     "minSdk": 29,
     "targetSdk": 35,
     "compileSdk": 35,
@@ -43,8 +43,20 @@
   ],
   "externalData": [
     {
-      "name": "OpenStreetMap raster tiles",
+      "name": "OpenStreetMap raster tiles (default)",
       "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
+      "attribution": "© OpenStreetMap contributors"
+    },
+    {
+      "name": "OpenStreetMap DE raster tiles (fallback, selectable in app)",
+      "url": "https://tile.openstreetmap.de/{z}/{x}/{y}.png",
+      "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
+      "attribution": "© OpenStreetMap contributors"
+    },
+    {
+      "name": "OpenStreetMap France raster tiles (fallback, selectable in app)",
+      "url": "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
       "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
       "attribution": "© OpenStreetMap contributors"
     }

@@ -3,6 +3,20 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_single_point"
+        android:title="@string/menu_single_point"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_toggle_closed"
+        android:checkable="true"
+        android:checked="true"
+        android:title="@string/menu_toggle_closed"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_map_source"
+        android:title="@string/menu_map_source"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_save"
         android:title="@string/menu_save"
         app:showAsAction="never" />

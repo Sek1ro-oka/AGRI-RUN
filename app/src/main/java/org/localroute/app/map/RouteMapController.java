@@ -1,11 +1,12 @@
 package org.localroute.app.map;
 
 import android.content.Context;
-import android.graphics.Color;
+import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.core.GeoPoint;
 import org.maplibre.android.camera.CameraUpdateFactory;
 import org.maplibre.android.geometry.LatLng;
@@ -24,38 +25,49 @@ import org.maplibre.geojson.LineString;
 import org.maplibre.geojson.Point;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * MapLibre 地图封装：只负责“画路线 + 画当前模拟位置 + 把点击坐标交回界面”。
  *
- * <p>瓦片使用 OpenStreetMap 官方栅格服务，遵守其使用政策：保留署名、按需加载、
+ * <p>瓦片使用 OpenStreetMap 生态的公开栅格服务，遵守其使用政策：保留署名、按需加载、
  * 不做批量预取；若将来高频使用应换成自建或商业瓦片服务（见交付文档）。
+ *
+ * <p>0.1.1 起加了三道兜底，避免用户看到“一片黑”却没有任何解释：
+ * <ol>
+ *   <li>样式里先放一层浅色 {@code background}，瓦片就算全部失败也不会显示成黑屏；</li>
+ *   <li>样式 10 秒内没加载成功就通过 {@link StatusListener} 把原因交给界面显示；</li>
+ *   <li>提供多个瓦片源，用户可以在界面里切换并重试。</li>
+ * </ol>
  */
 public final class RouteMapController {
 
     private static final String SOURCE_LINE = "route-line";
     private static final String SOURCE_VERTICES = "route-vertices";
     private static final String SOURCE_RUNNER = "run-position";
+    private static final String LAYER_BACKGROUND = "background";
+    private static final String LAYER_RASTER = "osm-raster";
     private static final String LAYER_LINE = "route-line-layer";
     private static final String LAYER_VERTICES = "route-vertices-layer";
     private static final String LAYER_START = "route-start-layer";
     private static final String LAYER_RUNNER = "run-position-layer";
 
-    /** 最小可用栅格样式：只依赖 OSM 官方瓦片，避免引入额外样式仓库。 */
-    private static final String OSM_RASTER_STYLE = "{"
-            + "\"version\":8,"
-            + "\"name\":\"OSM Raster\","
-            + "\"sources\":{"
-            + "\"osm\":{"
-            + "\"type\":\"raster\","
-            + "\"tiles\":[\"https://tile.openstreetmap.org/{z}/{x}/{y}.png\"],"
-            + "\"tileSize\":256,"
-            + "\"maxzoom\":19,"
-            + "\"attribution\":\"© OpenStreetMap contributors\""
-            + "}},"
-            + "\"layers\":[{\"id\":\"osm\",\"type\":\"raster\",\"source\":\"osm\",\"minzoom\":0,\"maxzoom\":20}]"
-            + "}";
+    /** 样式加载的看门狗：超过这个时间还没回调，就认为瓦片/样式加载失败。 */
+    private static final long STYLE_TIMEOUT_MS = 10_000L;
+
+    private static final String PREFS = "map";
+    private static final String PREF_TILE_SOURCE = "tile_source";
+
+    /** 可选瓦片源。全部是公开的 OpenStreetMap 栅格服务，按 OSM 使用政策注明署名。 */
+    private static final List<TileSource> TILE_SOURCES = Arrays.asList(
+            new TileSource("osm", "OpenStreetMap 官方",
+                    "https://tile.openstreetmap.org/{z}/{x}/{y}.png", 19),
+            new TileSource("osmfr", "OSM France（备用）",
+                    "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png", 19),
+            new TileSource("osmde", "OSM Germany（备用）",
+                    "https://tile.openstreetmap.de/{z}/{x}/{y}.png", 18));
 
     private final MapView mapView;
     @Nullable
@@ -68,9 +80,52 @@ public final class RouteMapController {
     private boolean followRunner = true;
     private boolean gestureListenerWanted;
     private boolean gestureListenerAttached;
+    private int tileSourceIndex;
+
+    @Nullable
+    private Runnable styleTimeout;
+    @Nullable
+    private StatusListener statusListener;
+    private String lastStatus = "";
+
+    /** 瓦片源描述。 */
+    public static final class TileSource {
+        private final String id;
+        private final String label;
+        private final String urlTemplate;
+        private final int maxZoom;
+
+        TileSource(String id, String label, String urlTemplate, int maxZoom) {
+            this.id = id;
+            this.label = label;
+            this.urlTemplate = urlTemplate;
+            this.maxZoom = maxZoom;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        public String label() {
+            return label;
+        }
+
+        public String urlTemplate() {
+            return urlTemplate;
+        }
+
+        public int maxZoom() {
+            return maxZoom;
+        }
+    }
 
     public interface OnMapClickListener {
         void onMapClick(GeoPoint point);
+    }
+
+    /** 地图状态回调：{@code message == null} 表示已就绪。 */
+    public interface StatusListener {
+        void onStatusChanged(@Nullable String message);
     }
 
     private RouteMapController(MapView mapView) {
@@ -87,13 +142,24 @@ public final class RouteMapController {
         return controller;
     }
 
+    public void setStatusListener(@Nullable StatusListener listener) {
+        this.statusListener = listener;
+        if (listener != null && !lastStatus.isEmpty()) {
+            listener.onStatusChanged(lastStatus);
+        }
+    }
+
+    private void notifyStatus(@Nullable String message) {
+        lastStatus = message == null ? "" : message;
+        if (statusListener != null) {
+            statusListener.onStatusChanged(message);
+        }
+    }
+
     public void onMapReady(@NonNull MapLibreMap mapLibreMap) {
         this.map = mapLibreMap;
-        mapLibreMap.setStyle(new Style.Builder().fromJson(OSM_RASTER_STYLE), loaded -> {
-            style = loaded;
-            addSources(loaded);
-            renderRoute(currentPoints);
-        });
+        tileSourceIndex = loadTileSourceIndex();
+
         mapLibreMap.getUiSettings().setAttributionEnabled(true);
         mapLibreMap.getUiSettings().setLogoEnabled(false);
         mapLibreMap.getUiSettings().setCompassEnabled(true);
@@ -106,6 +172,120 @@ public final class RouteMapController {
         });
         // 界面可能在 map 就绪之前就调用了 registerGestureListener，这里补挂一次。
         attachGestureListenerIfReady();
+        applyStyle();
+    }
+
+    /** 用当前瓦片源重建样式，并挂上看门狗。 */
+    private void applyStyle() {
+        if (map == null) {
+            return;
+        }
+        style = null;
+        final TileSource source = currentTileSource();
+        notifyStatus("正在加载 " + source.label() + " 瓦片…");
+        DiagnosticLog.info("加载地图样式：" + source.label() + " / " + source.urlTemplate());
+
+        cancelStyleTimeout();
+        styleTimeout = () -> {
+            if (style == null) {
+                String message = String.format(Locale.US,
+                        "加载 %s 超过 %d 秒仍未完成（可能是网络无法访问该瓦片服务）",
+                        source.label(), STYLE_TIMEOUT_MS / 1000L);
+                DiagnosticLog.warn("地图样式加载超时：" + message);
+                notifyStatus(message);
+            }
+        };
+        mapView.postDelayed(styleTimeout, STYLE_TIMEOUT_MS);
+
+        map.setStyle(new Style.Builder().fromJson(buildStyleJson(source)), loaded -> {
+            cancelStyleTimeout();
+            style = loaded;
+            addSources(loaded);
+            renderRoute(currentPoints);
+            DiagnosticLog.info("地图样式已加载：" + source.label());
+            notifyStatus(null);
+        });
+    }
+
+    private void cancelStyleTimeout() {
+        if (styleTimeout != null) {
+            mapView.removeCallbacks(styleTimeout);
+            styleTimeout = null;
+        }
+    }
+
+    /**
+     * 极简栅格样式：一层浅色背景 + 一层栅格瓦片。
+     *
+     * <p>背景层很关键：瓦片服务器不可达时 MapLibre 默认会露出清屏色（黑），
+     * 有了背景层至少能看到“有底图、只是没瓦片”，再配合状态提示就能定位问题。
+     */
+    private static String buildStyleJson(TileSource source) {
+        return "{"
+                + "\"version\":8,"
+                + "\"name\":\"OSM Raster " + source.id() + "\","
+                + "\"sources\":{"
+                + "\"osm\":{"
+                + "\"type\":\"raster\","
+                + "\"tiles\":[\"" + source.urlTemplate() + "\"],"
+                + "\"tileSize\":256,"
+                + "\"maxzoom\":" + source.maxZoom() + ","
+                + "\"attribution\":\"© OpenStreetMap contributors\""
+                + "}},"
+                + "\"layers\":["
+                + "{\"id\":\"" + LAYER_BACKGROUND + "\",\"type\":\"background\","
+                + "\"paint\":{\"background-color\":\"#E9EDF2\"}},"
+                + "{\"id\":\"" + LAYER_RASTER + "\",\"type\":\"raster\",\"source\":\"osm\","
+                + "\"minzoom\":0,\"maxzoom\":" + (source.maxZoom() + 1) + "}"
+                + "]}";
+    }
+
+    /** 供界面/诊断页展示的瓦片源列表。 */
+    public static List<TileSource> tileSources() {
+        return new ArrayList<>(TILE_SOURCES);
+    }
+
+    public TileSource currentTileSource() {
+        return TILE_SOURCES.get(clampIndex(tileSourceIndex));
+    }
+
+    public int currentTileSourceIndex() {
+        return clampIndex(tileSourceIndex);
+    }
+
+    /** 切换瓦片源并立即重试；返回是否真的切换了。 */
+    public boolean selectTileSource(int index) {
+        int clamped = clampIndex(index);
+        if (clamped == clampIndex(tileSourceIndex)) {
+            return false;
+        }
+        tileSourceIndex = clamped;
+        saveTileSourceIndex(clamped);
+        applyStyle();
+        return true;
+    }
+
+    private static int clampIndex(int index) {
+        if (index < 0 || index >= TILE_SOURCES.size()) {
+            return 0;
+        }
+        return index;
+    }
+
+    private int loadTileSourceIndex() {
+        SharedPreferences prefs = mapView.getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String id = prefs.getString(PREF_TILE_SOURCE, TILE_SOURCES.get(0).id());
+        for (int i = 0; i < TILE_SOURCES.size(); i++) {
+            if (TILE_SOURCES.get(i).id().equals(id)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    private void saveTileSourceIndex(int index) {
+        mapView.getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(PREF_TILE_SOURCE, TILE_SOURCES.get(index).id()).apply();
     }
 
     private void addSources(@NonNull Style loaded) {
@@ -114,30 +294,36 @@ public final class RouteMapController {
         loaded.addSource(new GeoJsonSource(SOURCE_RUNNER));
         loaded.addLayer(new LineLayer(LAYER_LINE, SOURCE_LINE)
                 .withProperties(
-                        PropertyFactory.lineColor(Color.parseColor("#1B5E20")),
+                        PropertyFactory.lineColor(0xFF1B5E20),
                         PropertyFactory.lineWidth(5f),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND)));
         loaded.addLayer(new CircleLayer(LAYER_VERTICES, SOURCE_VERTICES)
                 .withProperties(
-                        PropertyFactory.circleColor(Color.parseColor("#0D47A1")),
+                        PropertyFactory.circleColor(0xFF0D47A1),
                         PropertyFactory.circleRadius(5f),
                         PropertyFactory.circleStrokeWidth(2f),
-                        PropertyFactory.circleStrokeColor(Color.WHITE)));
+                        PropertyFactory.circleStrokeColor(0xFFFFFFFF)));
         loaded.addLayer(new CircleLayer(LAYER_START, SOURCE_VERTICES)
                 .withProperties(
-                        PropertyFactory.circleColor(Color.parseColor("#E65100")),
+                        PropertyFactory.circleColor(0xFFE65100),
                         PropertyFactory.circleRadius(8f)));
         loaded.addLayer(new CircleLayer(LAYER_RUNNER, SOURCE_RUNNER)
                 .withProperties(
-                        PropertyFactory.circleColor(Color.parseColor("#D32F2F")),
+                        PropertyFactory.circleColor(0xFFD32F2F),
                         PropertyFactory.circleRadius(9f),
                         PropertyFactory.circleStrokeWidth(3f),
-                        PropertyFactory.circleStrokeColor(Color.WHITE)));
+                        PropertyFactory.circleStrokeColor(0xFFFFFFFF)));
     }
 
-    /** 更新路线折线（自动闭合）与节点。 */
+    /**
+     * 更新路线折线（{@code closed} 为真时首尾相连，为假时保持开口）与节点。
+     */
     public void renderRoute(@NonNull List<GeoPoint> points) {
+        renderRoute(points, true);
+    }
+
+    public void renderRoute(@NonNull List<GeoPoint> points, boolean closed) {
         currentPoints.clear();
         currentPoints.addAll(points);
         if (style == null) {
@@ -149,7 +335,15 @@ public final class RouteMapController {
             for (GeoPoint point : points) {
                 ring.add(Point.fromLngLat(point.longitude(), point.latitude()));
             }
-            ring.add(Point.fromLngLat(points.get(0).longitude(), points.get(0).latitude()));
+            if (closed) {
+                ring.add(Point.fromLngLat(points.get(0).longitude(), points.get(0).latitude()));
+            }
+            lineFeatures.add(Feature.fromGeometry(LineString.fromLngLats(ring)));
+        } else if (points.size() == 1) {
+            // 只有一个节点时画不出折线，至少用一个极小线段占位，避免图层看起来“什么都没有”。
+            GeoPoint only = points.get(0);
+            ring.add(Point.fromLngLat(only.longitude(), only.latitude()));
+            ring.add(Point.fromLngLat(only.longitude(), only.latitude()));
             lineFeatures.add(Feature.fromGeometry(LineString.fromLngLats(ring)));
         }
         setGeoJson(SOURCE_LINE, FeatureCollection.fromFeatures(lineFeatures));
@@ -201,6 +395,16 @@ public final class RouteMapController {
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(
                     new LatLng(points.get(0).latitude(), points.get(0).longitude()), 17f));
         }
+    }
+
+    /** 当前地图中心；地图还没就绪时返回 null（用于「发送单点位置」预填）。 */
+    @Nullable
+    public GeoPoint cameraCenter() {
+        if (map == null) {
+            return null;
+        }
+        LatLng target = map.getCameraPosition().target;
+        return new GeoPoint(target.getLatitude(), target.getLongitude());
     }
 
     /** 跟随当前模拟位置；用户手动拖动地图后自动关闭。 */
@@ -263,6 +467,7 @@ public final class RouteMapController {
     }
 
     public void onDestroy() {
+        cancelStyleTimeout();
         mapView.onDestroy();
     }
 

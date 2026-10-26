@@ -46,3 +46,10 @@ evidence/*.log
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# ---- ?????/???? ----
+build-inspect/
+# ---- ?????? ----
+/build-*.log
+/*.log
+!delivery/evidence/*.log

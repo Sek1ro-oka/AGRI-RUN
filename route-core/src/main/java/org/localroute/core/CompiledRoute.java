@@ -10,9 +10,11 @@ import java.util.List;
  *
  * <p>几何约定：
  * <ul>
- *   <li>路线始终闭合：最后一个顶点与第一个顶点之间有一条“闭合边”；</li>
- *   <li>顶点不再包含重复的闭合终点（编译期已清理）；</li>
- *   <li>单圈长度包含闭合边；</li>
+ *   <li>运行期的轨迹始终是一条闭合环：最后一个顶点与第一个顶点之间有一条“闭合边”；</li>
+ *   <li>闭合路线：顶点就是用户输入的点（已去掉重复的闭合终点）；</li>
+ *   <li>不闭合路线：顶点是“去程 + 原路返回”，因此最后一个顶点是用户输入的倒数第二个点；
+ *       用 {@link #pathPointCount()} 可以拿到用户实际输入的点数；</li>
+ *   <li>单圈长度包含闭合边（不闭合时也就是往返两程的总长）；</li>
  *   <li>{@code prefixDistances[i]} 表示从顶点 0 沿路线到顶点 i 的距离，{@code prefixDistances[0] == 0}。</li>
  * </ul>
  *
@@ -24,11 +26,26 @@ public final class CompiledRoute {
     private final GeoPoint[] vertices;
     private final double[] prefixDistances;
     private final double lapLengthMeters;
+    private final boolean closed;
+    private final int pathPointCount;
 
-    CompiledRoute(GeoPoint[] vertices, double[] prefixDistances, double lapLengthMeters) {
+    CompiledRoute(GeoPoint[] vertices, double[] prefixDistances, double lapLengthMeters,
+                  boolean closed, int pathPointCount) {
         this.vertices = vertices;
         this.prefixDistances = prefixDistances;
         this.lapLengthMeters = lapLengthMeters;
+        this.closed = closed;
+        this.pathPointCount = pathPointCount;
+    }
+
+    /** 是否闭合：{@code false} 表示按“原路返回”计圈。 */
+    public boolean closed() {
+        return closed;
+    }
+
+    /** 用户实际输入（去重后）的点数，与 {@link #vertexCount()} 不同：不闭合时顶点会多一倍。 */
+    public int pathPointCount() {
+        return pathPointCount;
     }
 
     /** 顶点（不含重复闭合点），至少 2 个。 */

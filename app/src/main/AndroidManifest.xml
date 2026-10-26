@@ -1,8 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!--
+        0.1.1 修复“开发者选项 → 选择模拟位置信息应用 列表里没有本应用”：
+        AOSP Settings 的 MockLocationAppPreferenceController 用 Manifest.permission.ACCESS_MOCK_LOCATION
+        作为过滤条件传给 AppPicker，而 AppPicker 只列出 requestedPermissions 里包含该权限的应用
+        （packages/apps/Settings/.../development/AppPicker.java）。因此必须在清单里声明它。
+        该权限是 signature|development 级别，声明本身不会获得系统级能力，也不弹权限框；
+        真正的授权仍然由用户在开发者选项里选择本应用完成。
+        因此 lint 的 MockLocation 提示（建议只放在 debug 清单里）在这里不适用：
+        本应用的核心功能就是向系统提交模拟位置，正式包也必须出现在模拟位置应用列表里。
+    -->
+    <uses-permission
+        android:name="android.permission.ACCESS_MOCK_LOCATION"
+        tools:ignore="MockLocation" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

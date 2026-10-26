@@ -32,6 +32,20 @@ public class RouteEditorViewModel extends ViewModel {
     // 权限弹窗期间 Activity 可能重建，待启动参数放这里才不会丢（见 MainActivity.requestPermissionsThenStart）。
     private CompiledRoute pendingStartRoute;
     private RunConfig pendingStartConfig;
+    /** 权限弹窗期间待发送的单点坐标（0.1.1）。 */
+    private GeoPoint pendingSinglePoint;
+
+    public void setPendingSinglePoint(GeoPoint point) {
+        this.pendingSinglePoint = point;
+    }
+
+    public GeoPoint pendingSinglePoint() {
+        return pendingSinglePoint;
+    }
+
+    public void clearPendingSinglePoint() {
+        pendingSinglePoint = null;
+    }
 
     public void setPendingStart(CompiledRoute route, RunConfig config) {
         this.pendingStartRoute = route;
@@ -77,6 +91,18 @@ public class RouteEditorViewModel extends ViewModel {
 
     public boolean isPersisted() {
         return persisted;
+    }
+
+    /** 当前草稿是否闭合（默认闭合；关闭后运行期按“原路返回”计圈）。 */
+    public boolean isClosed() {
+        return draft.closed();
+    }
+
+    /** 切换闭合/开口；返回切换后的值。 */
+    public boolean toggleClosed() {
+        draft = draft.withClosed(!draft.closed());
+        dirty = true;
+        return draft.closed();
     }
 
     /** 添加节点；与最后一个节点重复或超过 5000 点时拒绝，返回是否成功。 */
@@ -172,7 +198,7 @@ public class RouteEditorViewModel extends ViewModel {
      */
     public CompiledRoute compileOrNull() {
         try {
-            return RouteCompiler.compile(draft.points());
+            return RouteCompiler.compile(draft.points(), draft.closed());
         } catch (InvalidRouteException e) {
             return null;
         }
@@ -188,9 +214,13 @@ public class RouteEditorViewModel extends ViewModel {
             return "已添加 1 个节点：至少需要 2 个不同节点才能运行";
         }
         try {
-            CompiledRoute route = RouteCompiler.compile(points);
-            return String.format(java.util.Locale.US, "%d 个节点 · 单圈 %.1f 米", points.size(),
-                    route.lapLengthMeters());
+            CompiledRoute route = RouteCompiler.compile(points, draft.closed());
+            if (draft.closed()) {
+                return String.format(java.util.Locale.US, "%d 个节点 · 闭合 · 单圈 %.1f 米",
+                        points.size(), route.lapLengthMeters());
+            }
+            return String.format(java.util.Locale.US, "%d 个节点 · 不闭合（原路返回）· 单圈 %.1f 米",
+                    points.size(), route.lapLengthMeters());
         } catch (InvalidRouteException e) {
             return e.getMessage() == null ? "路线无效" : e.getMessage();
         }

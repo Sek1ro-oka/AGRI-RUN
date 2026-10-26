@@ -110,4 +110,55 @@ public class RouteEditorViewModelTest {
         assertFalse(viewModel.isPersisted());
         assertEquals(0, viewModel.pointCount());
     }
+
+    @Test
+    public void toggleClosedChangesLapLengthAndPersistsFlag() {
+        viewModel.addPoint(new GeoPoint(30.0d, 120.0d));
+        viewModel.addPoint(new GeoPoint(30.0d, 120.001d));
+        viewModel.addPoint(new GeoPoint(30.001d, 120.001d));
+
+        CompiledRoute closed = viewModel.compileOrNull();
+        assertNotNull(closed);
+        assertTrue(viewModel.isClosed());
+        assertTrue(closed.closed());
+        assertTrue(viewModel.validationMessage().contains("闭合"));
+
+        boolean nowClosed = viewModel.toggleClosed();
+        assertFalse("切换后应变成不闭合", nowClosed);
+        assertTrue("切换闭合状态属于未保存修改", viewModel.isDirty());
+
+        CompiledRoute opened = viewModel.compileOrNull();
+        assertNotNull(opened);
+        assertFalse(opened.closed());
+        assertTrue("往返一圈一定比直接闭合更长",
+                opened.lapLengthMeters() > closed.lapLengthMeters());
+        assertTrue(viewModel.validationMessage().contains("原路返回"));
+        assertFalse(viewModel.toDefinition().closed());
+
+        assertTrue("再切一次应恢复闭合", viewModel.toggleClosed());
+        assertTrue(viewModel.toDefinition().closed());
+    }
+
+    @Test
+    public void loadKeepsOpenFlagFromDefinition() {
+        Instant now = Instant.parse("2026-10-26T12:00:00Z");
+        RouteDefinition route = new RouteDefinition("route-open", "不闭合路线",
+                Arrays.asList(new GeoPoint(30.0d, 120.0d), new GeoPoint(30.0d, 120.001d)),
+                false, now, now);
+        viewModel.load(route);
+        assertFalse(viewModel.isClosed());
+        CompiledRoute compiled = viewModel.compileOrNull();
+        assertNotNull(compiled);
+        assertFalse(compiled.closed());
+    }
+
+    @Test
+    public void pendingSinglePointIsClearedOnDemand() {
+        GeoPoint point = new GeoPoint(30.0d, 120.0d);
+        assertNull(viewModel.pendingSinglePoint());
+        viewModel.setPendingSinglePoint(point);
+        assertEquals(point, viewModel.pendingSinglePoint());
+        viewModel.clearPendingSinglePoint();
+        assertNull(viewModel.pendingSinglePoint());
+    }
 }

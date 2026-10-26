@@ -30,29 +30,30 @@
 | T21 | 地图网络失败 | 路线与引擎仍可用 | ⚠️ | 地图瓦片失败只影响底图，路线数据与引擎不依赖网络 |
 | T22 | 连续运行—停止 20 次 | 无残留任务/锁泄漏/服务僵尸 | ⚠️ | 每次运行独立 `MockLocationSession` 与 WakeLock，`cleanup()` 幂等 |
 | T23 | 5000 点路线 | 编辑与运行无 ANR，按距离查找不全量遍历 | ✅ 编译 / ⚠️ 真机 | `RouteCompilerTest` 校验 5000 点上限与 5001 点拒绝；`pointAt` 用前缀距离二分 |
-| T24 | 同包同签名覆盖安装 | 保留路线数据，版本号正确 | ⚠️ | `versionCode 1 / versionName 0.1.0`；升级脚本见 `docs/BUILD.md` |
+| T24 | 同包同签名覆盖安装 | 保留路线数据，版本号正确 | ⚠️ | `versionCode 2 / versionName 0.1.1`；可覆盖 0.1.0（versionCode 1）并保留已存路线 |
 
-## 自动化测试清单（95 个）
+## 自动化测试清单（107 个）
 
 | 模块 | 套件 | 用例数 |
 | --- | --- | --- |
 | route-core | `GeoMathTest` | 9 |
-| route-core | `RouteCompilerTest` | 12 |
+| route-core | `RouteCompilerTest` | 17 |
 | route-core | `RouteEngineTest` | 13 |
 | route-core | `LoopStateMachineTest` | 7 |
 | route-core | `TickGapPolicyTest` | 10 |
 | simulation-core | `MockLocationSessionTest` | 16 |
 | app | `RouteJsonCodecTest` | 9 |
 | app | `RouteRepositoryTest` | 10 |
-| app | `RouteEditorViewModelTest` | 9 |
-| 合计 | 9 个套件 | **95** |
+| app | `RouteEditorViewModelTest` | 12 |
+| app | `RunRequestTest` | 4 |
+| 合计 | 10 个套件 | **107** |
 
 执行命令与结果：
 
 ```powershell
 Set-Location E:\agri-run\route-workshop
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
-# BUILD SUCCESSFUL；51 + 16 + 28 = 95 个用例，0 失败
+# BUILD SUCCESSFUL；56 + 16 + 35 = 107 个用例，0 失败
 ```
 
 ## 如何把「未实测」变成「已实测」
@@ -61,3 +62,37 @@ Set-Location E:\agri-run\route-workshop
 2. 先跑 T15：装定位探针 → 开始监听 → 在路线工坊里开始 → 探针应显示坐标移动且标注「模拟位置」。
 3. 按 T04/T05/T07/T16/T17/T18/T20/T22 顺序各跑一遍，记录实际耗时与截图。
 4. 全部结果回填本文件对应行的「证据」列，并把状态从 ⚠️ 改为 ✅ 或 ❌。
+
+## 0.1.1 新增用例与检查项
+
+### 自动化（本版新增 12 个，合计 107）
+
+| 套件 | 用例 | 覆盖的场景 |
+| --- | --- | --- |
+| `RouteCompilerTest`（17） | `compileOpen_threePoints_lapIsTwiceTheOneWayPath` | 3 点不闭合：4 个顶点；单圈 = 2 × 单程；单程处位于终点、整圈回到起点 |
+|  | `compileOpen_square_doesNotCloseThePathDirectly` | 正方形不闭合：6 个顶点；比闭合更长 |
+|  | `compileOpen_twoPoints_lapIsTwiceTheStraightDistance` | 两点不闭合 |
+|  | `compileOpen_tooShort_throws` / `compileOpen_singlePoint_throws` | 往返不足 1 米、单点均拒绝 |
+| `RouteJsonCodecTest`（9） | `keepsOpenRouteFlagAndCompilesAsOutAndBack` | `closed=false` 往返编解码并可编译 |
+| `RouteEditorViewModelTest`（12） | `toggleClosedChangesLapLengthAndPersistsFlag` | 切换闭合：标记 dirty、圈长变长、文案含「原路返回」、`toDefinition().closed()` 同步 |
+|  | `loadKeepsOpenFlagFromDefinition` | 载入不闭合路线后仍不闭合 |
+|  | `pendingSinglePointIsClearedOnDemand` | 单点请求的暂存与清理 |
+| `RunRequestTest`（4，新增套件） | `routeRequestCarriesRouteAndConfig` / `singlePointRequestHasPointAndNoRoute` / `singlePointRequestRejectsNull` / `eachRequestGetsItsOwnId` | 两种请求模式 |
+
+### 需要真机确认的新项（0.1.1）
+
+| 编号 | 场景 | 期望 | 状态 |
+| --- | --- | --- | --- |
+| T25 | 开发者选项「选择模拟位置信息应用」 | 列表里出现「路线工坊」（0.1.1 清单声明 `ACCESS_MOCK_LOCATION`） | ⚠️ 未实测（已用 aapt2 确认 APK 内含该权限） |
+| T26 | 地图加载 | 打开即见浅灰底 + 「地图加载中…」；能出瓦片；切到不可用源时 10 秒内底部出现原因 | ⚠️ 未实测 |
+| T27 | 不闭合路线 | 勾掉「闭合路线」后画 3 点：单圈 ≈ 2 × 单程；跑起来到终点后原路返回，完成圈数按往返计 | ⚠️ 未实测（数学部分已单测） |
+| T28 | 单点位置 | 菜单「发送单点位置」→ 输入坐标 → 通知栏显示「单点位置」；定位探针收到该坐标且速度 0，停止后不再更新 | ⚠️ 未实测 |
+
+### 执行命令（0.1.1）
+
+```powershell
+$env:JAVA_HOME='D:\Java\jdk-21'; $env:ANDROID_HOME='E:\Android\Sdk'
+Set-Location E:\agri-run\route-workshop
+.\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
+# BUILD SUCCESSFUL：56 + 16 + 35 = 107 个用例，0 失败
+```

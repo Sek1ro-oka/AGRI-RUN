@@ -39,6 +39,24 @@
     <string name="menu_settings_check">设置检查</string>
     <string name="menu_diagnostics">诊断信息</string>
 
+    <!-- 0.1.1 新增：单点位置、闭合开关、瓦片源 -->
+    <string name="menu_single_point">发送单点位置</string>
+    <string name="menu_toggle_closed">闭合路线</string>
+    <string name="menu_map_source">地图瓦片源</string>
+    <string name="map_status_loading">地图加载中…</string>
+    <string name="dialog_single_point_title">发送单点位置</string>
+    <string name="dialog_single_point_message">前台服务会持续把系统模拟位置固定在这个坐标（速度 0），直到你点「停止」。</string>
+    <string name="hint_latitude">纬度（-90 ~ 90）</string>
+    <string name="hint_longitude">经度（-180 ~ 180）</string>
+    <string name="action_send">发送</string>
+    <string name="toast_single_point_started">已开始发送单点位置</string>
+    <string name="toast_single_point_invalid">经纬度不合法：纬度 -90~90、经度 -180~180</string>
+    <string name="toast_single_point_stop_first">已有运行任务，请先停止再发送单点位置</string>
+    <string name="hint_closed_on">闭合：最后一点会连回起点</string>
+    <string name="hint_closed_off">不闭合：运行到终点后沿原路返回，按往返计圈</string>
+    <string name="hint_single_point_running">单点位置发送中（速度 0）</string>
+    <string name="tile_source_title">地图瓦片源</string>
+
     <!-- 设置检查页 -->
     <string name="settings_title">设置检查</string>
     <string name="settings_recheck">重新检查</string>

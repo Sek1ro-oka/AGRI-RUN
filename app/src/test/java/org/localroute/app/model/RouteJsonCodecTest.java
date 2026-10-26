@@ -8,6 +8,8 @@ import static org.junit.Assert.fail;
 
 import org.json.JSONException;
 import org.junit.Test;
+import org.localroute.core.CompiledRoute;
+import org.localroute.core.GeoMath;
 import org.localroute.core.GeoPoint;
 import org.localroute.core.InvalidRouteException;
 import org.localroute.core.RouteCompiler;
@@ -53,9 +55,21 @@ public class RouteJsonCodecTest {
     }
 
     @Test
-    public void rejectsClosedFalse() {
+    public void keepsOpenRouteFlagAndCompilesAsOutAndBack() {
+        // 0.1.1 起 closed=false 是合法状态：路线沿原路返回，不再被拒绝。
         String json = replaceJson(encode(sample()), "\"closed\"", "true", "false");
-        expectFormatError(json);
+        try {
+            RouteDefinition decoded = RouteJsonCodec.decode(json);
+            assertFalse("closed=false 应原样保留", decoded.closed());
+            CompiledRoute compiled = RouteCompiler.compile(decoded.points(), decoded.closed());
+            assertFalse(compiled.closed());
+            assertEquals(4, compiled.vertexCount());
+            double oneWay = GeoMath.distanceMeters(decoded.points().get(0), decoded.points().get(1))
+                    + GeoMath.distanceMeters(decoded.points().get(1), decoded.points().get(2));
+            assertEquals("往返一圈 = 单程的两倍", 2 * oneWay, compiled.lapLengthMeters(), 0.05);
+        } catch (JSONException | RouteJsonCodec.RouteFormatException | InvalidRouteException e) {
+            fail("不闭合路线应可保存并编译：" + e);
+        }
     }
 
     @Test

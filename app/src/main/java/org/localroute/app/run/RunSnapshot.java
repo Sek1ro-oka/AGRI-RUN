@@ -31,6 +31,7 @@ public final class RunSnapshot {
     private final String errorMessage;
     private final List<String> publishedProviders;
     private final long updatedAtMillis;
+    private final boolean singlePoint;
 
     private RunSnapshot(Builder builder) {
         this.runId = builder.runId;
@@ -48,6 +49,7 @@ public final class RunSnapshot {
         this.errorMessage = builder.errorMessage;
         this.publishedProviders = Collections.unmodifiableList(new ArrayList<>(builder.publishedProviders));
         this.updatedAtMillis = builder.updatedAtMillis > 0 ? builder.updatedAtMillis : System.currentTimeMillis();
+        this.singlePoint = builder.singlePoint;
     }
 
     public static Builder builder(RunState state) {
@@ -127,6 +129,11 @@ public final class RunSnapshot {
         return state == RunState.STARTING || state == RunState.RUNNING || state == RunState.PAUSED;
     }
 
+    /** 是否是「发送单点位置」任务（没有单圈与圈数概念）。 */
+    public boolean singlePoint() {
+        return singlePoint;
+    }
+
     public boolean hasPosition() {
         return state != RunState.IDLE && state != RunState.READY;
     }
@@ -147,6 +154,9 @@ public final class RunSnapshot {
     }
 
     public String loopsText() {
+        if (singlePoint) {
+            return "单点";
+        }
         int target = targetLoops <= 0 ? 0 : targetLoops;
         return completedLoops + " / " + target;
     }
@@ -186,6 +196,7 @@ public final class RunSnapshot {
         private String errorMessage;
         private List<String> publishedProviders = new ArrayList<>();
         private long updatedAtMillis;
+        private boolean singlePoint;
 
         private Builder(RunState state) {
             this.state = state;
@@ -250,6 +261,11 @@ public final class RunSnapshot {
 
         public Builder updatedAtMillis(long value) {
             this.updatedAtMillis = value;
+            return this;
+        }
+
+        public Builder singlePoint(boolean value) {
+            this.singlePoint = value;
             return this;
         }
 

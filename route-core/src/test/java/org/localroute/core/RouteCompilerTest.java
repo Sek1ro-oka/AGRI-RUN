@@ -1,6 +1,7 @@
 package org.localroute.core;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -156,5 +157,64 @@ public class RouteCompilerTest {
         assertEquals(route.pointAt(10d), route.pointAt(10d - lap));
         assertEquals(METERS_PER_DEGREE_LAT * 0.001d, GeoMath.distanceMeters(
                 route.pointAt(0d), route.pointAt(lap / 4d)), 1.0d);
+    }
+
+    // ------------------------------------------------------------ 不闭合（原路返回）
+
+    @Test
+    public void compileOpen_threePoints_lapIsTwiceTheOneWayPath() throws Exception {
+        List<GeoPoint> points = Arrays.asList(squarePoint(0), squarePoint(1), squarePoint(2));
+        CompiledRoute route = RouteCompiler.compile(points, false);
+
+        assertFalse("不闭合路线应保留标记", route.closed());
+        assertEquals("3 个点 + 回程 1 个折返点", 4, route.vertexCount());
+        assertEquals(3, route.pathPointCount());
+        double oneWay = GeoMath.distanceMeters(points.get(0), points.get(1))
+                + GeoMath.distanceMeters(points.get(1), points.get(2));
+        assertEquals(2d * oneWay, route.lapLengthMeters(), 0.05d);
+        // 走到单程长度时位于最后一个点，随后原路折返，走满一圈回到起点。
+        assertTrue(route.pointAt(oneWay).isNear(points.get(2), 1.0d));
+        assertTrue(route.pointAt(route.lapLengthMeters() - 1e-6d).isNear(points.get(0), 1.0d));
+    }
+
+    @Test
+    public void compileOpen_square_doesNotCloseThePathDirectly() throws Exception {
+        List<GeoPoint> square = square();
+        CompiledRoute opened = RouteCompiler.compile(square, false);
+        CompiledRoute closed = RouteCompiler.compile(square, true);
+
+        double oneWay = 0d;
+        for (int i = 0; i < square.size() - 1; i++) {
+            oneWay += GeoMath.distanceMeters(square.get(i), square.get(i + 1));
+        }
+        assertEquals(2d * oneWay, opened.lapLengthMeters(), 0.05d);
+        assertEquals("4 个点 + 回程 2 个折返点，末段由闭合边回到起点", 6, opened.vertexCount());
+        assertTrue("往返一圈一定比直接闭合更长",
+                opened.lapLengthMeters() > closed.lapLengthMeters());
+    }
+
+    @Test
+    public void compileOpen_tooShort_throws() {
+        GeoPoint a = new GeoPoint(0d, 0d);
+        GeoPoint b = new GeoPoint(0d, 0.000003d);
+        InvalidRouteException exception = assertThrows(InvalidRouteException.class,
+                () -> RouteCompiler.compile(Arrays.asList(a, b), false));
+        assertEquals(RunErrorCode.ROUTE_INVALID, exception.errorCode());
+    }
+
+    @Test
+    public void compileOpen_singlePoint_throws() {
+        assertThrows(InvalidRouteException.class,
+                () -> RouteCompiler.compile(Collections.singletonList(squarePoint(0)), false));
+    }
+
+    @Test
+    public void compileOpen_twoPoints_lapIsTwiceTheStraightDistance() throws Exception {
+        GeoPoint a = new GeoPoint(0d, 0d);
+        GeoPoint b = new GeoPoint(0d, 0.001d);
+        CompiledRoute route = RouteCompiler.compile(Arrays.asList(a, b), false);
+        assertFalse(route.closed());
+        assertEquals(2, route.vertexCount());
+        assertEquals(2d * GeoMath.distanceMeters(a, b), route.lapLengthMeters(), 1e-6d);
     }
 }

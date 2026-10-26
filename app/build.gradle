@@ -21,8 +21,8 @@ android {
         applicationId 'org.localroute.app'
         minSdk 29
         targetSdk 35
-        versionCode 1
-        versionName '0.1.0'
+        versionCode 2
+        versionName '0.1.1'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         // 不想被语言分包影响：本项目只有中文资源
         resourceConfigurations += ['zh', 'en']

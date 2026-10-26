@@ -1,10 +1,11 @@
-# 测试结果报告 — 路线工坊 0.1.0
+# 测试结果报告 — 路线工坊 0.1.1
 
 - 测试日期：2026-10-26（Asia/Hong_Kong）
-- 被测版本：`org.localroute.app` versionName 0.1.0 / versionCode 1（release，本地自签名）
+- 被测版本：`org.localroute.app` versionName 0.1.1 / versionCode 2（release，本地自签名）
 - 测试主机：Windows 11，CPU/内存见 `docs/environment.md`
 - 构建工具链：JDK 21.0.3（`D:\Java\jdk-21`）、Gradle 8.11.1、AGP 8.9.2、Android SDK 35、build-tools 35.0.0
-- **测试机：无。本轮没有任何真机或模拟器接入**（`adb devices -l` 输出只有 `List of devices attached`，见 `evidence/adb-devices.txt`）。
+- **测试机：无自动化设备接入**。用户在真我 GT Neo5 上装了 0.1.0 并反馈了四个问题（地图黑屏、闭合不可选、模拟位置应用列表缺失、没有单点发送），
+  0.1.1 就是针对这四条做的修改；但**本轮仍没有在真机上复验**，`adb devices -l` 依旧只有表头（见 `evidence/adb-devices.txt`）。
 
 > 本报告只写实际执行过的检查。凡是需要真机才能得出的结论，一律标注「未实测」，**不代替用户做真机结论**。
 
@@ -23,42 +24,44 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 | 模块 | 测试套件 | 用例数 | 失败 | 覆盖内容 |
 | --- | --- | --- | --- | --- |
 | route-core | `GeoMathTest` | 9 | 0 | 1 度纬度≈111 194.9 m、方位角 0/90/180/270、球面插值中点、跨 ±180° 插值、经度归一化、坐标范围校验（纬度 ±90、经度 ±180、NaN/Infinity 拒绝） |
-| route-core | `RouteCompilerTest` | 12 | 0 | 0 点/1 点/全重复点抛 `ROUTE_INVALID`、正方形单圈=周长、两点闭合单圈=2×直线距离、相邻重复点去重、重复闭合终点去重不多算零长边、单圈<1 m 拒绝、5000 点通过 / 5001 点拒绝、prefix 距离单调 |
+| route-core | `RouteCompilerTest` | 17 | 0 | 0 点/1 点/全重复点抛 `ROUTE_INVALID`、正方形单圈=周长、两点闭合单圈=2×直线距离、相邻重复点去重、重复闭合终点去重不多算零长边、单圈<1 m 拒绝、5000 点通过 / 5001 点拒绝、prefix 距离单调；**不闭合**：3 点往返单圈=2×单程且折返点正确、正方形不闭合比闭合长、两点往返、往返不足 1 米与单点均拒绝 |
 | route-core | `RouteEngineTest` | 13 | 0 | 1 圈恰好完成且位置精确回起点、5 圈逐圈 +1 不越界、4.5 圈不多算、超时不多走、完成容差两侧（差 2e-6 m 不完成、进入 1e-6 m 视为完成）、单圈恰好 1 米附近（略大通过 / 0.8 米拒绝）、暂停 30 秒不计时、250/500/1000 ms 采样结果一致、调度卡顿 6 秒后距离连续、跨 ±180° 取点、`RunConfig` 边界（0.49/60.1/0/1001/99 ms 拒绝）、时长格式化 |
 | route-core | `LoopStateMachineTest` | 7 | 0 | 正常迁移链 IDLE→READY→STARTING→RUNNING→PAUSED→RUNNING→COMPLETED→READY、非法迁移抛异常、`stop()` 幂等、`fail()` 记录错误码且不覆盖、COMPLETED 下 stop 为空操作 |
 | route-core | `TickGapPolicyTest` | 10 | 0 | 默认上限 5 秒、没有上次 tick 不暂停、恰好 5 秒不暂停、5 秒 + 1 ns 暂停、时钟回退不暂停、自定义上限、原因文案含秒数与「自动暂停/继续」、负间隔不出负数、整秒与一位小数格式化、非正上限拒绝 |
 | simulation-core | `MockLocationSessionTest` | 16 | 0 | gps→network→fused 创建顺序、不支持项跳过并记录、可选 provider 创建失败只跳过不影响 gps、可选 provider 启用失败被撤掉并跳过、gps 启用失败整体回滚、上次崩溃残留的 provider 先清理再创建、`SecurityException` 映射为 `MOCK_APP_NOT_SELECTED`、重复 start 不重建、publish 写入全部 provider 且字段完整、publish 失败映射 `PUBLISH_FAILED`、未 start 时 publish 抛异常、stop 只移除本次创建且幂等、remove 抛异常不外泄、候选必须含 gps、stop 先停用再移除（部分 ROM 只认停用） |
-| app | `RouteJsonCodecTest` | 9 | 0 | 编解码往返、字段与顺序、单点草稿可保存但编译报 `ROUTE_INVALID`、`closed:false` 拒绝、未知 `schemaVersion` 拒绝、空 id 拒绝、坐标越界拒绝、超 5000 点拒绝 |
+| app | `RouteJsonCodecTest` | 9 | 0 | 编解码往返、字段与顺序、单点草稿可保存但编译报 `ROUTE_INVALID`、`closed:false` 往返保留并编译成往返路线、未知 `schemaVersion` 拒绝、空 id 拒绝、坐标越界拒绝、超 5000 点拒绝 |
 | app | `RouteRepositoryTest` | 10 | 0 | 保存/加载往返、列表按更新时间倒序、id 生成格式、非法 id 拒绝、删除幂等、损坏文件移入 `corrupt/` 保留原文件名且不被覆盖、文件名为 A 而内容 id 为 B 时被隔离不进列表、原子写不残留 `.tmp` |
-| app | `RouteEditorViewModelTest` | 9 | 0 | 加点/撤销/清空/闭合、点数上限、单圈长度随点变化、草稿（<2 点）不可运行、手动经纬度输入解析（先纬后经、非法值拒绝）、速度与圈数校验、保存后重新加载名字与点 |
-| **合计** | 9 个套件 | **95** | **0** | 失败 0、错误 0、跳过 0 |
+| app | `RouteEditorViewModelTest` | 12 | 0 | 加点/撤销/清空/闭合、点数上限、单圈长度随点变化、草稿（<2 点）不可运行、手动经纬度输入解析（先纬后经、非法值拒绝）、速度与圈数校验、保存后重新加载名字与点；**闭合开关**：切换后 dirty、圈长变长、文案含「原路返回」、`toDefinition().closed()` 同步、载入不闭合路线保持不闭合；单点请求暂存与清理 |
+| app | `RunRequestTest`（新增） | 4 | 0 | 路线请求携带路线与配置、单点请求无路线且速度默认、单点拒绝 null、每个请求有独立 id |
+| **合计** | 10 个套件 | **107** | **0** | 失败 0、错误 0、跳过 0 |
 
 ## 2. 静态检查（lint）
 
-`lintDebug` 对两个模块均通过（`abortOnError true`）：**0 error**。
+`lintDebug` 对两个模块均通过（`abortOnError true`）：**0 error / 15 warning**（app），探针模块 0 error。
 
 保留的 warning（均不阻塞，已在 `KNOWN_ISSUES` 记录）：
 
 - `LogNotTimber`：项目未引入 Timber，属模板规则提示。
 - `ObsoleteSdkInt`：若干 `minSdk 29` 下恒真的分支，为保证可读性未删除。
-- `DataExtractionRules`、`DisableBaselineAlignment`、`SetTextI18n`（`SettingsCheckActivity.java:103` 用 `setText` 拼状态文本）。
-- `UnusedResources`：`colors.xml` 中预留给地图线的 4 个颜色。
+- `DataExtractionRules`、`DisableBaselineAlignment`、`SetTextI18n`（`SettingsCheckActivity` 用 `setText` 拼状态文本）。
 
-`WrongConstant` 与 `CoarseFineLocation` 两个 error 级问题已在交付前修复：旧版 `addTestProvider` 重载按 API 31 签名校验，使用处已加 `@SuppressLint("WrongConstant")` 并注明原因；探针补 `ACCESS_COARSE_LOCATION`。
+已修复的 error 级问题：`WrongConstant`（旧 `addTestProvider` 重载按 API 31 校验，使用处加 `@SuppressLint` 并注明原因）、`CoarseFineLocation`（探针补 `ACCESS_COARSE_LOCATION`）、
+`MockLocation`（0.1.1 确实需要声明 `ACCESS_MOCK_LOCATION`，已加 `tools:ignore` 并写明理由）。未使用资源（`map_status_failed*`、4 个预留颜色）已删除，`UnusedResources` 警告清零。
 
 ## 3. 构建产物与签名
 
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
-| `路线工坊-0.1.0-release.apk` | 32.89 MB | release，本地自签名；只含 `arm64-v8a`/`armeabi-v7a` 原生库 |
-| `定位探针-0.1.0-debug.apk` | 10.59 MB | 独立包名 `org.localroute.probe`，debug 签名，用于验证系统位置 |
+| `路线工坊-0.1.1-release.apk` | 32.91 MB | release，本地自签名；只含 `arm64-v8a`/`armeabi-v7a` 原生库 |
+| `定位探针-0.1.0-debug.apk` | 10.59 MB | 独立包名 `org.localroute.probe`，debug 签名，用于验证系统位置（本版未改动） |
 | `source.zip` | 约 0.2 MB | `git archive HEAD` 生成；源码快照对应的提交见 `git log -1`（归档内容即该提交的树） |
 
 - `apksigner verify --print-certs`：签名有效，证书 `CN=Route Workshop Local`，SHA-256 `14f0286f4624de37fc1a013f9a15514ac04981bb1f222b77b3ce7dbb38f02a9c`。
-- `aapt2 dump badging`：`package org.localroute.app`、`versionCode 1`、`versionName 0.1.0`、`minSdk 29`、`targetSdk 35`、应用名「路线工坊」、入口 `org.localroute.app.ui.MainActivity`。
+- `aapt2 dump badging`：`package org.localroute.app`、`versionCode 2`、`versionName 0.1.1`、`minSdk 29`、`targetSdk 35`、应用名「路线工坊」、入口 `org.localroute.app.ui.MainActivity`；
+  权限清单里已包含 `android.permission.ACCESS_MOCK_LOCATION`（这就是修好“模拟位置应用列表里没有本应用”的关键）。
 - 探针包名 `org.localroute.probe`，权限只有 FINE/COARSE 定位。
 
-## 4. 任务书 T01—T24 逐条对照
+## 4. 任务书 T01—T24 与 0.1.1 新增 T25—T28 逐条对照
 
 图例：**自动化** = 已被 JVM 单元测试覆盖并通过；**部分** = 逻辑层有覆盖、系统集成层未验证；**未实测** = 需要真机，本轮没有设备。
 
@@ -88,16 +91,21 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 | T22 | 连续运行—停止 20 次 | 未验证 | 未实测 |
 | T23 | 5000 点无 ANR | `RouteCompilerTest` 覆盖 5000 点编译；界面渲染与 `pointAt` 二分查找未在真机计时 | 部分 |
 | T24 | 覆盖安装保留数据 | 未验证 | 未实测 |
+| T25 | 开发者选项的模拟位置应用列表里出现本应用 | 0.1.1 清单声明 `ACCESS_MOCK_LOCATION`；`aapt2 dump badging` 已确认 APK 里含该权限（AOSP `AppPicker` 按 `requestedPermissions` 过滤） | 部分（打包已核实，列表未真机确认） |
+| T26 | 地图可见与失败可诊断 | 三种瓦片源 + 10 秒看门狗 + 底部状态条 + 浅灰底图；无网络时手动输入/单点发送仍可用 | 未实测 |
+| T27 | 不闭合路线的圈长与折返 | `RouteCompilerTest`（5 个新用例）+ `RouteEditorViewModelTest`（2 个）+ `RouteJsonCodecTest`（1 个）覆盖数学与持久化；界面与真机行为未验证 | 部分（逻辑层通过） |
+| T28 | 单点位置发送 | `RunRequestTest`（4 个用例）覆盖单点请求构造；服务端固定坐标输出与通知行为未验证 | 部分（逻辑层通过） |
 
-汇总：**自动化通过 10 条**（T01—T06、T10、T12、T13 及 T04 相关边界）、**部分通过 9 条**（T07、T08、T09、T11、T14、T19、T20、T23 等）、**未实测 5 条**（T15—T18、T21、T22、T24 中需真机项）。
+汇总：**自动化通过 10 条**（T01—T06、T10、T12、T13 及 T04 相关边界）、**部分通过 12 条**（T07、T08、T09、T11、T14、T19、T20、T23、T25、T27、T28 等）、**未实测 6 条**（T15—T18、T21、T22、T24、T26 中需真机项）。
 
 ## 5. 怎么把「未实测」变成「已实测」
 
-1. 手机打开「开发者选项 → 选择模拟位置信息应用」，选中「路线工坊」。
-2. 安装 `路线工坊-0.1.0-release.apk`，授予定位权限与通知权限，确认系统定位开关开启。
+1. 手机打开「开发者选项 → 选择模拟位置信息应用」，选中「路线工坊」（0.1.1 才会出现在列表里）。
+2. 安装 `路线工坊-0.1.1-release.apk`，授予定位权限与通知权限，确认系统定位开关开启。
 3. 按 `README_安装与使用.md` 画一条路线（或手动输入 `samples/` 里的合成坐标），速度 9 km/h、1 圈，点「开始」。
 4. 同时安装 `定位探针-0.1.0-debug.apk`，在探针里点「开始监听」，应看到每秒约 2 条 `模拟位置` 标记的坐标，且沿路线移动 → 即 T15 通过。
-5. 依次执行 T16（锁屏 10 分钟）、T17（通知按钮）、T18（旋转）、T22（连停 20 次）、T24（覆盖安装）并记录实际现象。
+5. 依次执行 T16（锁屏 10 分钟）、T17（通知按钮）、T18（旋转）、T22（连停 20 次）、T24（覆盖安装）、
+   T25（列表出现本应用）、T26（地图黑屏排查与换源）、T27（不闭合往返）、T28（单点位置）并记录实际现象。
 
 ## 6. 本轮未做的事（如实说明）
 

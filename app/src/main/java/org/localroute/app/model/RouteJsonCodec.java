@@ -94,10 +94,7 @@ public final class RouteJsonCodec {
         Instant createdAt = parseInstant(root.optString("createdAt", ""));
         Instant updatedAt = parseInstant(root.optString("updatedAt", ""));
         boolean closed = root.optBoolean("closed", true);
-        if (!closed) {
-            throw new RouteFormatException("本项目只支持闭合路线，文件却声明 closed=false");
-        }
-        return new RouteDefinition(id, name, points,
+        return new RouteDefinition(id, name, points, closed,
                 createdAt == null ? Instant.now() : createdAt,
                 updatedAt == null ? (createdAt == null ? Instant.now() : createdAt) : updatedAt);
     }

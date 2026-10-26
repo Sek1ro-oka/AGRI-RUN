@@ -91,6 +91,8 @@ public class SimulationService extends Service {
     private MockLocationSession session;
     private org.localroute.core.ActiveElapsedClock clock;
     private RouteEngine.Progress lastProgress;
+    /** 单点模式要固定发送的坐标；路线模式为 null。 */
+    private org.localroute.core.GeoPoint singlePoint;
     private long lastElapsedMs;
     private long lastNotificationAt;
     private long lastTickNanos;
@@ -255,6 +257,7 @@ public class SimulationService extends Service {
         request = pending;
         route = pending.route();
         config = pending.config();
+        singlePoint = pending.singlePoint();
         runId = pending.runId();
         routeName = pending.routeName();
         clock = new org.localroute.core.ActiveElapsedClock();
@@ -288,6 +291,11 @@ public class SimulationService extends Service {
         DiagnosticLog.info("测试 provider 已创建：" + publishedProviders
                 + (result.skippedProviders().isEmpty() ? "" : "，跳过：" + result.skippedProviders()));
 
+        if (singlePoint != null) {
+            startSinglePointRun();
+            return;
+        }
+
         RouteEngine.Progress first = RouteEngine.progressAt(route, config, 0L);
         try {
             session.publish(fixFor(first, 0d, SystemClock.elapsedRealtimeNanos()));
@@ -310,8 +318,33 @@ public class SimulationService extends Service {
         scheduleNextTick();
     }
 
-    // ---------------------------------------------------------------- 调度循环
+    /**
+     * 单点模式启动：只提交一次目标坐标，成功后进入 RUNNING，之后每个 tick 重新提交同一坐标。
+     *
+     * <p>没有路线、没有单圈、没有圈数；速度固定 0，有效用时照常累计。
+     */
+    private void startSinglePointRun() {
+        long now = SystemClock.elapsedRealtimeNanos();
+        try {
+            session.publish(fixForPoint(singlePoint, now));
+            DiagnosticLog.fix("单点位置首次提交 " + singlePoint.format());
+        } catch (MockProviderException e) {
+            failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(), e.getMessage());
+            return;
+        }
+        clock.reset();
+        clock.start(now);
+        lastProgress = null;
+        lastElapsedMs = 0L;
+        lastTickNanos = now;
+        stateMachine.providerReady();
+        acquireWakeLock();
+        publishSnapshot(RunState.RUNNING, null);
+        updateNotification(RunState.RUNNING, null, false);
+        scheduleNextTick();
+    }
 
+    // ---------------------------------------------------------------- 调度循环
     private void doTick() {
         if (stopped || request == null) {
             return;
@@ -340,8 +373,27 @@ public class SimulationService extends Service {
             return;
         }
         long elapsed = clock.elapsedNanos(now);
-        RouteEngine.Progress progress = RouteEngine.progressAt(route, config, elapsed);
         boolean paused = state == RunState.PAUSED;
+
+        if (singlePoint != null) {
+            // 单点模式：位置与速度都不变，只是按节奏重复提交，保持系统里的模拟位置“活着”。
+            try {
+                session.publish(fixForPoint(singlePoint, now));
+            } catch (MockProviderException e) {
+                failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(), e.getMessage());
+                return;
+            }
+            DiagnosticLog.fix(String.format(Locale.US, "单点 %s 用时=%dms", singlePoint.format(),
+                    elapsed / 1_000_000L));
+            lastElapsedMs = elapsed / 1_000_000L;
+            lastTickNanos = now;
+            publishSnapshot(paused ? RunState.PAUSED : RunState.RUNNING, null);
+            updateNotification(paused ? RunState.PAUSED : RunState.RUNNING, null, false);
+            scheduleNextTick();
+            return;
+        }
+
+        RouteEngine.Progress progress = RouteEngine.progressAt(route, config, elapsed);
         double speed = paused ? 0d : progress.speedMps();
 
         try {
@@ -514,6 +566,7 @@ public class SimulationService extends Service {
         request = null;
         route = null;
         config = null;
+        singlePoint = null;
     }
 
     // ---------------------------------------------------------------- 辅助
@@ -530,6 +583,12 @@ public class SimulationService extends Service {
     private MockFix fixFor(RouteEngine.Progress progress, double speedMps, long elapsedRealtimeNanos) {
         return new MockFix(progress.latitude(), progress.longitude(),
                 FIX_ALTITUDE_METERS, FIX_ACCURACY_METERS, speedMps, progress.bearingDegrees(),
+                System.currentTimeMillis(), elapsedRealtimeNanos);
+    }
+
+    private MockFix fixForPoint(org.localroute.core.GeoPoint point, long elapsedRealtimeNanos) {
+        return new MockFix(point.latitude(), point.longitude(),
+                FIX_ALTITUDE_METERS, FIX_ACCURACY_METERS, 0d, 0d,
                 System.currentTimeMillis(), elapsedRealtimeNanos);
     }
 
@@ -590,6 +649,18 @@ public class SimulationService extends Service {
                 .targetLoops(config == null ? 0 : config.loopCount())
                 .activeElapsedMs(lastElapsedMs)
                 .publishedProviders(publishedProviders);
+        if (singlePoint != null) {
+            // 单点模式没有路线几何：单圈、距离、圈数都固定 0，界面用 singlePoint 标记走另一套文案。
+            builder.singlePoint(true)
+                    .position(singlePoint.latitude(), singlePoint.longitude())
+                    .bearingDegrees(0d)
+                    .speedMps(0d)
+                    .lapLengthMeters(0d)
+                    .distanceMeters(0d)
+                    .completedLoops(0)
+                    .targetLoops(0);
+            return builder;
+        }
         if (route != null) {
             builder.lapLengthMeters(route.lapLengthMeters());
         }
@@ -648,7 +719,11 @@ public class SimulationService extends Service {
         }
         lastNotificationAt = now;
         String text;
-        if (progress == null) {
+        if (progress == null && singlePoint != null) {
+            text = String.format(Locale.US, "%s单点 %s · %s",
+                    stateText(state), singlePoint.format(),
+                    org.localroute.core.ActiveElapsedClock.formatDuration(lastElapsedMs * 1_000_000L));
+        } else if (progress == null) {
             text = state == RunState.PAUSED ? "已暂停" : "正在准备模拟位置…";
         } else {
             text = String.format(Locale.US, "%s · 圈 %d/%d · %s · %s",

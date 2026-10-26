@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.view.MenuItem;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -86,8 +87,19 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         mapController.registerGestureListener();
+        // 地图加载失败时把原因显示在底部，避免用户只看到一块不动的底图。
+        mapController.setStatusListener(message -> {
+            if (message == null) {
+                binding.mapStatus.setVisibility(android.view.View.GONE);
+            } else {
+                binding.mapStatus.setText(message);
+                binding.mapStatus.setVisibility(android.view.View.VISIBLE);
+            }
+        });
 
         binding.toolbar.setOnMenuItemClickListener(this::onMenuItemClick);
+        binding.toolbar.getMenu().findItem(R.id.action_toggle_closed)
+                .setChecked(viewModel.isClosed());
         binding.buttonUndo.setOnClickListener(v -> {
             if (viewModel.undo() != null) {
                 refreshDraft(false);
@@ -181,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void refreshDraft(boolean fit) {
         List<GeoPoint> points = viewModel.points();
-        mapController.renderRoute(points);
+        mapController.renderRoute(points, viewModel.isClosed());
         if (fit) {
             mapController.fitRoute(points);
         }
@@ -197,16 +209,22 @@ public class MainActivity extends AppCompatActivity {
                 ? String.format(Locale.US, "%.1f km/h", snapshot.speedKmh())
                 : "—");
         binding.textDistance.setText(snapshot.distanceMeters() > 0 ? snapshot.distanceText() : "—");
-        binding.textLoops.setText(snapshot.targetLoops() > 0 ? snapshot.loopsText() : "—");
+        binding.textLoops.setText(snapshot.targetLoops() > 0 || snapshot.singlePoint()
+                ? snapshot.loopsText() : "—");
         binding.textPosition.setText(snapshot.positionText());
         binding.textProviders.setText(snapshot.providersText());
 
-        double lap = snapshot.lapLengthMeters();
-        if (lap <= 0) {
+        double lap = snapshot.singlePoint() ? 0d : snapshot.lapLengthMeters();
+        if (lap <= 0 && !snapshot.singlePoint()) {
             CompiledRoute draftRoute = viewModel.compileOrNull();
             lap = draftRoute == null ? 0d : draftRoute.lapLengthMeters();
         }
         binding.textLap.setText(lap > 0 ? RunSnapshot.formatMeters(lap) : "—");
+
+        android.view.MenuItem closedItem = binding.toolbar.getMenu().findItem(R.id.action_toggle_closed);
+        if (closedItem != null) {
+            closedItem.setChecked(viewModel.isClosed());
+        }
 
         boolean active = snapshot.isActive();
         binding.buttonStart.setEnabled(!active);
@@ -234,6 +252,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String hintText(RunState state) {
+        if (state == RunState.RUNNING && snapshot.singlePoint()) {
+            return getString(R.string.hint_single_point_running) + "，点「停止」结束";
+        }
         if (state == RunState.ERROR) {
             String code = snapshot.errorCode() == null ? "" : snapshot.errorCode().name() + " · ";
             String message = snapshot.errorMessage() == null ? "未知错误" : snapshot.errorMessage();
@@ -304,7 +325,7 @@ public class MainActivity extends AppCompatActivity {
         }
         CompiledRoute route;
         try {
-            route = RouteCompiler.compile(points);
+            route = RouteCompiler.compile(points, viewModel.isClosed());
         } catch (InvalidRouteException e) {
             toast(e.getMessage() == null ? "路线无效" : e.getMessage());
             return;
@@ -358,10 +379,16 @@ public class MainActivity extends AppCompatActivity {
     private void onPermissionResult(java.util.Map<String, Boolean> result) {
         CompiledRoute route = viewModel.pendingStartRoute();
         RunConfig config = viewModel.pendingStartConfig();
+        GeoPoint singlePoint = viewModel.pendingSinglePoint();
         viewModel.clearPendingStart();
+        viewModel.clearPendingSinglePoint();
         boolean fineGranted = hasPermission(Manifest.permission.ACCESS_FINE_LOCATION);
         if (!fineGranted) {
             toast("缺少「精确位置」权限，无法运行");
+            return;
+        }
+        if (singlePoint != null) {
+            beginSinglePoint(singlePoint);
             return;
         }
         if (route == null || config == null) {
@@ -377,20 +404,29 @@ public class MainActivity extends AppCompatActivity {
             toast("已有运行中的任务，请先停止");
             return;
         }
+        ensureMockReady(() -> launchRun(route, config));
+    }
+
+    /**
+     * 提交模拟位置前统一做一次“系统是否允许”的检查。
+     *
+     * <p>检查通过或清掉上次残留后执行 {@code onReady}；不通过则弹窗说明原因并给出入口。
+     */
+    private void ensureMockReady(Runnable onReady) {
         SettingsInspector.MockProbeResult probe = SettingsInspector.probeMockProvider(this);
         if (probe == SettingsInspector.MockProbeResult.ALLOWED) {
-            launchRun(route, config);
+            onReady.run();
             return;
         }
         if (probe == SettingsInspector.MockProbeResult.ALLOWED_AFTER_CLEANUP) {
             toast("已清理上次运行残留的测试 provider");
-            launchRun(route, config);
+            onReady.run();
             return;
         }
         String message;
         if (probe == SettingsInspector.MockProbeResult.DENIED) {
             message = "系统拒绝了模拟位置请求：请到「开发者选项 → 选择模拟位置信息应用」里选中"
-                    + "「路线工坊」后重试。";
+                    + "「路线工坊」后重试。若列表里没有本应用，请确认安装的是 0.1.1 及以上版本。";
         } else if (probe == SettingsInspector.MockProbeResult.PROVIDER_UNSUPPORTED) {
             message = "当前设备不支持添加测试 provider，无法伪造位置。";
         } else {
@@ -414,6 +450,123 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean hasPermission(String permission) {
         return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    // ---------------------------------------------------------------- 单点位置（0.1.1）
+
+    /** 「发送单点位置」：只发一个固定坐标，速度 0，一直发到用户停止。 */
+    private void showSinglePointDialog() {
+        if (snapshot.isActive()) {
+            toast(getString(R.string.toast_single_point_stop_first));
+            return;
+        }
+        GeoPoint seed = mapController.cameraCenter();
+        if (seed == null && snapshot.hasPosition()) {
+            seed = new GeoPoint(snapshot.latitude(), snapshot.longitude());
+        }
+        if (seed == null) {
+            seed = new GeoPoint(0d, 0d);
+        }
+
+        float density = getResources().getDisplayMetrics().density;
+        int padding = (int) (20 * density);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(padding, (int) (8 * density), padding, 0);
+
+        EditText latitudeInput = new EditText(this);
+        latitudeInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+                | InputType.TYPE_NUMBER_FLAG_SIGNED);
+        latitudeInput.setHint(R.string.hint_latitude);
+        latitudeInput.setText(String.format(Locale.US, "%.6f", seed.latitude()));
+
+        EditText longitudeInput = new EditText(this);
+        longitudeInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+                | InputType.TYPE_NUMBER_FLAG_SIGNED);
+        longitudeInput.setHint(R.string.hint_longitude);
+        longitudeInput.setText(String.format(Locale.US, "%.6f", seed.longitude()));
+
+        container.addView(latitudeInput);
+        container.addView(longitudeInput);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.dialog_single_point_title)
+                .setMessage(R.string.dialog_single_point_message)
+                .setView(container)
+                .setPositiveButton(R.string.action_send, null)
+                .setNegativeButton("取消", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    GeoPoint point = parseCoordinate(
+                            latitudeInput.getText().toString() + "," + longitudeInput.getText().toString());
+                    if (point == null) {
+                        toast(getString(R.string.toast_single_point_invalid));
+                        return;
+                    }
+                    dialog.dismiss();
+                    requestPermissionsThenSendPoint(point);
+                }));
+        dialog.show();
+    }
+
+    private void requestPermissionsThenSendPoint(GeoPoint point) {
+        List<String> needed = new ArrayList<>();
+        if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            needed.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && !hasPermission(Manifest.permission.POST_NOTIFICATIONS)) {
+            needed.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+        if (!needed.isEmpty()) {
+            viewModel.setPendingSinglePoint(point);
+            toast("需要定位权限才能提交模拟位置");
+            permissionLauncher.launch(needed.toArray(new String[0]));
+            return;
+        }
+        beginSinglePoint(point);
+    }
+
+    private void beginSinglePoint(GeoPoint point) {
+        if (snapshot.isActive()) {
+            toast(getString(R.string.toast_single_point_stop_first));
+            return;
+        }
+        ensureMockReady(() -> {
+            SimulationService.start(this, RunRequest.createSinglePoint(point));
+            DiagnosticLog.info("界面请求发送单点位置：" + point.format());
+            toast(getString(R.string.toast_single_point_started));
+        });
+    }
+
+    // ---------------------------------------------------------------- 地图/闭合（0.1.1）
+
+    private void toggleClosed() {
+        boolean closed = viewModel.toggleClosed();
+        refreshDraft(false);
+        toast(closed ? getString(R.string.hint_closed_on) : getString(R.string.hint_closed_off));
+    }
+
+    private void showTileSourceDialog() {
+        List<RouteMapController.TileSource> sources = RouteMapController.tileSources();
+        int current = mapController.currentTileSourceIndex();
+        String[] labels = new String[sources.size()];
+        for (int i = 0; i < sources.size(); i++) {
+            labels[i] = (i == current ? "✓ " : "") + sources.get(i).label();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.tile_source_title)
+                .setItems(labels, (d, which) -> {
+                    if (which == current) {
+                        toast("已经是当前瓦片源");
+                        return;
+                    }
+                    mapController.selectTileSource(which);
+                    toast("已切换到「" + sources.get(which).label() + "」，正在重新加载");
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     // ---------------------------------------------------------------- 路线编辑
@@ -479,6 +632,18 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean onMenuItemClick(MenuItem item) {
         int id = item.getItemId();
+        if (id == R.id.action_single_point) {
+            showSinglePointDialog();
+            return true;
+        }
+        if (id == R.id.action_toggle_closed) {
+            toggleClosed();
+            return true;
+        }
+        if (id == R.id.action_map_source) {
+            showTileSourceDialog();
+            return true;
+        }
         if (id == R.id.action_save) {
             saveRoute();
             return true;
