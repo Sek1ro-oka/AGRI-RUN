@@ -1,20 +1,20 @@
-# 构建与测试完整输出（路线工坊 0.1.2）
-记录时间：2026-10-27 01:32:57 +08:00
-主机工作目录：E:\agri-run\route-workshop
-JAVA_HOME=D:\Java\jdk-21（JDK 21.0.3）
-ANDROID_HOME=E:\Android\Sdk（platform android-35，build-tools 35.0.0）
-命令：gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest :app:lintDebug :location-probe:lintDebug :app:assembleRelease :app:assembleDebug :location-probe:assembleDebug --rerun-tasks --console=plain
-GRADLE_EXIT=0
+# 路线工坊 0.1.3 验证记录
+时间: 2026-10-27 02:21:02 +08:00
+工作目录: E:\agri-run\route-workshop
+JAVA_HOME: D:\Java\jdk-21
+ANDROID_HOME: E:\Android\Sdk
+命令: gradlew :route-core:test :simulation-core:test :app:testDebugUnitTest :app:lintDebug :location-probe:lintDebug :app:assembleRelease :app:assembleDebug :location-probe:assembleDebug --rerun-tasks
+
 > Task :app:preBuild UP-TO-DATE
 > Task :location-probe:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
-> Task :simulation-core:processResources NO-SOURCE
 > Task :location-probe:preDebugBuild UP-TO-DATE
+> Task :simulation-core:processResources NO-SOURCE
 > Task :simulation-core:processTestResources NO-SOURCE
 > Task :location-probe:dataBindingMergeDependencyArtifactsDebug
-> Task :location-probe:generateDebugResValues
 > Task :app:dataBindingMergeDependencyArtifactsDebug
 > Task :app:generateDebugResValues
+> Task :location-probe:generateDebugResValues
 > Task :location-probe:generateDebugResources
 > Task :app:generateDebugResources
 > Task :route-core:compileJava
@@ -29,17 +29,6 @@ GRADLE_EXIT=0
 > Task :route-core:compileTestJava
 > Task :route-core:processTestResources NO-SOURCE
 > Task :route-core:testClasses
-> Task :location-probe:packageDebugResources
-> Task :app:packageDebugResources
-> Task :location-probe:javaPreCompileDebug
-> Task :app:javaPreCompileDebug
-> Task :location-probe:parseDebugLocalResources
-> Task :app:mapDebugSourceSetPaths
-> Task :app:createDebugCompatibleScreenManifests
-> Task :app:parseDebugLocalResources
-> Task :app:extractDeepLinksDebug
-> Task :location-probe:mapDebugSourceSetPaths
-> Task :location-probe:createDebugCompatibleScreenManifests
 
 > Task :simulation-core:test
 
@@ -91,8 +80,9 @@ MockLocationSessionTest > publish_wrapsFailureIntoPublishFailed PASSED
 
 MockLocationSessionTest > start_failsWhenGpsUnsupported PASSED
 
-> Task :app:checkDebugAarMetadata
-> Task :location-probe:checkDebugAarMetadata
+> Task :app:packageDebugResources
+> Task :location-probe:packageDebugResources
+> Task :app:mapDebugSourceSetPaths
 
 > Task :route-core:test
 
@@ -127,6 +117,36 @@ GeoMathTest > distance_isSymmetric PASSED
 GeoMathTest > interpolate_clampsFraction PASSED
 
 GeoMathTest > interpolate_midpointIsHalfway PASSED
+
+GpxCodecTest > parse_truncatesToMaxPointsAndWarns PASSED
+
+GpxCodecTest > parse_acceptsSingleQuotesNewlinesAndReversedAttributes PASSED
+
+GpxCodecTest > parse_malformedXml_fallsBackToRegexWithoutNoiseOnStandardError PASSED
+
+GpxCodecTest > export_escapesXmlSpecialCharactersInName PASSED
+
+GpxCodecTest > parse_withoutAnyUsablePoint_throwsRouteInvalid PASSED
+
+GpxCodecTest > exportThenParse_roundTripsWithinOneMillionthDegree PASSED
+
+GpxCodecTest > parse_documentWithDoctype_isReadWithoutResolvingEntities PASSED
+
+GpxCodecTest > parse_ignoresUtf8Bom PASSED
+
+GpxCodecTest > parse_entityOnlyDocument_throwsInsteadOfLeakingFileContent PASSED
+
+GpxCodecTest > export_writesStandardGpx11HeaderAndOneTrkptPerPoint PASSED
+
+GpxCodecTest > parse_skipsInvalidPointsAndReportsEachOne PASSED
+
+GpxCodecTest > export_nullOrEmptyInput_stillProducesWellFormedButEmptyTrack PASSED
+
+GpxCodecTest > parse_acceptsNamespacePrefixedElements PASSED
+
+GpxCodecTest > parse_acceptsMixedTrkptRteptAndWptInDocumentOrder PASSED
+
+GpxCodecTest > parse_toleratesMalformedXmlByFallingBackToPlainScan PASSED
 
 LoopStateMachineTest > stop_isNoOpWhenNotRunning PASSED
 
@@ -222,76 +242,85 @@ TickGapPolicyTest > nonPositiveLimitIsRejected PASSED
 
 TickGapPolicyTest > defaultsUseFiveSeconds PASSED
 
+> Task :location-probe:mapDebugSourceSetPaths
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:checkDebugAarMetadata
+> Task :location-probe:javaPreCompileDebug
+> Task :location-probe:checkDebugAarMetadata
+> Task :app:javaPreCompileDebug
+> Task :location-probe:createDebugCompatibleScreenManifests
+> Task :app:parseDebugLocalResources
 > Task :location-probe:extractDeepLinksDebug
-> Task :app:processDebugMainManifest
-> Task :app:processDebugManifest
-> Task :app:preDebugUnitTestBuild UP-TO-DATE
-> Task :app:processDebugJavaRes NO-SOURCE
-> Task :app:javaPreCompileDebugUnitTest
-> Task :app:processDebugManifestForPackage
-> Task :app:processDebugUnitTestJavaRes NO-SOURCE
-> Task :app:preDebugAndroidTestBuild SKIPPED
-> Task :app:generateDebugAndroidTestResValues
-> Task :app:extractProguardFiles
-> Task :app:preReleaseBuild UP-TO-DATE
-> Task :app:mergeReleaseJniLibFolders
+> Task :app:extractDeepLinksDebug
+> Task :location-probe:parseDebugLocalResources
 > Task :location-probe:processDebugMainManifest
 > Task :location-probe:processDebugManifest
 > Task :location-probe:preDebugAndroidTestBuild SKIPPED
 > Task :location-probe:generateDebugAndroidTestResValues
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:processDebugJavaRes NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes NO-SOURCE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:generateDebugAndroidTestResValues
 > Task :location-probe:extractProguardFiles
 > Task :location-probe:preDebugUnitTestBuild UP-TO-DATE
 > Task :location-probe:mergeDebugNativeDebugMetadata NO-SOURCE
-> Task :app:dataBindingMergeDependencyArtifactsRelease
 > Task :location-probe:mergeDebugShaders
 > Task :location-probe:compileDebugShaders NO-SOURCE
 > Task :location-probe:generateDebugAssets UP-TO-DATE
-> Task :app:generateReleaseResValues
+> Task :app:extractProguardFiles
+> Task :app:preReleaseBuild UP-TO-DATE
 > Task :location-probe:mergeDebugAssets
-> Task :app:generateReleaseResources
+> Task :app:mergeReleaseJniLibFolders
 > Task :location-probe:compressDebugAssets
 > Task :location-probe:desugarDebugFileDependencies
 > Task :location-probe:processDebugJavaRes NO-SOURCE
-> Task :location-probe:processDebugManifestForPackage
+> Task :app:dataBindingMergeDependencyArtifactsRelease
+> Task :app:generateReleaseResValues
+> Task :app:generateReleaseResources
+> Task :app:checkReleaseDuplicateClasses
 > Task :location-probe:mergeDebugJniLibFolders
 > Task :location-probe:mergeDebugNativeLibs NO-SOURCE
 > Task :location-probe:stripDebugDebugSymbols NO-SOURCE
 > Task :location-probe:validateSigningDebug
+> Task :location-probe:checkDebugDuplicateClasses
 > Task :location-probe:writeDebugAppMetadata
 > Task :location-probe:writeDebugSigningConfigVersions
-> Task :app:checkReleaseDuplicateClasses
-> Task :location-probe:checkDebugDuplicateClasses
 > Task :location-probe:mergeLibDexDebug
+> Task :location-probe:processDebugManifestForPackage
 > Task :app:mergeReleaseNativeLibs
-> Task :app:packageReleaseResources
-> Task :app:javaPreCompileRelease
-> Task :app:mapReleaseSourceSetPaths
-> Task :app:checkReleaseAarMetadata
-> Task :app:parseReleaseLocalResources
-> Task :app:createReleaseCompatibleScreenManifests
-> Task :app:extractDeepLinksRelease
 
 > Task :app:stripReleaseDebugSymbols
 Unable to strip the following libraries, packaging them as they are: libmaplibre.so.
 
-> Task :app:processReleaseMainManifest
+> Task :app:packageReleaseResources
+> Task :app:javaPreCompileRelease
+> Task :app:checkReleaseAarMetadata
+> Task :app:parseReleaseLocalResources
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
 > Task :app:extractReleaseNativeSymbolTables
-> Task :app:processReleaseManifest
+> Task :app:mergeDebugResources
+> Task :app:processReleaseMainManifest
+> Task :location-probe:mergeDebugResources
+> Task :app:dataBindingGenBaseClassesDebug
 > Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:processReleaseManifest
+> Task :location-probe:dataBindingGenBaseClassesDebug
 > Task :app:desugarReleaseFileDependencies
 > Task :app:mergeReleaseStartupProfile
-> Task :app:mergeDebugResources
-> Task :app:dataBindingGenBaseClassesDebug
 > Task :app:mergeReleaseShaders
 > Task :app:compileReleaseShaders NO-SOURCE
 > Task :app:generateReleaseAssets UP-TO-DATE
 > Task :app:mergeReleaseAssets
 > Task :app:compressReleaseAssets
 > Task :app:extractReleaseVersionControlInfo
-> Task :app:processReleaseJavaRes NO-SOURCE
 > Task :app:mergeReleaseArtProfile
-> Task :location-probe:mergeDebugResources
-> Task :location-probe:dataBindingGenBaseClassesDebug
+> Task :app:processReleaseJavaRes NO-SOURCE
 > Task :app:collectReleaseDependencies
 > Task :app:sdkReleaseDependencyData
 > Task :app:validateSigningRelease
@@ -304,11 +333,31 @@ Unable to strip the following libraries, packaging them as they are: libmaplibre
 > Task :app:mergeDebugAssets
 > Task :app:compressDebugAssets
 > Task :app:desugarDebugFileDependencies
-> Task :app:mergeDebugJniLibFolders
 > Task :app:checkDebugDuplicateClasses
+> Task :location-probe:mergeExtDexDebug
+> Task :location-probe:processDebugResources
+> Task :app:mergeExtDexRelease
+> Task :location-probe:mergeDebugJavaResource
+
+> Task :location-probe:compileDebugJavaWithJavac
+gradlew.bat : 注: 
+E:\agri-run\route-workshop\location-probe\src\main\java\org\localroute\probe\ProbeActivity.java使用或覆盖了已过时的 API。
+所在位置 行:13 字符: 8
++ $out = & .\gradlew.bat :route-core:test :simulation-core:test :app:te ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (注: E:\agri-run\...使用或覆盖了已过时的 API。:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+
+> Task :app:mergeReleaseResources
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeReleaseJavaResource
+> Task :app:dataBindingGenBaseClassesRelease
 > Task :app:validateSigningDebug
 > Task :app:writeDebugAppMetadata
 > Task :app:writeDebugSigningConfigVersions
+> Task :app:processDebugManifestForPackage
 > Task :app:processReleaseManifestForPackage
 > Task :app:mergeLibDexDebug
 > Task :app:mergeDebugNativeLibs
@@ -316,72 +365,54 @@ Unable to strip the following libraries, packaging them as they are: libmaplibre
 > Task :app:stripDebugDebugSymbols
 Unable to strip the following libraries, packaging them as they are: libmaplibre.so.
 
-> Task :app:processDebugResources
-> Task :location-probe:processDebugResources
-> Task :location-probe:mergeExtDexDebug
-
-> Task :app:compileDebugJavaWithJavac
-gradlew.bat : 注: 某些输入文件使用或覆盖了已过时的 API。
-所在位置 行:4 字符: 8
-+ $log = & .\gradlew.bat :route-core:test :simulation-core:test :app:te ...
-+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (注: 某些输入文件使用或覆盖了已过时的 API。:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
-
-> Task :app:bundleDebugClassesToCompileJar
-> Task :app:bundleDebugClassesToRuntimeJar
-> Task :app:generateDebugLintReportModel
-> Task :app:mergeExtDexRelease
-> Task :app:compileDebugUnitTestJavaWithJavac
-> Task :app:mergeExtDexDebug
-> Task :location-probe:mergeDebugJavaResource
-
-> Task :location-probe:compileDebugJavaWithJavac
-注: E:\agri-run\route-workshop\location-probe\src\main\java\org\localroute\probe\ProbeActivity.java使用或覆盖了已过时的 API。
-注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
-
-> Task :app:testDebugUnitTest
-> Task :app:generateDebugAndroidTestLintModel
-> Task :app:generateDebugUnitTestLintModel
-> Task :app:mergeReleaseJavaResource
-> Task :app:mergeReleaseResources
-> Task :app:dexBuilderDebug
 > Task :app:mergeDebugJavaResource
-> Task :app:dataBindingGenBaseClassesRelease
 > Task :location-probe:bundleDebugClassesToCompileJar
-> Task :app:mergeDebugGlobalSynthetics
 > Task :location-probe:generateDebugLintReportModel
 > Task :location-probe:generateDebugAndroidTestLintModel
 > Task :location-probe:generateDebugUnitTestLintModel
-> Task :app:mergeProjectDexDebug
+> Task :app:processDebugResources
+> Task :app:processReleaseResources
 > Task :location-probe:dexBuilderDebug
 > Task :location-probe:mergeDebugGlobalSynthetics
-> Task :app:packageDebug
-> Task :app:createDebugApkListingFileRedirect
-> Task :app:assembleDebug
+> Task :location-probe:lintAnalyzeDebugUnitTest
+> Task :location-probe:lintAnalyzeDebugAndroidTest
 > Task :location-probe:mergeProjectDexDebug
 > Task :location-probe:packageDebug
 > Task :location-probe:createDebugApkListingFileRedirect
 > Task :location-probe:assembleDebug
-> Task :app:processReleaseResources
-> Task :location-probe:lintAnalyzeDebug
 
-> Task :app:compileReleaseJavaWithJavac
+> Task :app:compileDebugJavaWithJavac
 注: 某些输入文件使用或覆盖了已过时的 API。
 注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
 
-> Task :location-probe:lintAnalyzeDebugAndroidTest
-> Task :app:dexBuilderRelease
-> Task :location-probe:lintAnalyzeDebugUnitTest
-> Task :app:mergeReleaseGlobalSynthetics
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:generateDebugLintReportModel
+> Task :app:mergeExtDexDebug
+> Task :location-probe:lintAnalyzeDebug
+> Task :app:compileDebugUnitTestJavaWithJavac
 
 > Task :location-probe:lintReportDebug
 Wrote HTML report to file:///E:/agri-run/route-workshop/location-probe/build/reports/lint-results-debug.html
 
 > Task :location-probe:lintDebug
+> Task :app:testDebugUnitTest
+> Task :app:generateDebugAndroidTestLintModel
+> Task :app:generateDebugUnitTestLintModel
+
+> Task :app:compileReleaseJavaWithJavac
+注: 某些输入文件使用或覆盖了已过时的 API。
+注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+
+> Task :app:dexBuilderRelease
+> Task :app:mergeReleaseGlobalSynthetics
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
 > Task :app:optimizeReleaseResources
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
 > Task :app:mergeDexRelease
 > Task :app:compileReleaseArtProfile
 > Task :app:packageRelease
@@ -477,7 +508,7 @@ E:\agri-run\route-workshop\app\src\main\res\layout\activity_main.xml:65: Warning
    nested layouts, the baseline alignment property should be turned off to
    make the layout computation faster.
 
-E:\agri-run\route-workshop\app\src\main\res\values\strings.xml:83: Warning: The resource R.string.self_check_probe appears to be unused [UnusedResources]
+E:\agri-run\route-workshop\app\src\main\res\values\strings.xml:95: Warning: The resource R.string.self_check_probe appears to be unused [UnusedResources]
     <string name="self_check_probe">%1$s：%2$s</string>
             ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -516,5 +547,7 @@ E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\ui\SettingsCheck
 
 [Incubating] Problems report is available at: file:///E:/agri-run/route-workshop/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 39s
+BUILD SUCCESSFUL in 49s
 147 actionable tasks: 147 executed
+
+GRADLE_EXIT=0

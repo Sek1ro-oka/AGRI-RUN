@@ -49,7 +49,10 @@ Desktop.ini
 
 # ---- ?????/???? ----
 build-inspect/
-# ---- ?????? ----
+# ---- 构建日志（根目录）----
 /build-*.log
 /*.log
 !delivery/evidence/*.log
+
+# ---- 模拟器原始截图（精选后放入 delivery/evidence/emulator）----
+evidence-emu/

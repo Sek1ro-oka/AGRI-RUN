@@ -2,21 +2,26 @@
   "application": {
     "name": "路线工坊",
     "packageName": "org.localroute.app",
-    "versionName": "0.1.2",
-    "versionCode": 3,
+    "versionName": "0.1.3",
+    "versionCode": 4,
     "minSdk": 29,
     "targetSdk": 35,
     "compileSdk": 35,
     "language": "java",
     "buildDate": "2026-10-27",
-    "buildType": "release (self-signed, local only)"
+    "buildType": "release (self-signed, local only)",
+    "changesSinceLast": [
+      "0.1.1：闭合可选（原路返回）、单点位置、地图兜底与状态提示、申请 ACCESS_MOCK_LOCATION 以出现在模拟位置应用列表",
+      "0.1.2：传送到地图选点、高德底图 + WGS-84/GCJ-02 换算、诊断页位置自检",
+      "0.1.3：默认高德底图、单点自动放大、瓦片探测与不可达提示、GPX 导入导出"
+    ]
   },
   "probe": {
     "name": "定位探针",
     "packageName": "org.localroute.probe",
     "versionName": "0.1.0",
     "versionCode": 1,
-    "note": "debug 构建，仅用于独立验证系统收到的位置"
+    "note": "debug 构建，仅用于独立验证系统收到了哪些位置；不参与模拟位置注入"
   },
   "toolchain": {
     "jdk": "21.0.3 (D:\\Java\\jdk-21)",
@@ -25,7 +30,8 @@
     "agp": "8.9.2",
     "androidBuildTools": "35.0.0",
     "androidPlatform": "android-35",
-    "note": "工程位于纯 ASCII 路径 E:\\agri-run\\route-workshop；早期在含中文路径下用 subst R: 兜底，2026-10-26 改名后已删除映射与 android.overridePathCheck"
+    "emulator": "AVD API 35 (google_apis / x86_64)，用于 0.1.3 实测；debug 包额外包含 x86_64 ABI",
+    "note": "工程位于纯 ASCII 路径 E:\\agri-run\\route-workshop；0.1.0 时期在中文路径下用过 subst R: 与 android.overridePathCheck，2026-10-26 改名后两者都已移除"
   },
   "dependencies": [
     { "module": "org.maplibre.gl:android-sdk", "version": "13.7.1", "license": "BSD-2-Clause", "scope": "implementation" },
@@ -43,26 +49,29 @@
   ],
   "externalData": [
     {
-      "name": "AMap raster tiles (optional, non-official endpoint)",
-      "url": "https://webrd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
-      "coordinateSystem": "GCJ-02 (converted to WGS-84 in app via ChinaShift)",
-      "license": "No public license / unofficial endpoint; selectable only, OSM remains default",
-      "attribution": "© 高德地图"
+      "name": "AMap (autonavi) raster tiles",
+      "url": "https://webrd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
+      "coordinateSystem": "GCJ-02（应用显示层用 ChinaShift 与 WGS-84 互转）",
+      "license": "无公开授权，非官方接口；个人本地调试用途",
+      "attribution": "© 高德地图",
+      "default": true,
+      "note": "style=8 在当前接口返回纯白瓦片，已改 style=7；2026-10-27 实测 HTTP 200 / image/png"
     },
     {
-      "name": "OpenStreetMap raster tiles (default)",
+      "name": "OpenStreetMap raster tiles (selectable)",
       "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
-      "attribution": "© OpenStreetMap contributors"
+      "attribution": "© OpenStreetMap contributors",
+      "note": "2026-10-27 在本机与模拟器网络下不可达（DNS 指向黑洞地址 + TLS 握手失败），应用会显示原因提示"
     },
     {
-      "name": "OpenStreetMap DE raster tiles (fallback, selectable in app)",
+      "name": "OpenStreetMap DE raster tiles (selectable)",
       "url": "https://tile.openstreetmap.de/{z}/{x}/{y}.png",
       "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
       "attribution": "© OpenStreetMap contributors"
     },
     {
-      "name": "OpenStreetMap France raster tiles (fallback, selectable in app)",
+      "name": "OpenStreetMap France raster tiles (selectable)",
       "url": "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
       "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
       "attribution": "© OpenStreetMap contributors"
@@ -75,7 +84,7 @@
     "note": "source.zip 由 git archive HEAD 生成，归档内容即生成时 HEAD 的树；为避免自引用导致哈希漂移，本文件不写死提交号，需要精确提交时在源码树执行 git log -1。SHA256SUMS.txt 在归档之后计算，不进入 source.zip"
   },
   "artifacts": [
-    { "file": "路线工坊-0.1.2-release.apk", "module": ":app", "sizeMB": 32.91, "signing": "本地自签名（keystore 与口令不入库）" },
+    { "file": "路线工坊-0.1.3-release.apk", "module": ":app", "sizeMB": 32.93, "signing": "本地自签名（keystore 与口令不入库）" },
     { "file": "定位探针-0.1.0-debug.apk", "module": ":location-probe", "sizeMB": 10.59, "signing": "debug 签名" },
     { "file": "source.zip", "note": "git archive 生成的源码快照（不含构建产物与私钥）" }
   ]

@@ -127,3 +127,37 @@ Set-Location E:\agri-run\route-workshop
 | T29 | 菜单「传送到地图选点」→ 点地图任意点 | 通知与页面立刻显示「单点 · 速度 0.0」，独立读取（探针）在那一点收到坐标；再点菜单或「停止」结束 |
 | T30 | 菜单「地图瓦片源」→ 高德地图（GCJ-02） | 底图变成中文高德；在 0.1.1 里画好的路线换源后仍贴合街道；在高德底图上新点的点，换回 OSM 后位置不漂移 |
 | T31 | 诊断页「位置自检」区块 | 运行时显示「系统已接受（偏差 X 米，带模拟标记）」；停止后显示「应用最后提交」历史坐标 |
+
+## 0.1.3 追加：套件与人工检查项
+
+自动化套件（命令见本文开头，统计以 JUnit XML 为准）：
+
+| 模块 | 套件 | 用例 |
+| --- | --- | --- |
+| route-core | GeoMath | 9 |
+| route-core | RouteCompiler | 17 |
+| route-core | RouteEngine | 13 |
+| route-core | LoopStateMachine | 7 |
+| route-core | TickGapPolicy | 10 |
+| route-core | ChinaShift | 7 |
+| route-core | GpxCodec | 15 |
+| simulation-core | MockLocationSession | 16 |
+| simulation-core | LocationVerifier | 8 |
+| app | RouteJsonCodec | 9 |
+| app | RouteRepository | 10 |
+| app | RouteEditorViewModel | 19 |
+| app | RunRequest | 4 |
+
+合计 **144**（route-core 78 / simulation-core 24 / app 42），failures 0、errors 0。
+
+0.1.3 新增的人工检查项（下表编号与 `delivery/TEST_REPORT_测试结果.md` 保持一致；T29—T31 见上文 0.1.2 表格，T32—T33 见 TEST_REPORT）：
+
+| 编号 | 检查项 | 期望 |
+| --- | --- | --- |
+| T34 | 清空应用数据后首次启动 | 默认高德底图，中文路名可见；底部无「地图不可达」提示（模拟器已实测） |
+| T35 | 切换「OpenStreetMap 官方」（在当前网络下） | 地图区出现可见提示说明瓦片不可达；路线与里程仍可编辑、可运行（模拟器已实测） |
+| T36 | 手动输入一个经纬度作为第一个节点 | 地图自动放大到 16 级并居中到该点（模拟器已实测） |
+| T37 | 导出 GPX → 清空 → 从同一文件导入 | 节点数、单圈长度与导出前一致；文件在 `Download/` 下且是 `gpx 1.1`（模拟器已实测） |
+| T38 | 输入 WGS-84 `39.906297,116.395157` | 在「天安门东」地铁站图标处（高德底图 + GCJ 换算生效，模拟器已实测） |
+
+模拟器实测的具体步骤与截图索引见 `docs/04_模拟器实测记录.md`。
