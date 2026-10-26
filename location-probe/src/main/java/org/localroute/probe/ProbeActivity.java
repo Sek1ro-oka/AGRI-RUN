@@ -73,6 +73,11 @@ public class ProbeActivity extends AppCompatActivity implements LocationListener
 
         updateStatus(getString(R.string.probe_idle_hint));
         reportProvidersState();
+
+        // 探针只是旁证工具：已有权限时自动开始监听，省掉一次点击（也便于自动化验证）。
+        if (hasLocationPermission()) {
+            binding.getRoot().post(this::startListening);
+        }
     }
 
     private void reportProvidersState() {
@@ -246,6 +251,15 @@ public class ProbeActivity extends AppCompatActivity implements LocationListener
             binding.textLog.append(line);
         }
         binding.scroll.post(() -> binding.scroll.fullScroll(android.view.View.FOCUS_DOWN));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 回到前台自动恢复监听（onStop 时会停掉）。
+        if (!listening && hasLocationPermission()) {
+            startListening();
+        }
     }
 
     @Override

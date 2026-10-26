@@ -26,7 +26,8 @@ android {
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         // 不想被语言分包影响：本项目只有中文资源
         resourceConfigurations += ['zh', 'en']
-        // MapLibre 的原生库同时带 arm 与 x86；只保留真机需要的两种 ARM ABI，减小体积。
+        // MapLibre 的原生库同时带 arm 与 x86；正式包只留真机需要的两种 ARM ABI，减小体积。
+        // 模拟器用的 x86_64 只在 debug 里启用（见 buildTypes.debug）。
         ndk {
             abiFilters 'arm64-v8a', 'armeabi-v7a'
         }
@@ -48,6 +49,10 @@ android {
             minifyEnabled false
             applicationIdSuffix '.debug'
             // 调试包与正式包包名不同，可以同时安装，便于对照排查。
+            // 额外带上 x86_64：本机用 AVD 模拟器做实测，ARM 包装不进 x86 模拟器。
+            ndk {
+                abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            }
         }
         release {
             minifyEnabled false
