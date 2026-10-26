@@ -49,6 +49,13 @@
       "attribution": "© OpenStreetMap contributors"
     }
   ],
+  "source": {
+    "repository": "本地 git 仓库（无远端，从未推送）",
+    "branch": "master",
+    "commit": "4b25157",
+    "parentCommit": "dc683ae",
+    "note": "source.zip 由 git archive HEAD 生成；SHA256SUMS.txt 在归档之后计算，所以包内校验清单可能比本目录的少一行（这是自引用校验的固有限制）"
+  },
   "artifacts": [
     { "file": "路线工坊-0.1.0-release.apk", "module": ":app" },
     { "file": "定位探针-0.1.0-debug.apk", "module": ":location-probe" },
