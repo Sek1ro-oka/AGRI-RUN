@@ -53,7 +53,7 @@
 | 开发者选项的模拟位置应用列表里没有本应用 | 清单补声明 `android.permission.ACCESS_MOCK_LOCATION`（AOSP 的 AppPicker 用它过滤候选应用），已用 aapt2 确认 0.1.1 的 APK 里包含该权限 |
 | 想直接传送单点位置 | 菜单「发送单点位置」：输入经纬度（默认填地图中心），前台服务每 500 ms 提交同一个坐标、速度 0，通知栏可停止 |
 
-测试：107 个 JVM 用例（route-core 56 / simulation-core 16 / app 35），lint 0 error。
+测试：0.1.1 当时是 107 个 JVM 用例（route-core 56 / simulation-core 16 / app 35），lint 0 error。
 
 ## 0.1.2 变更（针对第二轮反馈）
 
