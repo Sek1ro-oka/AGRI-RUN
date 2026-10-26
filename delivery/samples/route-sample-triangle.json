@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "sample-triangle",
+  "name": "示例三角路线（合成坐标）",
+  "coordinateSystem": "WGS84",
+  "closed": true,
+  "createdAt": "2026-10-26T12:00:00Z",
+  "updatedAt": "2026-10-26T12:00:00Z",
+  "points": [
+    { "latitude": 0.000000, "longitude": 0.000000 },
+    { "latitude": 0.000000, "longitude": 0.000300 },
+    { "latitude": 0.000260, "longitude": 0.000150 }
+  ]
+}

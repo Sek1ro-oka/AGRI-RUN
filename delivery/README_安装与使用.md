@@ -77,7 +77,20 @@ $adb = 'E:\Android\Sdk\platform-tools\adb.exe'
 | 第三方 App 里看不到移动 | 确认它拿到了定位权限；确认它是**前台**在记录；本工具不对第三方行为负责 |
 | 想彻底清干净 | 点「停止」→ 退出 App；必要时在系统设置里撤销「模拟位置信息应用」 |
 
-## 八、数据与卸载
+## 八、本目录里的其它文件
+
+| 文件 | 用途 |
+| --- | --- |
+| `TEST_REPORT_测试结果.md` | 77 个自动化用例的结果、T01—T24 逐条覆盖情况、哪些没实测 |
+| `KNOWN_ISSUES_已知问题.md` | 已知限制与未验证项 |
+| `BUILD_构建说明.md` | 怎么从源码重新构建、签名怎么生成、怎么校验 APK |
+| `VERSION_版本与依赖.json` | 版本号与 12 个依赖的版本、许可证 |
+| `SHA256SUMS.txt` | 交付文件的 SHA-256，校验方法：`sha256sum -c SHA256SUMS.txt`（Windows 用 `Get-FileHash` 对照） |
+| `source.zip` | 源码快照（与 git 提交 `dc683ae` 一致） |
+| `samples/` | 两条合成坐标的示例路线（不是真实地点） |
+| `evidence/` | 构建/测试原始记录与「无真机」说明 |
+
+## 九、数据与卸载
 
 - 路线存在应用私有目录 `files/routes/<路线id>.json`，`versionCode` 升级覆盖安装会保留。
 - 卸载 App 会一并删除这些文件；需要备份就用 debug 包的 `run-as`（见 `BUILD_构建说明.md`）。
