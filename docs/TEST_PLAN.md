@@ -30,9 +30,9 @@
 | T21 | 地图网络失败 | 路线与引擎仍可用 | ⚠️ | 地图瓦片失败只影响底图，路线数据与引擎不依赖网络 |
 | T22 | 连续运行—停止 20 次 | 无残留任务/锁泄漏/服务僵尸 | ⚠️ | 每次运行独立 `MockLocationSession` 与 WakeLock，`cleanup()` 幂等 |
 | T23 | 5000 点路线 | 编辑与运行无 ANR，按距离查找不全量遍历 | ✅ 编译 / ⚠️ 真机 | `RouteCompilerTest` 校验 5000 点上限与 5001 点拒绝；`pointAt` 用前缀距离二分 |
-| T24 | 同包同签名覆盖安装 | 保留路线数据，版本号正确 | ⚠️ | `versionCode 2 / versionName 0.1.1`；可覆盖 0.1.0（versionCode 1）并保留已存路线 |
+| T24 | 同包同签名覆盖安装 | 保留路线数据，版本号正确 | ⚠️ | `versionCode 3 / versionName 0.1.1`；可覆盖 0.1.0（versionCode 1）并保留已存路线 |
 
-## 自动化测试清单（107 个）
+## 自动化测试清单（0.1.1 时 107 个，0.1.2 起 124 个）
 
 | 模块 | 套件 | 用例数 |
 | --- | --- | --- |
@@ -53,7 +53,7 @@
 ```powershell
 Set-Location E:\agri-run\route-workshop
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
-# BUILD SUCCESSFUL；56 + 16 + 35 = 107 个用例，0 失败
+# BUILD SUCCESSFUL；63 + 24 + 37 = 124 个用例，0 失败
 ```
 
 ## 如何把「未实测」变成「已实测」
@@ -94,7 +94,7 @@ Set-Location E:\agri-run\route-workshop
 $env:JAVA_HOME='D:\Java\jdk-21'; $env:ANDROID_HOME='E:\Android\Sdk'
 Set-Location E:\agri-run\route-workshop
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
-# BUILD SUCCESSFUL：56 + 16 + 35 = 107 个用例，0 失败
+# BUILD SUCCESSFUL：63 + 24 + 37 = 124 个用例，0 失败
 ```
 
 ## 0.1.2 新增套件与用例
