@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_save"
+        android:title="@string/menu_save"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_load"
+        android:title="@string/menu_load"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_rename"
+        android:title="@string/menu_rename"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_delete"
+        android:title="@string/menu_delete"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_settings_check"
+        android:title="@string/menu_settings_check"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_diagnostics"
+        android:title="@string/menu_diagnostics"
+        app:showAsAction="never" />
+</menu>

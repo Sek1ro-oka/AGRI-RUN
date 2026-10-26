@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="probe_app_name">定位探针</string>
+    <string name="probe_listen">开始监听</string>
+    <string name="probe_stop">停止</string>
+    <string name="probe_clear">清空</string>
+    <string name="probe_idle_hint">未监听。点“开始监听”从系统读取位置。</string>
+    <string name="probe_cleared">已清空记录。</string>
+    <string name="probe_already_listening">已在监听中。</string>
+    <string name="probe_location_disabled">系统定位开关是关的，请先打开系统定位。</string>
+    <string name="probe_no_provider">没有可用的 provider（GPS / 网络都不可用）。</string>
+    <string name="probe_listening">监听中……</string>
+    <string name="probe_not_listening">当前没有在监听。</string>
+    <string name="probe_permission_missing">缺少定位权限，无法监听。</string>
+    <string name="probe_stopped_summary">已停止：共 %1$d 个位置，累计位移 %2$s 米，监听 %3$s 秒</string>
+    <string name="probe_status_counters">已收 %1$d 个位置 · 累计位移 %2$s 米 · %3$s</string>
+</resources>

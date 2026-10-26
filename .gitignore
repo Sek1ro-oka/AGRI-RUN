@@ -1,0 +1,45 @@
+# ---- Gradle ----
+.gradle/
+build/
+*/build/
+captures/
+.gradle-cache/
+
+# Gradle Wrapper 的 jar 必须入库
+!gradle/wrapper/gradle-wrapper.jar
+
+# ---- 本机专属配置（含 SDK 绝对路径，禁止入库）----
+local.properties
+
+# ---- IDE ----
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.externalNativeBuild/
+.cxx/
+
+# ---- 签名私钥与密码（禁止入库）----
+*.jks
+*.keystore
+*.jceks
+keystore.properties
+signing.properties
+release-signing.properties
+
+# ---- 交付产物（APK/ZIP 不入库，交付清单与文档入库）----
+*.apk
+*.aab
+*.zip
+!gradle/wrapper/*.jar
+
+# ---- 运行期证据与本机日志 ----
+evidence/*.log
+*.hprof
+*.hprof.*
+
+# ---- 操作系统 ----
+Thumbs.db
+Desktop.ini
+.DS_Store

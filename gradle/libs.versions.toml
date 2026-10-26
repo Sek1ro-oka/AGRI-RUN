@@ -1,0 +1,36 @@
+[versions]
+# 工具链（与 docs/environment.md 保持一致；禁止使用 +、动态版本或 SNAPSHOT）
+agp = "8.9.2"
+# AndroidX / Material
+appcompat = "1.7.0"
+material = "1.12.0"
+lifecycle = "2.8.7"
+# 地图渲染器（MapLibre Native Android）
+maplibre = "13.7.1"
+# 测试
+junit = "4.13.2"
+androidxTestCore = "1.6.1"
+androidxTestJunit = "1.2.1"
+androidxTestRunner = "1.6.2"
+androidxTestRules = "1.6.1"
+espresso = "3.6.1"
+# 仅用于 JVM 单元测试：与 Android 平台的 org.json 同 API 的参考实现
+jsonReference = "20240303"
+
+[libraries]
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+androidx-lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycle" }
+androidx-lifecycle-livedata = { module = "androidx.lifecycle:lifecycle-livedata", version.ref = "lifecycle" }
+google-material = { module = "com.google.android.material:material", version.ref = "material" }
+maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
+
+junit = { module = "junit:junit", version.ref = "junit" }
+org-json-reference = { module = "org.json:json", version.ref = "jsonReference" }
+androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
+androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestJunit" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
+androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidxTestRules" }
+espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }

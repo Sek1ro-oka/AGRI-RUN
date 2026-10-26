@@ -1,0 +1,28 @@
+plugins {
+    id 'java-library'
+}
+
+// 纯 Java 模块：不依赖 Android SDK，便于 JVM 单元测试与算法复用。
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+dependencies {
+    // 运行期使用 Android 平台自带的 org.json；JVM 单测时用参考实现替代。
+    compileOnly libs.org.json.reference
+    testImplementation libs.junit
+    testImplementation libs.org.json.reference
+}
+
+tasks.withType(Test).configureEach {
+    useJUnit()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+    }
+}

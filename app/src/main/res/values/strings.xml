@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">路线工坊</string>
+
+    <!-- 地图区 -->
+    <string name="map_hint">点击地图添加节点；拖动与双指缩放不会添加节点</string>
+
+    <!-- 状态面板标签 -->
+    <string name="label_state">状态</string>
+    <string name="label_elapsed">有效用时</string>
+    <string name="label_speed">速度</string>
+    <string name="label_lap">单圈</string>
+    <string name="label_position">当前位置</string>
+    <string name="label_distance">累计距离</string>
+    <string name="label_loops">已完成圈数</string>
+    <string name="label_providers">已提交给</string>
+
+    <!-- 输入 -->
+    <string name="hint_speed_input">速度（km/h）</string>
+    <string name="hint_loops_input">圈数</string>
+    <string name="placeholder">—</string>
+
+    <!-- 路线编辑按钮 -->
+    <string name="action_undo">撤销</string>
+    <string name="action_clear">清空</string>
+    <string name="action_manual">手动输入</string>
+
+    <!-- 运行控制按钮 -->
+    <string name="action_start">开始</string>
+    <string name="action_pause">暂停</string>
+    <string name="action_resume">继续</string>
+    <string name="action_stop">停止</string>
+
+    <!-- 菜单 -->
+    <string name="menu_save">保存路线</string>
+    <string name="menu_load">加载路线</string>
+    <string name="menu_rename">重命名</string>
+    <string name="menu_delete">删除路线</string>
+    <string name="menu_settings_check">设置检查</string>
+    <string name="menu_diagnostics">诊断信息</string>
+
+    <!-- 设置检查页 -->
+    <string name="settings_title">设置检查</string>
+    <string name="settings_recheck">重新检查</string>
+    <string name="settings_open_dev_options">打开开发者选项</string>
+    <string name="settings_open_app_details">打开应用详情</string>
+    <string name="settings_probe_mock">检测模拟位置权限</string>
+    <string name="settings_probe_hint">「检测模拟位置权限」会创建并立刻移除一个测试 provider，用来判断系统是否允许本应用提交模拟位置；运行中请勿使用。</string>
+
+    <!-- 诊断页 -->
+    <string name="diagnostics_title">诊断信息</string>
+    <string name="diagnostics_copy">复制全部</string>
+    <string name="diagnostics_clear_log">清空日志</string>
+    <string name="diagnostics_coordinate_log">记录坐标日志（默认关闭）</string>
+</resources>

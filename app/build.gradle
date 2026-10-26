@@ -1,0 +1,116 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+// 本地签名：keystore.properties 与本机 keystore 都已被 .gitignore 排除，不会入库。
+// 没有这两个文件时 release 变体保持未签名（Gradle 会产出 -unsigned.apk），构建不会因此失败。
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def hasLocalKeystore = keystorePropertiesFile.exists()
+        && keystoreProperties['storeFile'] != null
+        && rootProject.file(keystoreProperties['storeFile']).exists()
+
+android {
+    namespace 'org.localroute.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'org.localroute.app'
+        minSdk 29
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        // 不想被语言分包影响：本项目只有中文资源
+        resourceConfigurations += ['zh', 'en']
+        // MapLibre 的原生库同时带 arm 与 x86；只保留真机需要的两种 ARM ABI，减小体积。
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+    }
+
+    signingConfigs {
+        if (hasLocalKeystore) {
+            release {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+            applicationIdSuffix '.debug'
+            // 调试包与正式包包名不同，可以同时安装，便于对照排查。
+        }
+        release {
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasLocalKeystore) {
+                signingConfig signingConfigs.release
+            }
+            // 未检测到本地 keystore 时 release 变体未签名，构建仍可完成；
+            // 安装与分发说明见 docs/BUILD.md「签名」一节。
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig false
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = false
+            returnDefaultValues = false
+        }
+    }
+
+    lint {
+        abortOnError true
+        checkReleaseBuilds false
+        warningsAsErrors false
+        htmlReport true
+        xmlReport true
+        textReport true
+    }
+
+    packaging {
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
+        }
+    }
+}
+
+dependencies {
+    implementation project(':route-core')
+    implementation project(':simulation-core')
+
+    implementation libs.androidx.appcompat
+    implementation libs.androidx.lifecycle.viewmodel
+    implementation libs.androidx.lifecycle.livedata
+    implementation libs.google.material
+    implementation libs.maplibre.android
+
+    testImplementation libs.junit
+    // 仅测试用：为 JVM 单元测试提供与 Android 平台同 API 的 org.json 参考实现
+    testImplementation libs.org.json.reference
+
+    androidTestImplementation libs.androidx.test.core
+    androidTestImplementation libs.androidx.test.junit
+    androidTestImplementation libs.androidx.test.runner
+    androidTestImplementation libs.androidx.test.rules
+    androidTestImplementation libs.espresso.core
+}
