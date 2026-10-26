@@ -81,7 +81,7 @@ $adb = 'E:\Android\Sdk\platform-tools\adb.exe'
 
 | 文件 | 用途 |
 | --- | --- |
-| `TEST_REPORT_测试结果.md` | 77 个自动化用例的结果、T01—T24 逐条覆盖情况、哪些没实测 |
+| `TEST_REPORT_测试结果.md` | 88 个自动化用例的结果、T01—T24 逐条覆盖情况、哪些没实测 |
 | `KNOWN_ISSUES_已知问题.md` | 已知限制与未验证项 |
 | `BUILD_构建说明.md` | 怎么从源码重新构建、签名怎么生成、怎么校验 APK |
 | `VERSION_版本与依赖.json` | 版本号与 12 个依赖的版本、许可证 |

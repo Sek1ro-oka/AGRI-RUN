@@ -120,15 +120,27 @@ public final class MockLocationSession {
     /** 移除本次创建的全部 provider（幂等，不抛异常）。 */
     public void stop() {
         for (int i = createdProviders.size() - 1; i >= 0; i--) {
-            String provider = createdProviders.get(i);
-            try {
-                api.removeTestProvider(provider);
-            } catch (RuntimeException ignored) {
-                // 清理阶段不允许把异常抛回调度线程；诊断页会显示实际发布过的 provider。
-            }
+            removeQuietly(createdProviders.get(i));
         }
         createdProviders.clear();
         started = false;
+    }
+
+    /**
+     * 先停用再移除：部分 ROM 只认「停用」，直接移除会让 provider 停留在「测试模式」，
+     * 之后真实定位可能被吞掉。两步都是尽力而为，任何异常都不外泄。
+     */
+    private void removeQuietly(String provider) {
+        try {
+            api.setTestProviderEnabled(provider, false);
+        } catch (Exception ignored) {
+            // 已经不存在或不可停用：继续移除。
+        }
+        try {
+            api.removeTestProvider(provider);
+        } catch (RuntimeException ignored) {
+            // 清理阶段不允许把异常抛回调度线程；诊断页会显示实际发布过的 provider。
+        }
     }
 
     public boolean isStarted() {
@@ -152,11 +164,7 @@ public final class MockLocationSession {
 
     private void rollback() {
         for (int i = createdProviders.size() - 1; i >= 0; i--) {
-            try {
-                api.removeTestProvider(createdProviders.get(i));
-            } catch (RuntimeException ignored) {
-                // 同上：回滚阶段尽力而为。
-            }
+            removeQuietly(createdProviders.get(i));
         }
         createdProviders.clear();
         started = false;

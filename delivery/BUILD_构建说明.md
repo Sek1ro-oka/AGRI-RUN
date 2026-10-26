@@ -14,16 +14,16 @@
 
 ## 2. 关键：路径必须是 ASCII
 
-工程原始路径含中文（`E:\农林快跑\route-workshop`），Windows 上会导致：
+工程现已放在纯 ASCII 路径 `E:\agri-run\route-workshop`，直接构建即可，不需要任何盘符映射。
 
-- Gradle 测试 worker `ClassNotFoundException`（无法加载测试类）；
-- 混用不同盘符时 dex 报 `this and base files have different roots`。
-
-因此本机统一这样构建：
+历史：工程最初位于含中文的路径（`E:\农林快跑\route-workshop`），Windows 上会导致
+Gradle 测试 worker `ClassNotFoundException`（无法加载测试类）、混用盘符时 dex 报
+`this and base files have different roots`。当时用 `subst R:` 兜底；2026-10-26 已把目录改名成
+ASCII，`subst` 映射与 `android.overridePathCheck` 开关都已删除。若你把源码解压到含中文的路径，
+请先移动到纯 ASCII 目录再构建，否则测试会整体加载失败。
 
 ```powershell
-subst R: "E:\农林快跑"          # 只需一次（重启后要重做）
-Set-Location R:\route-workshop
+Set-Location E:\agri-run\route-workshop
 $env:JAVA_HOME='D:\Java\jdk-21'
 $env:ANDROID_HOME='E:\Android\Sdk'
 $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''
@@ -33,7 +33,7 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''
 ## 3. 构建命令
 
 ```powershell
-# 单元测试（77 个用例）
+# 单元测试（88 个用例）
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
 
 # Lint（有 error 会失败）

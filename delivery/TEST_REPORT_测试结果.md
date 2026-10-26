@@ -10,7 +10,7 @@
 
 ## 1. 自动化单元测试
 
-执行命令（在 `R:\route-workshop`，即 `E:\农林快跑\route-workshop` 的 subst 盘符）：
+执行命令（工程现已位于纯 ASCII 路径 `E:\agri-run\route-workshop`）：
 
 ```bat
 gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
@@ -26,11 +26,12 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 | route-core | `RouteCompilerTest` | 12 | 0 | 0 点/1 点/全重复点抛 `ROUTE_INVALID`、正方形单圈=周长、两点闭合单圈=2×直线距离、相邻重复点去重、重复闭合终点去重不多算零长边、单圈<1 m 拒绝、5000 点通过 / 5001 点拒绝、prefix 距离单调 |
 | route-core | `RouteEngineTest` | 11 | 0 | 1 圈恰好完成且位置精确回起点、5 圈逐圈 +1 不越界、4.5 圈不多算、超时不多走、完成容差、暂停 30 秒不计时、250/500/1000 ms 采样结果一致、调度卡顿 6 秒后距离连续、跨 ±180° 取点、`RunConfig` 边界（0.49/60.1/0/1001/99 ms 拒绝）、时长格式化 |
 | route-core | `LoopStateMachineTest` | 7 | 0 | 正常迁移链 IDLE→READY→STARTING→RUNNING→PAUSED→RUNNING→COMPLETED→READY、非法迁移抛异常、`stop()` 幂等、`fail()` 记录错误码且不覆盖、COMPLETED 下 stop 为空操作 |
-| simulation-core | `MockLocationSessionTest` | 12 | 0 | gps→network→fused 创建顺序、不支持项跳过并记录、可选 provider 失败回滚已创建项、`SecurityException` 映射为 `MOCK_APP_NOT_SELECTED`、重复 start 不重建、publish 写入全部 provider 且字段完整、publish 失败映射 `PUBLISH_FAILED`、未 start 时 publish 抛异常、stop 只移除本次创建且幂等、remove 抛异常不外泄、候选必须含 gps |
+| route-core | `TickGapPolicyTest` | 10 | 0 | 默认上限 5 秒、没有上次 tick 不暂停、恰好 5 秒不暂停、5 秒 + 1 ns 暂停、时钟回退不暂停、自定义上限、原因文案含秒数与「自动暂停/继续」、负间隔不出负数、整秒与一位小数格式化、非正上限拒绝 |
+| simulation-core | `MockLocationSessionTest` | 13 | 0 | gps→network→fused 创建顺序、不支持项跳过并记录、可选 provider 失败回滚已创建项、`SecurityException` 映射为 `MOCK_APP_NOT_SELECTED`、重复 start 不重建、publish 写入全部 provider 且字段完整、publish 失败映射 `PUBLISH_FAILED`、未 start 时 publish 抛异常、stop 只移除本次创建且幂等、remove 抛异常不外泄、候选必须含 gps、stop 先停用再移除（部分 ROM 只认停用） |
 | app | `RouteJsonCodecTest` | 9 | 0 | 编解码往返、字段与顺序、单点草稿可保存但编译报 `ROUTE_INVALID`、`closed:false` 拒绝、未知 `schemaVersion` 拒绝、空 id 拒绝、坐标越界拒绝、超 5000 点拒绝 |
 | app | `RouteRepositoryTest` | 8 | 0 | 保存/加载往返、列表按更新时间倒序、id 生成格式、非法 id 拒绝、删除幂等、损坏文件移入 `corrupt/` 保留原文件名且不被覆盖、原子写不残留 `.tmp` |
 | app | `RouteEditorViewModelTest` | 9 | 0 | 加点/撤销/清空/闭合、点数上限、单圈长度随点变化、草稿（<2 点）不可运行、手动经纬度输入解析（先纬后经、非法值拒绝）、速度与圈数校验、保存后重新加载名字与点 |
-| **合计** | 8 个套件 | **77** | **0** | 失败 0、错误 0、跳过 0 |
+| **合计** | 9 个套件 | **88** | **0** | 失败 0、错误 0、跳过 0 |
 
 ## 2. 静态检查（lint）
 
@@ -73,7 +74,7 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 | T08 | 暂停后继续 | `RouteEngineTest`（按有效时间连续推进）+ `LoopStateMachineTest`（PAUSED→RUNNING）；真机无跳跃未验证 | 部分 |
 | T09 | 连续点开始/暂停/停止 | `LoopStateMachineTest`（`stop()` 幂等）、服务层单实例由 `SimulationService` 的单一 `HandlerThread` + `PendingRunRegistry` 保证；重复点击未在真机验证 | 部分 |
 | T10 | 250 / 500 / 1000 ms 采样一致性 | `RouteEngineTest`：三种 tick 同一时刻位置与距离一致 | 自动化通过 |
-| T11 | 调度间隔 > 5 秒自动暂停 | 已实现（`SimulationService.MAX_TICK_GAP_NANOS`，暂停时有效时间只累计到上一次成功 tick）；**无单元测试、未真机验证** | 未实测 |
+| T11 | 调度间隔 > 5 秒自动暂停 | 策略抽到 `TickGapPolicy`（10 个单测覆盖 5 秒边界、时钟回退、文案），服务在 tick 里命中即暂停且有效时间只累计到上一次成功 tick；**服务接线本身未真机验证** | 部分（策略已单测） |
 | T12 | 跨 ±180° | `GeoMathTest`（插值）+ `RouteEngineTest`（取点、方位） | 自动化通过 |
 | T13 | NaN / 无限 / 越界坐标 | `GeoPoint` 构造校验 + `RouteJsonCodecTest` 越界拒绝 | 自动化通过 |
 | T14 | 未选模拟应用 / 权限拒绝 / 定位关闭 | `MockLocationSessionTest` 覆盖 setup 失败与错误码映射；系统弹窗、权限拒绝的真实路径未验证 | 部分 |
@@ -88,7 +89,7 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 | T23 | 5000 点无 ANR | `RouteCompilerTest` 覆盖 5000 点编译；界面渲染与 `pointAt` 二分查找未在真机计时 | 部分 |
 | T24 | 覆盖安装保留数据 | 未验证 | 未实测 |
 
-汇总：**自动化通过 10 条**（T01—T06、T10、T12、T13 及 T04 相关边界）、**部分通过 8 条**（T07、T08、T09、T14、T19、T20、T23 等）、**未实测 6 条**（T11、T15—T18、T21、T22、T24 中需真机项）。
+汇总：**自动化通过 10 条**（T01—T06、T10、T12、T13 及 T04 相关边界）、**部分通过 9 条**（T07、T08、T09、T11、T14、T19、T20、T23 等）、**未实测 5 条**（T15—T18、T21、T22、T24 中需真机项）。
 
 ## 5. 怎么把「未实测」变成「已实测」
 

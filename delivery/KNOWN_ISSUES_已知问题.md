@@ -39,7 +39,7 @@
 
 ## 三、工程/构建限制
 
-1. 工程位于含中文的路径，Windows 下必须通过 `subst` 映射 ASCII 盘符（`R:\route-workshop`）构建；
+1. 工程已迁移到纯 ASCII 路径（`E:\agri-run\route-workshop`）；早期在含中文路径下必须用 `subst` 映射盘符构建，这一点已在 2026-10-26 解决；
    直接在同一条路径混用 `E:\` 与 `R:\` 会报 `this and base files have different roots`。
 2. Gradle 8.11.1 不支持 JDK 25；构建必须 `JAVA_HOME=D:\Java\jdk-21`。
 3. Gradle 发行包走腾讯镜像（`services.gradle.org` 在本机不可达）。

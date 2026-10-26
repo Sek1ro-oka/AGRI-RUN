@@ -198,6 +198,21 @@ public class MockLocationSessionTest {
     }
 
     @Test
+    public void stop_disablesBeforeRemoving() {
+        FakeProviderApi api = new FakeProviderApi();
+        MockLocationSession session = new MockLocationSession(api);
+        session.start();
+        api.events.clear();
+
+        session.stop();
+
+        int disableGps = api.events.indexOf("enable:gps=false");
+        int removeGps = api.events.indexOf("remove:gps");
+        assertTrue("停止时应先停用 gps：" + api.events, disableGps >= 0);
+        assertTrue("停用之后才移除 gps：" + api.events, removeGps > disableGps);
+    }
+
+    @Test
     public void stop_swallowsRemoveFailures() {
         FakeProviderApi api = new FakeProviderApi();
         api.removeThrows = true;

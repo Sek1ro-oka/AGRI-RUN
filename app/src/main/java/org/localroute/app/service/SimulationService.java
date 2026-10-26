@@ -70,7 +70,8 @@ public class SimulationService extends Service {
     private static final int NOTIFICATION_ID = 1001;
     private static final long WAKELOCK_TIMEOUT_MS = 90L * 60L * 1000L;
     /** 任务书 T11：两次 tick 的实际间隔超过这个值，就认为调度被阻塞，自动暂停而不是硬补一大段路线。 */
-    private static final long MAX_TICK_GAP_NANOS = 5_000_000_000L;
+    private static final org.localroute.core.TickGapPolicy TICK_GAP_POLICY =
+            org.localroute.core.TickGapPolicy.defaults();
     private static final double FIX_ALTITUDE_METERS = 10d;
     private static final double FIX_ACCURACY_METERS = 3d;
 
@@ -162,7 +163,9 @@ public class SimulationService extends Service {
                 } catch (RuntimeException ignored) {
                     // 状态不允许时忽略，清理照旧。
                 }
-                publishSnapshot(RunState.STOPPED, null);
+                if (stateMachine.state() == RunState.STOPPED) {
+                    publishSnapshot(RunState.STOPPED, null);
+                }
             }
             cleanupEverything();
             stopForeground(STOP_FOREGROUND_REMOVE);
@@ -307,8 +310,7 @@ public class SimulationService extends Service {
         }
 
         long now = SystemClock.elapsedRealtimeNanos();
-        if (state == RunState.RUNNING && lastTickNanos > 0L
-                && now - lastTickNanos > MAX_TICK_GAP_NANOS) {
+        if (state == RunState.RUNNING && TICK_GAP_POLICY.shouldPause(lastTickNanos, now)) {
             // T11：调度被阻塞（后台被冻结、系统卡顿等）。只把有效时间累计到上一次成功 tick，
             // 然后自动暂停，绝不一口气补掉这几秒——否则位置会突然跳出一大段。
             autoPauseForSchedulerGap(now - lastTickNanos);
@@ -383,9 +385,7 @@ public class SimulationService extends Service {
             DiagnosticLog.warn("自动暂停时状态异常（已忽略）：" + e.getMessage());
         }
         lastElapsedMs = clock.elapsedNanos(pausedAt) / 1_000_000L;
-        String reason = String.format(Locale.US,
-                "调度间隔 %.1f 秒（上限 5 秒），已自动暂停；点「继续」从暂停点恢复",
-                gapNanos / 1_000_000_000d);
+        String reason = TICK_GAP_POLICY.reasonForGap(gapNanos);
         DiagnosticLog.warn(reason);
         repo.publish(baseSnapshot(RunState.PAUSED)
                 .error(RunErrorCode.SCHEDULER_INTERRUPTED, reason)
@@ -416,7 +416,9 @@ public class SimulationService extends Service {
             return;
         }
         RunState state = stateMachine.state();
-        if (state == RunState.RUNNING || state == RunState.PAUSED || state == RunState.STARTING) {
+        boolean wasActive = state == RunState.RUNNING || state == RunState.PAUSED
+                || state == RunState.STARTING;
+        if (wasActive) {
             try {
                 stateMachine.stop();
             } catch (RuntimeException e) {
@@ -424,7 +426,12 @@ public class SimulationService extends Service {
             }
         }
         lastElapsedMs = clock == null ? lastElapsedMs : clock.elapsedNanos(SystemClock.elapsedRealtimeNanos()) / 1_000_000L;
-        publishSnapshot(RunState.STOPPED, lastProgress);
+        if (wasActive) {
+            // 只有真正打断运行才把快照改成「已停止」；已完成/失败的状态不该被停止覆盖掉。
+            publishSnapshot(RunState.STOPPED, lastProgress);
+        } else if (state == RunState.COMPLETED || state == RunState.ERROR) {
+            DiagnosticLog.info("停止请求到达时任务已是终态 " + state + "，保留该状态");
+        }
         cleanupEverything();
         updateNotification(RunState.STOPPED, lastProgress, true);
         stopForeground(STOP_FOREGROUND_DETACH);

@@ -11,39 +11,33 @@
 | AGP | 8.9.2 |
 | 网络 | 直连 `dl.google.com` / `repo1.maven.org`；`services.gradle.org` 在本机不可达，故用镜像 |
 
-## 2. 必须知道的 Windows 路径坑
+## 2. Windows 路径坑（已通过迁移目录解决，保留记录）
 
-工程位于 `E:\农林快跑\route-workshop`（含中文）。
+**现状：工程位于纯 ASCII 路径 `E:\agri-run\route-workshop`，直接构建即可，不再需要 `subst`，
+`gradle.properties` 里的 `android.overridePathCheck` 也已移除（2026-10-26 迁移）。**
 
-1. **AGP 默认拒绝非 ASCII 路径** → `gradle.properties` 里设了 `android.overridePathCheck=true`。
+迁移前工程在 `E:\农林快跑\route-workshop`（含中文），踩过的三个坑，供以后换机器时参考：
+
+1. **AGP 默认拒绝非 ASCII 路径** → 当时靠 `android.overridePathCheck=true` 绕过。
 2. **Gradle 测试 worker 在非 ASCII 路径下会 `ClassNotFoundException`**（已用最小工程复现：ASCII 路径通过，
-   中文路径必挂）。表现为 `4 tests completed, 4 failed`，每个失败都是
-   `java.lang.ClassNotFoundException: org.localroute.core.GeoMathTest`。
+   中文路径必挂）。表现为 `4 tests completed, 4 failed`，每条失败都是
+   `java.lang.ClassNotFoundException: org.localroute.core.GeoMathTest`。调过 `-Dfile.encoding`、
+   `JAVA_TOOL_OPTIONS`、`--no-daemon`，都无效。
 3. **同一个工程用两个不同路径构建会再挂一次**：`this and base files have different roots`
-   （`E:\...` 与 `R:\...` 的产物混在一起时，dex 转换无法处理）。
+   （`E:\...` 与 `R:\...` 的产物混在一起时，dex 转换无法处理），必须先 `clean`。
 
-**结论：本机统一通过 `subst` 出来的 ASCII 盘符构建，不要混用两条路径。**
-
-```powershell
-# 管理员/普通用户均可（subst 是每用户会话级映射，重启后需要重做一次）
-subst R: "E:\农林快跑"
-Test-Path R:\route-workshop\settings.gradle      # 应为 True
-```
-
-切换路径后先 `clean` 一次，再构建：
-
-```powershell
-$env:JAVA_HOME='D:\Java\jdk-21'
-$env:ANDROID_HOME='E:\Android\Sdk'
-$env:HTTP_PROXY=''; $env:HTTPS_PROXY=''          # 本机代理失效，直连更快
-Set-Location R:\route-workshop
-.\gradlew.bat clean
-```
+当时的临时解法是 `subst R: "E:\农林快跑"`，但它有两个后遗症：重启后映射消失、两条路径混用会触发第 3 个坑。
+**最终解法是把目录改名成 ASCII（`E:\agri-run`）**，一劳永逸；`subst` 已删除。
 
 ## 3. 常用命令
 
 ```powershell
-# 全部 JVM 单元测试（route-core 39 + simulation-core 12 + app 26 = 77）
+Set-Location E:\agri-run\route-workshop
+$env:JAVA_HOME='D:\Java\jdk-21'
+$env:ANDROID_HOME='E:\Android\Sdk'
+$env:HTTP_PROXY=''; $env:HTTPS_PROXY=''          # 本机代理已失效，直连更快
+
+# 全部 JVM 单元测试（route-core 49 + simulation-core 13 + app 26 = 88）
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
 
 # Lint（abortOnError=true，有 error 会直接失败）

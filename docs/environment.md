@@ -8,8 +8,8 @@
 | 项 | 值 |
 | --- | --- |
 | 开发机 | Windows（中文系统，控制台代码页 GBK） |
-| 工作区 | `E:\农林快跑`（工程在 `E:\农林快跑\route-workshop`） |
-| 构建用映射盘符 | `subst R: "E:\农林快跑"` → `R:\route-workshop` |
+| 工作区 | `E:\agri-run`（工程在 `E:\agri-run\route-workshop`；2026-10-26 由 `E:\农林快跑` 改名而来） |
+| 构建路径 | 直接使用 `E:\agri-run\route-workshop`（纯 ASCII，不再需要 `subst`） |
 | 磁盘 | C: 32.5 GB 可用，D: 19.9 GB，E: 324.3 GB |
 | 真机 | **无**（`adb devices -l` 为空） |
 
@@ -35,9 +35,11 @@
 
 ## 已知环境陷阱（都踩过）
 
-1. 含中文的路径会让 Gradle 测试 worker `ClassNotFoundException` → 必须走 `subst R:`。
-2. 同一工程混用 `E:\` 与 `R:\` 构建 → `different roots` dex 失败 → 先 `clean`，之后只用一个路径。
-3. AGP 默认拒绝非 ASCII 路径 → `android.overridePathCheck=true`（纯 Java、无 NDK）。
+1. 路径含中文时 Gradle 测试 worker 会 `ClassNotFoundException`（`-Dfile.encoding`、`JAVA_TOOL_OPTIONS`、
+   `--no-daemon` 都救不了）→ **已于 2026-10-26 把目录改名为 ASCII（`E:\agri-run`）彻底解决**；
+   迁移前用 `subst R:` 兜底，现已删除映射。
+2. 同一工程混用 `E:\` 与 `R:\`（或改名前后）构建 → `different roots` dex 失败 → 先 `clean`，之后只用一个路径。
+3. AGP 默认拒绝非 ASCII 路径 → 迁移前用 `android.overridePathCheck=true` 兜底，**迁移后已移除该开关**。
 4. PowerShell 的 `Get-Content` 会把 UTF-8 中文按 GBK 显示成乱码；判断“文件是否被写坏”要用
    `[System.IO.File]::ReadAllText($p, [Text.Encoding]::UTF8)` 或 `ReadAllBytes`。
 5. PowerShell 5.1 的 `Set-Content -Encoding utf8` 会写 BOM；需要无 BOM 时用

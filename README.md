@@ -8,7 +8,7 @@
 - 无账号、无网络请求（地图瓦片除外）、无服务器、数据只存在手机本地
 - 附带一个独立包名的小工具 **定位探针**（`org.localroute.probe`），用来独立验证“系统确实收到了坐标”
 
-> 本仓库按 `E:\农林快跑\路线工具_开发任务书_v1.md` 开发，只做任务书里的 P0 范围。
+> 本仓库按 `E:\agri-run\路线工具_开发任务书_v1.md` 开发，只做任务书里的 P0 范围。
 > 它不修改、不注入、不 hook 任何第三方应用；是否采信模拟位置由系统与第三方应用自己决定。
 
 ## 功能一览
@@ -40,13 +40,14 @@
 ## 构建
 
 需要 JDK 17+（本项目用 JDK 21 实测）、Android SDK（platform 35、build-tools 35.0.0）。
-**Windows 上工程路径必须能通过纯 ASCII 路径访问**，否则 Gradle 的测试 worker 会
-`ClassNotFoundException`、跨盘符构建还会报 `different roots`；本机用 `subst R: "E:\农林快跑"` 后用 `R:\route-workshop` 构建。
-详见 `docs/BUILD.md`。
+工程已放在**纯 ASCII 路径** `E:\agri-run\route-workshop`，直接构建即可，不需要 `subst`。
+（早期工程位于含中文的路径，Gradle 测试 worker 会 `ClassNotFoundException`、混用盘符会报
+`different roots`，因此曾用 `subst` 兜底；2026-10-26 已把目录迁移成 ASCII 名字，相关开关一并移除。
+排查记录见 `docs/BUILD.md`。）
 
 ```powershell
 $env:JAVA_HOME='D:\Java\jdk-21'; $env:ANDROID_HOME='E:\Android\Sdk'
-Set-Location R:\route-workshop
+Set-Location E:\agri-run\route-workshop
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest
 .\gradlew.bat :app:assembleRelease :app:lintDebug
 ```

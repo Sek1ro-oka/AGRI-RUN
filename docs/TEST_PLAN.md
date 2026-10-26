@@ -17,7 +17,7 @@
 | T08 | 暂停后继续 | 从暂停点继续，无跳跃、不补算暂停时间 | ✅ 逻辑 / ⚠️ 真机 | `clock.pause/start` 配对，`handleResume` 用 `elapsedNanos` 续算 |
 | T09 | 连续点开始/暂停/停止 | 只有一个任务，停止可重复调用 | ✅ 状态机 / ⚠️ 真机 | `LoopStateMachine` 非法迁移抛异常；非运行状态 `stop()` 为空操作；`START_NOT_STICKY` |
 | T10 | 250 / 500 / 1000 ms 时间步 | 同等有效时间下位置与距离一致 | ✅ | `RouteEngineTest`：三种 tick 在同一有效时间得到相同 `Progress` |
-| T11 | 调度间隔大于 5 秒 | 自动暂停并解释原因，不跨越大段路线 | ⚠️ | 服务在 tick 里检测「实际间隔 > 5 s」→ 只把时间累计到上一次 tick，然后 RUNNING→PAUSED 并在通知/状态里说明原因（见 `SimulationService` 的 `MAX_TICK_GAP_NANOS`） |
+| T11 | 调度间隔大于 5 秒 | 自动暂停并解释原因，不跨越大段路线 | ⚠️ | 策略抽到 `route-core` 的 `TickGapPolicy`（`defaults()`、`shouldPause(last,now)`、`reasonForGap`），tick 里命中即 RUNNING→PAUSED，有效时间只累计到上一次成功 tick，通知与界面都会带上原因；10 个单测覆盖边界，服务接线本身仍未上真机 |
 | T12 | 跨 ±180° 合成路线 | 沿短方向插值 | ✅ | `GeoMathTest`：跨日界线 slerp 落在日期线附近；`RouteCompiler` 用球面插值 |
 | T13 | NaN / 无限 / 越界坐标、速度、圈数 | 拒绝输入，不写入可运行路线 | ✅ | `GeoPoint` 构造校验、`RunConfig` 边界、`RouteCompilerTest`、`RouteEngineTest`、`RunConfigTest` |
 | T14 | 未选模拟应用 / 权限拒绝 / 定位关闭 | 显示正确原因，不进入假 RUNNING | ⚠️ | 启动前逐项检查并 `failAndStop`；`SecurityException` 映射 `MOCK_APP_NOT_SELECTED`；只有首次提交成功才 `providerReady()` |
@@ -32,7 +32,7 @@
 | T23 | 5000 点路线 | 编辑与运行无 ANR，按距离查找不全量遍历 | ✅ 编译 / ⚠️ 真机 | `RouteCompilerTest` 校验 5000 点上限与 5001 点拒绝；`pointAt` 用前缀距离二分 |
 | T24 | 同包同签名覆盖安装 | 保留路线数据，版本号正确 | ⚠️ | `versionCode 1 / versionName 0.1.0`；升级脚本见 `docs/BUILD.md` |
 
-## 自动化测试清单（77 个）
+## 自动化测试清单（88 个）
 
 | 模块 | 套件 | 用例数 |
 | --- | --- | --- |
@@ -40,18 +40,19 @@
 | route-core | `RouteCompilerTest` | 12 |
 | route-core | `RouteEngineTest` | 11 |
 | route-core | `LoopStateMachineTest` | 7 |
-| simulation-core | `MockLocationSessionTest` | 12 |
+| route-core | `TickGapPolicyTest` | 10 |
+| simulation-core | `MockLocationSessionTest` | 13 |
 | app | `RouteJsonCodecTest` | 9 |
 | app | `RouteRepositoryTest` | 8 |
 | app | `RouteEditorViewModelTest` | 9 |
-| 合计 | 8 个套件 | **77** |
+| 合计 | 9 个套件 | **88** |
 
 执行命令与结果：
 
 ```powershell
-Set-Location R:\route-workshop
+Set-Location E:\agri-run\route-workshop
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
-# BUILD SUCCESSFUL；39 + 12 + 26 = 77 个用例，0 失败
+# BUILD SUCCESSFUL；49 + 13 + 26 = 88 个用例，0 失败
 ```
 
 ## 如何把「未实测」变成「已实测」

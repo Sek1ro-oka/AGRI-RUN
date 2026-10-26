@@ -25,7 +25,7 @@
     "agp": "8.9.2",
     "androidBuildTools": "35.0.0",
     "androidPlatform": "android-35",
-    "note": "构建路径必须为 ASCII（本机用 subst R: 映射 E:\\农林快跑）"
+    "note": "工程位于纯 ASCII 路径 E:\\agri-run\\route-workshop；早期在含中文路径下用 subst R: 兜底，2026-10-26 改名后已删除映射与 android.overridePathCheck"
   },
   "dependencies": [
     { "module": "org.maplibre.gl:android-sdk", "version": "13.7.1", "license": "BSD-2-Clause", "scope": "implementation" },

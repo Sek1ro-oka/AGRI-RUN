@@ -4,7 +4,9 @@
 
 | 文件 | 内容 |
 | --- | --- |
-| `build-and-test-run.log` | 最后一次全量执行的完整 Gradle 输出：`:route-core:test`、`:simulation-core:test`、`:app:testDebugUnitTest`、`:app:lintDebug`、`:location-probe:lintDebug`、`:app:assembleRelease`、`:app:assembleDebug`、`:location-probe:assembleDebug`，结尾为 `BUILD SUCCESSFUL` |
+| `build-run.log` | 最后一次全量构建的完整 Gradle 输出：`clean` + 三个模块的单元测试、`:app:lintDebug`、`:location-probe:lintDebug`、`:app:assembleRelease`、`:app:assembleDebug`、`:location-probe:assembleDebug`，结尾为 `BUILD SUCCESSFUL` |
+| `tests-run.log` | 强制重跑单元测试（`--rerun-tasks --no-build-cache`）的日志，用于证明 88 个用例是真的执行过、不是缓存命中 |
+| `lint-summary.txt` | `lintDebug` 的 error/warning 清单摘要（0 errors, 20 warnings） |
 | `gradle-version.txt` | `gradlew --version`：Gradle 8.11.1、Launcher JVM 21.0.3、Daemon JVM `D:\Java\jdk-21` |
 | `java-version.txt` | 构建用 JDK 版本 |
 | `adb-devices.txt` | `adb devices -l` 的原始输出：**只有表头，没有设备**——这是本轮「无真机」的直接证据 |
@@ -22,8 +24,10 @@
 ```powershell
 $env:JAVA_HOME = 'D:\Java\jdk-21'
 $env:ANDROID_HOME = 'E:\Android\Sdk'
-Set-Location 'R:\route-workshop'   # subst R: "E:\农林快跑"
+Set-Location 'E:\agri-run\route-workshop'
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --console=plain
 ```
 
-注意：必须从 `R:\`（纯 ASCII 路径）构建，直接在含中文的路径下跑单元测试会因 Gradle 测试 worker 的 `ClassNotFoundException` 失败，原因与绕法见 `docs/BUILD.md`。
+工程已位于纯 ASCII 路径，直接构建即可。早期工程在含中文的路径下时，Gradle 测试 worker 会因
+`ClassNotFoundException` 整体加载失败（当时用 `subst` 映射盘符绕开），原因与处理见 `docs/BUILD.md`；
+如果你把源码放到含中文的目录再构建，仍会遇到同样的问题。
