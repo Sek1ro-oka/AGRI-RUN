@@ -81,12 +81,12 @@ $adb = 'E:\Android\Sdk\platform-tools\adb.exe'
 
 | 文件 | 用途 |
 | --- | --- |
-| `TEST_REPORT_测试结果.md` | 88 个自动化用例的结果、T01—T24 逐条覆盖情况、哪些没实测 |
+| `TEST_REPORT_测试结果.md` | 95 个自动化用例的结果、T01—T24 逐条覆盖情况、哪些没实测 |
 | `KNOWN_ISSUES_已知问题.md` | 已知限制与未验证项 |
 | `BUILD_构建说明.md` | 怎么从源码重新构建、签名怎么生成、怎么校验 APK |
 | `VERSION_版本与依赖.json` | 版本号与 12 个依赖的版本、许可证 |
 | `SHA256SUMS.txt` | 交付文件的 SHA-256，校验方法：`sha256sum -c SHA256SUMS.txt`（Windows 用 `Get-FileHash` 对照） |
-| `source.zip` | 源码快照（与 git 提交 `dc683ae` 一致） |
+| `source.zip` | 源码快照（`git archive HEAD` 生成；对应提交见仓库 `git log -1`） |
 | `samples/` | 两条合成坐标的示例路线（不是真实地点） |
 | `evidence/` | 构建/测试原始记录与「无真机」说明 |
 

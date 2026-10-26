@@ -37,7 +37,7 @@ $env:JAVA_HOME='D:\Java\jdk-21'
 $env:ANDROID_HOME='E:\Android\Sdk'
 $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''          # 本机代理已失效，直连更快
 
-# 全部 JVM 单元测试（route-core 49 + simulation-core 13 + app 26 = 88）
+# 全部 JVM 单元测试（route-core 51 + simulation-core 16 + app 28 = 95）
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
 
 # Lint（abortOnError=true，有 error 会直接失败）

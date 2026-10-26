@@ -60,8 +60,10 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<String[]> permissionLauncher;
 
     private RunSnapshot snapshot = RunSnapshot.idle();
-    private CompiledRoute pendingRoute;
-    private RunConfig pendingConfig;
+    // 待启动参数放在 ViewModel 里：权限弹窗期间旋转屏幕时 Activity 会重建，字段会丢失，
+    // 用户点「允许」后就毫无反应。ViewModel 能跨配置变更存活。
+    private final java.util.concurrent.ExecutorService ioExecutor =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -157,6 +159,8 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        // shutdown 而不是 shutdownNow：已提交的保存/加载让它跑完，避免半截临时文件。
+        ioExecutor.shutdown();
         mapController.onDestroy();
         super.onDestroy();
     }
@@ -346,30 +350,40 @@ public class MainActivity extends AppCompatActivity {
             startWithSetupCheck(route, config);
             return;
         }
-        pendingRoute = route;
-        pendingConfig = config;
+        viewModel.setPendingStart(route, config);
         toast("需要定位权限才能提交模拟位置");
         permissionLauncher.launch(needed.toArray(new String[0]));
     }
 
     private void onPermissionResult(java.util.Map<String, Boolean> result) {
-        CompiledRoute route = pendingRoute;
-        RunConfig config = pendingConfig;
-        pendingRoute = null;
-        pendingConfig = null;
+        CompiledRoute route = viewModel.pendingStartRoute();
+        RunConfig config = viewModel.pendingStartConfig();
+        viewModel.clearPendingStart();
         boolean fineGranted = hasPermission(Manifest.permission.ACCESS_FINE_LOCATION);
         if (!fineGranted) {
             toast("缺少「精确位置」权限，无法运行");
             return;
         }
-        if (route != null && config != null) {
-            startWithSetupCheck(route, config);
+        if (route == null || config == null) {
+            // 旋转后重建、或权限结果比请求晚到：给出提示而不是静默无响应。
+            toast("权限已就绪，请再点一次「开始」");
+            return;
         }
+        startWithSetupCheck(route, config);
     }
 
     private void startWithSetupCheck(CompiledRoute route, RunConfig config) {
+        if (snapshot.isActive()) {
+            toast("已有运行中的任务，请先停止");
+            return;
+        }
         SettingsInspector.MockProbeResult probe = SettingsInspector.probeMockProvider(this);
         if (probe == SettingsInspector.MockProbeResult.ALLOWED) {
+            launchRun(route, config);
+            return;
+        }
+        if (probe == SettingsInspector.MockProbeResult.ALLOWED_AFTER_CLEANUP) {
+            toast("已清理上次运行残留的测试 provider");
             launchRun(route, config);
             return;
         }
@@ -509,15 +523,20 @@ public class MainActivity extends AppCompatActivity {
 
     private void doSave() {
         RouteDefinition route = viewModel.toDefinition();
-        try {
-            repository.save(route);
-            viewModel.markSaved();
-            toast("已保存：" + route.displayName());
-            DiagnosticLog.info("路线已保存：" + route.id());
-        } catch (IOException | RuntimeException e) {
-            DiagnosticLog.error("保存路线失败", e);
-            toast("保存失败：" + e.getMessage());
-        }
+        // 编码 + fsync 是磁盘操作，放到后台线程，避免点保存时卡住界面（5000 点路线时更明显）。
+        ioExecutor.execute(() -> {
+            try {
+                repository.save(route);
+                runOnUiThread(() -> {
+                    viewModel.markSaved();
+                    toast("已保存：" + route.displayName());
+                    DiagnosticLog.info("路线已保存：" + route.id());
+                });
+            } catch (IOException | RuntimeException e) {
+                DiagnosticLog.error("保存路线失败", e);
+                runOnUiThread(() -> toast("保存失败：" + e.getMessage()));
+            }
+        });
     }
 
     private String defaultRouteName() {
@@ -526,7 +545,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showLoadDialog() {
-        List<RouteSummary> summaries = repository.list();
+        // 列表要逐个解析 JSON（每条最多 5000 点），后台线程读，读完再弹对话框。
+        ioExecutor.execute(() -> {
+            List<RouteSummary> summaries = repository.list();
+            runOnUiThread(() -> showLoadDialogWith(summaries));
+        });
+    }
+
+    private void showLoadDialogWith(List<RouteSummary> summaries) {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
         if (summaries.isEmpty()) {
             toast("还没有保存的路线");
             return;
@@ -544,15 +573,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadRoute(RouteSummary summary) {
-        try {
-            RouteDefinition route = repository.load(summary.id());
-            viewModel.load(route);
-            refreshDraft(true);
-            toast("已加载：" + route.displayName());
-        } catch (IOException | RouteJsonCodec.RouteFormatException | RuntimeException e) {
-            DiagnosticLog.error("加载路线失败：" + summary.id(), e);
-            toast("加载失败：" + e.getMessage());
-        }
+        ioExecutor.execute(() -> {
+            try {
+                RouteDefinition route = repository.load(summary.id());
+                runOnUiThread(() -> {
+                    viewModel.load(route);
+                    refreshDraft(true);
+                    toast("已加载：" + route.displayName());
+                });
+            } catch (IOException | RouteJsonCodec.RouteFormatException | RuntimeException e) {
+                DiagnosticLog.error("加载路线失败：" + summary.id(), e);
+                runOnUiThread(() -> toast("加载失败：" + e.getMessage()));
+            }
+        });
     }
 
     private void showRenameDialog() {

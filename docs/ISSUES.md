@@ -8,10 +8,10 @@
 | 编号 | 标题 | 处理 | 证据 |
 | --- | --- | --- | --- |
 | I-001 | AGP 拒绝含中文的工程路径 | 先用 `android.overridePathCheck=true` 兜底；2026-10-26 目录改名为 `E:\agri-run` 后该开关已移除 | `clean` 后 `:app:assembleDebug` 在 ASCII 路径下构建通过 |
-| I-002 | Gradle 测试 worker 在中文路径下 `ClassNotFoundException` | 先用 `subst R: "E:\农林快跑"` 兜底；2026-10-26 把目录改名为 `E:\agri-run` 彻底解决并删除 `subst` | ASCII 路径 `clean` 后 88 个用例全绿 |
+| I-002 | Gradle 测试 worker 在中文路径下 `ClassNotFoundException` | 先用 `subst R: "E:\农林快跑"` 兜底；2026-10-26 把目录改名为 `E:\agri-run` 彻底解决并删除 `subst` | ASCII 路径 `clean` 后 95 个用例全绿 |
 | I-003 | 混用两个路径（`E:\` 与 `R:\`、改名前后）构建导致 `different roots` dex 失败 | 先 `gradlew clean`，此后只用一个路径构建 | ASCII 路径 `clean` 全量构建 `BUILD SUCCESSFUL` |
 | I-004 | Gradle wrapper 无法下载（`services.gradle.org` 不可达） | `--gradle-distribution-url` 指向腾讯镜像并写入 `gradle-wrapper.properties` | `gradlew.bat --version` 输出 Gradle 8.11.1 |
-| I-005 | 路线文件半写风险 | 写 `.json.tmp` + `FileDescriptor.sync()` + 原子 `move`；损坏文件移入 `corrupt/` 且保留原文件名 | `RouteRepositoryTest` 8 个用例 |
+| I-005 | 路线文件半写风险 | 写 `.json.tmp`（随机后缀）+ `FileDescriptor.sync()` + 目录 fsync（平台不支持时忽略）+ 原子 `move`；损坏文件移入 `corrupt/` 且保留原文件名 | `RouteRepositoryTest` 10 个用例 |
 | I-006 | `delete()` 二次删除返回 true（不幂等） | 先判 `exists()` 再 `delete()` | `RouteRepositoryTest.deleteRemovesFileAndIsIdempotent` |
 | I-007 | `RouteEngine` 有效用时 `01:00:00` 显示成 `1:00:00` | 格式串改 `%02d:%02d:%02d` | `RouteEngineTest.formatDuration_handlesMinutesAndHours` |
 | I-008 | 状态机允许 `STARTING` 直接 `resume()`、`COMPLETED` 被 `stop()` 改写成 `STOPPED` | `resume()` 前置校验；`stop()` 在非运行状态为空操作；服务层只在实际打断运行时才发布 STOPPED 快照 | `LoopStateMachineTest` 7 个用例 |
@@ -22,6 +22,18 @@
 | I-013 | 定位探针只有占位界面，无法独立验证坐标 | 实现 `ProbeActivity`：多 provider 监听、模拟位置标记、累计位移、停止汇总 | 构建产物 `location-probe-debug.apk`（真机未实测） |
 | I-014 | 大路线（5000 点）塞进 Intent 可能触发体积上限 | 用进程内 `PendingRunRegistry` 传请求，Intent 只带 `runId` | 代码审查 `MainActivity` → `SimulationService` 路径 |
 | I-015 | 通知栏缺少暂停/继续/停止 | 常驻通知两个 Action，与页面共用 `handlePause/handleResume/handleStop` | 代码审查（真机未实测） |
+| I-016 | 上次异常退出残留的测试 provider 让应用永久无法运行，且被误报成「设备不支持」 | `MockLocationSession.start()` 先尝试清理残留再创建；设置页探测新增 `ALLOWED_AFTER_CLEANUP` 结果并在界面说明 | `MockLocationSessionTest.staleProviderFromPreviousCrash_isClearedBeforeCreating` |
+| I-017 | `add` 成功但 `enable` 失败时 provider 未记录，回滚删不掉，自己制造残留 | 先记录再启用；启用失败额外撤掉该 provider | `gpsEnableFailure_rollsBackEverything`、`optionalEnableFailureIsSkippedAndProviderRemoved` |
+| I-018 | 可选 provider（network/fused）失败导致整次运行失败，与「GPS 必需、其余尽力」矛盾 | 非必需 provider 失败只记入 `skippedProviders` 并继续；只有 gps 失败或一个都没建成才失败 | `optionalProviderFailureIsSkippedNotFatal` |
+| I-019 | `handleStart` 在主线程、其余命令在 Handler 线程，共享字段无同步；`onStartCommand` 无兜底异常 | START 改为投递到服务 Handler；`post()` 包一层 `runGuarded`，异常转 `ERROR`；`stopped` 加 `volatile` | 代码审查（服务层暂无单测） |
+| I-020 | 早退路径（无请求/重复停止/未知动作）不写终态，界面可能永远停在「运行中」 | 新增 `stopAndPublishStoppedIfActive()` | 代码审查 |
+| I-021 | 通知节流用挂钟、每 tick 重复 `startForeground`、所有动作都先发「准备中」 | 改用 `elapsedRealtime()` 节流；后续更新走 `NotificationManager.notify`；只有 ACTION_START 发「准备中」 | 代码审查 |
+| I-022 | 手势监听在 map 就绪前注册，静默失效 → 运行中地图拖不动 | `registerGestureListener()` 记录意图，`onMapReady` 补挂 | 代码审查 |
+| I-023 | 权限弹窗期间旋转丢请求，点「允许」后毫无反应 | 待启动参数搬进 `RouteEditorViewModel`；缺失时提示「请再点一次开始」 | 代码审查 |
+| I-024 | 主线程读写磁盘（保存、列表、诊断导出） | 保存/列表/加载改到单线程 `Executor`，回调回主线程；`onDestroy` 里 `shutdown()` | 代码审查 |
+| I-025 | 原子写没 fsync、tmp 名固定、`list()` 认内容 id | 目录 fsync、tmp 随机后缀、文件名与内容 id 不一致时隔离 | `listQuarantinesFileWhoseNameDoesNotMatchContentId`、`saveLeavesNoTemporaryFilesBehind` |
+| I-026 | 完成容差、单圈 1 米边界缺测试 | 补 `completionThreshold_boundaryEitherSide`、`lapLengthNearOneMeter_isAcceptedOrRejected` | 用例数 88 → 95 全绿 |
+| I-027 | 完成了独立的只读代码审查（此前 I-106 记录为“未做”） | 另起 subagent 不共享上下文、只读审查，逐条评估后修复 P1/P2 问题 | 本文件 I-016—I-026、`delivery/TEST_REPORT_测试结果.md` 第 7 节 |
 
 ## 未关闭
 
@@ -32,4 +44,7 @@
 | I-103 | OSM 公共瓦片的使用政策风险 | 已写署名、未自定义 UA、无离线预取 | 正式长期使用前换自建/商业瓦片源 |
 | I-104 | 第三方 App 是否采信模拟位置未知 | 未做任何检索与承诺 | 属被测方行为，不在本工具范围内 |
 | I-105 | 无导出 GPX/GeoJSON 能力 | 任务书 P0 未要求 | 若需要再进 P1 |
-| I-106 | 未做独立的代码审查（单人开发，无第二人） | 本轮我同时承担指挥与实现 | 交付报告里如实标注“未安排独立审查” |
+| I-107 | `SimulationService` 没有任何自动化测试 | 700+ 行服务只靠静态走查；JVM 单测覆盖不到 Handler/通知/WakeLock | 后续引入 Robolectric 或真机 instrumentation，至少覆盖 tick 推进与 stop/complete 分支 |
+| I-108 | 崩溃残留的测试 provider 在真机上是否跨进程存活 | 代码已加「先清理再创建」，但未在真机验证 system_server 里的残留行为 | 真机：强杀进程后重启应用，看是否仍能正常开始（观察诊断页 provider 矩阵） |
+| I-109 | `fused`（GMS）provider 能否注册因 ROM 而异 | 代码按「尽力尝试、失败跳过」处理，逐项记录在 `publishedProviders/skippedProviders` | 真机看诊断页矩阵并记录实际结果 |
+| I-110 | Android 14 上从通知 Action 冷启动前台服务可能受限 | 代码先 `ensureForeground` 再投递命令，未在真机验证 | 真机：杀掉界面后用通知按钮暂停/停止，确认状态与通知一致 |

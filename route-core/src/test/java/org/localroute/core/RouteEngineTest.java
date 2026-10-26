@@ -223,4 +223,44 @@ public class RouteEngineTest {
         assertEquals("01:00:00", ActiveElapsedClock.formatDuration(3_600_000_000_000L));
         assertEquals("02:03:04", ActiveElapsedClock.formatDuration(7_384_000_000_000L));
     }
+
+    /** 完成判定容差是 1e-6 米：两侧各验一次，避免“差一点点就完成/差一点点不完成”的边界错乱。 */
+    @Test
+    public void completionThreshold_boundaryEitherSide() throws Exception {
+        CompiledRoute route = squareRoute();
+        RunConfig config = new RunConfig(9d, 1);
+        double target = RouteEngine.targetDistanceMeters(route, config);
+        double speed = config.speedMetersPerSecond();
+
+        RouteEngine.Progress justShort = RouteEngine.progressAt(route, config,
+                Math.round((target - 2e-6d) / speed * NANOS_PER_SECOND));
+        assertFalse("距目标 2e-6 米时不应完成", justShort.finished());
+
+        RouteEngine.Progress atThreshold = RouteEngine.progressAt(route, config,
+                Math.round((target - 1e-6d) / speed * NANOS_PER_SECOND));
+        assertTrue("进入 1e-6 米容差即视为完成", atThreshold.finished());
+        assertEquals("完成时距离夹到目标", target, atThreshold.distanceMeters(), 1e-9d);
+        assertEquals(route.vertex(0).latitude(), atThreshold.latitude(), 1e-12d);
+        assertEquals(route.vertex(0).longitude(), atThreshold.longitude(), 1e-12d);
+    }
+
+    /** 单圈恰好 1 米附近：略大于 1 米可编译，略小于 1 米按需求拒绝。 */
+    @Test
+    public void lapLengthNearOneMeter_isAcceptedOrRejected() {
+        double metersPerDegreeLat = 110_574d;
+        double acceptedLat = 0.5d / metersPerDegreeLat;
+        double rejectedLat = 0.40d / metersPerDegreeLat;
+
+        CompiledRoute accepted;
+        try {
+            accepted = RouteCompiler.compile(Arrays.asList(
+                    new GeoPoint(0d, 0d), new GeoPoint(acceptedLat, 0d)));
+        } catch (InvalidRouteException e) {
+            throw new AssertionError("略大于 1 米的往返路线应可编译", e);
+        }
+        assertTrue("往返长度应略大于 1 米：" + accepted.lapLengthMeters(), accepted.lapLengthMeters() > 1.0d);
+
+        assertThrows(InvalidRouteException.class, () -> RouteCompiler.compile(Arrays.asList(
+                new GeoPoint(0d, 0d), new GeoPoint(rejectedLat, 0d))));
+    }
 }

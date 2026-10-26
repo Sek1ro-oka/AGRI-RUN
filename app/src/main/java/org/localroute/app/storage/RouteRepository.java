@@ -8,10 +8,12 @@ import org.localroute.app.model.RouteSummary;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -78,8 +80,15 @@ public final class RouteRepository {
         }
         List<RouteSummary> summaries = new ArrayList<>(files.length);
         for (File file : files) {
+            String idFromName = file.getName().substring(0, file.getName().length() - ".json".length());
             try {
                 RouteDefinition route = readFile(file);
+                if (!route.id().equals(idFromName)) {
+                    // 文件名与内容 id 不一致：列表里会出现“点开说路线不存在、删也删不掉”的幽灵条目。
+                    quarantine(file, new RouteJsonCodec.RouteFormatException(
+                            "文件名与内容 id 不一致（" + idFromName + " ≠ " + route.id() + "）"));
+                    continue;
+                }
                 summaries.add(new RouteSummary(route.id(), route.displayName(), route.updatedAt(),
                         route.points().size()));
             } catch (IOException | JSONException | RouteJsonCodec.RouteFormatException e) {
@@ -106,7 +115,9 @@ public final class RouteRepository {
     /** 原子保存（新增或覆盖）。 */
     public void save(RouteDefinition route) throws IOException {
         File target = fileFor(route.id());
-        File tmp = new File(routesDir, route.id() + ".json.tmp");
+        // 临时文件名带随机后缀：同一 id 的两次并发保存不会互相截断同一个临时文件。
+        File tmp = new File(routesDir,
+                route.id() + ".json." + UUID.randomUUID().toString().substring(0, 8) + ".tmp");
         byte[] payload;
         try {
             payload = RouteJsonCodec.encode(route).getBytes(StandardCharsets.UTF_8);
@@ -129,6 +140,19 @@ public final class RouteRepository {
             if (tmp.exists() && !tmp.delete()) {
                 warnings.add("临时文件未能删除：" + tmp.getName());
             }
+        }
+        syncDirectory();
+    }
+
+    /**
+     * 目录项也要落盘，否则掉电后 rename 可能丢失（旧版本还在，新版本没了）。
+     * Windows 上目录不能以 READ 打开，这里 best-effort：失败只忽略，不影响保存结果。
+     */
+    private void syncDirectory() {
+        try (FileChannel channel = FileChannel.open(routesDir.toPath(), StandardOpenOption.READ)) {
+            channel.force(true);
+        } catch (IOException | RuntimeException ignored) {
+            // 平台不支持时跳过（真机 Android 上通常可行）。
         }
     }
 

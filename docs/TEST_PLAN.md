@@ -32,27 +32,27 @@
 | T23 | 5000 点路线 | 编辑与运行无 ANR，按距离查找不全量遍历 | ✅ 编译 / ⚠️ 真机 | `RouteCompilerTest` 校验 5000 点上限与 5001 点拒绝；`pointAt` 用前缀距离二分 |
 | T24 | 同包同签名覆盖安装 | 保留路线数据，版本号正确 | ⚠️ | `versionCode 1 / versionName 0.1.0`；升级脚本见 `docs/BUILD.md` |
 
-## 自动化测试清单（88 个）
+## 自动化测试清单（95 个）
 
 | 模块 | 套件 | 用例数 |
 | --- | --- | --- |
 | route-core | `GeoMathTest` | 9 |
 | route-core | `RouteCompilerTest` | 12 |
-| route-core | `RouteEngineTest` | 11 |
+| route-core | `RouteEngineTest` | 13 |
 | route-core | `LoopStateMachineTest` | 7 |
 | route-core | `TickGapPolicyTest` | 10 |
-| simulation-core | `MockLocationSessionTest` | 13 |
+| simulation-core | `MockLocationSessionTest` | 16 |
 | app | `RouteJsonCodecTest` | 9 |
-| app | `RouteRepositoryTest` | 8 |
+| app | `RouteRepositoryTest` | 10 |
 | app | `RouteEditorViewModelTest` | 9 |
-| 合计 | 9 个套件 | **88** |
+| 合计 | 9 个套件 | **95** |
 
 执行命令与结果：
 
 ```powershell
 Set-Location E:\agri-run\route-workshop
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
-# BUILD SUCCESSFUL；49 + 13 + 26 = 88 个用例，0 失败
+# BUILD SUCCESSFUL；51 + 16 + 28 = 95 个用例，0 失败
 ```
 
 ## 如何把「未实测」变成「已实测」

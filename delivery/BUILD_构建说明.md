@@ -33,7 +33,7 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''
 ## 3. 构建命令
 
 ```powershell
-# 单元测试（88 个用例）
+# 单元测试（95 个用例）
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
 
 # Lint（有 error 会失败）

@@ -28,8 +28,11 @@ public class MockLocationSessionTest {
         final Set<String> failEnable = new HashSet<>();
         final Map<String, MockFix> lastPublished = new LinkedHashMap<>();
         final List<String> created = new ArrayList<>();
+        /** 模拟 system_server 里真实存在的测试 provider（残留也在这里）。 */
+        final Set<String> registered = new HashSet<>();
         boolean failPublish;
         boolean removeThrows;
+        boolean removeUnknownThrows = true;
         RunErrorCode addErrorCode = RunErrorCode.PROVIDER_SETUP_FAILED;
 
         @Override
@@ -43,6 +46,11 @@ public class MockLocationSessionTest {
             if (failAdd.contains(provider)) {
                 throw new MockProviderException(addErrorCode, "add failed: " + provider);
             }
+            if (registered.contains(provider)) {
+                throw new MockProviderException(RunErrorCode.PROVIDER_SETUP_FAILED,
+                        "Provider \"" + provider + "\" already exists");
+            }
+            registered.add(provider);
             created.add(provider);
         }
 
@@ -68,7 +76,12 @@ public class MockLocationSessionTest {
             events.add("remove:" + provider);
             created.remove(provider);
             if (removeThrows) {
+                registered.remove(provider);
                 throw new IllegalStateException("remove boom");
+            }
+            if (removeUnknownThrows && !registered.remove(provider)) {
+                // 与 Android 平台一致：移除一个不存在的测试 provider 会抛 IllegalArgumentException。
+                throw new IllegalArgumentException("Provider \"" + provider + "\" unknown");
             }
         }
     }
@@ -85,8 +98,14 @@ public class MockLocationSessionTest {
 
         assertTrue(result.success());
         assertEquals(Arrays.asList("gps", "network", "fused"), result.publishedProviders());
+        List<String> createdEvents = new ArrayList<>();
+        for (String event : api.events) {
+            if (event.startsWith("add:") || event.startsWith("enable:")) {
+                createdEvents.add(event);
+            }
+        }
         assertEquals(Arrays.asList("add:gps", "enable:gps=true", "add:network", "enable:network=true",
-                "add:fused", "enable:fused=true"), api.events);
+                "add:fused", "enable:fused=true"), createdEvents);
         assertTrue(session.isStarted());
     }
 
@@ -103,19 +122,66 @@ public class MockLocationSessionTest {
     }
 
     @Test
-    public void start_rollsBackWhenOptionalProviderFails() {
+    public void optionalProviderFailureIsSkippedNotFatal() {
         FakeProviderApi api = new FakeProviderApi();
         api.failAdd.add("network");
         MockLocationSession session = new MockLocationSession(api);
 
         ProviderSetupResult result = session.start();
 
+        assertTrue("network 属于尝试项，失败不应让整次运行失败：" + api.events, result.success());
+        assertEquals(Arrays.asList("gps", "fused"), result.publishedProviders());
+        assertTrue(result.skippedProviders().contains("network"));
+        assertEquals("gps", api.created.get(0));
+        assertTrue(session.lastOptionalFailure().contains("network"));
+    }
+
+    @Test
+    public void optionalEnableFailureIsSkippedAndProviderRemoved() {
+        FakeProviderApi api = new FakeProviderApi();
+        api.failEnable.add("network");
+        MockLocationSession session = new MockLocationSession(api);
+
+        ProviderSetupResult result = session.start();
+
+        assertTrue(result.success());
+        assertEquals(Arrays.asList("gps", "fused"), result.publishedProviders());
+        assertTrue(result.skippedProviders().contains("network"));
+        assertFalse("启用失败的 network 必须被撤掉，不能留在系统里", api.registered.contains("network"));
+        assertTrue(api.events.contains("remove:network"));
+    }
+
+    @Test
+    public void gpsEnableFailure_rollsBackEverything() {
+        FakeProviderApi api = new FakeProviderApi();
+        api.failEnable.add("gps");
+        MockLocationSession session = new MockLocationSession(api);
+
+        ProviderSetupResult result = session.start();
+
         assertFalse(result.success());
-        assertEquals("network", result.failedProvider());
         assertEquals(RunErrorCode.PROVIDER_SETUP_FAILED, result.errorCode());
-        assertEquals("已创建的 gps 必须被撤销", 0, api.created.size());
-        assertTrue(api.events.contains("remove:gps"));
+        assertEquals("gps", result.failedProvider());
         assertFalse(session.isStarted());
+        assertTrue("已创建的 gps 必须被撤销", api.registered.isEmpty());
+    }
+
+    @Test
+    public void staleProviderFromPreviousCrash_isClearedBeforeCreating() {
+        FakeProviderApi api = new FakeProviderApi();
+        // 模拟上次进程被杀留下的 gps 测试 provider。
+        api.registered.add("gps");
+        api.created.add("gps");
+        MockLocationSession session = new MockLocationSession(api);
+
+        ProviderSetupResult result = session.start();
+
+        assertTrue("残留 provider 必须被清理后继续：" + api.events, result.success());
+        assertEquals(Arrays.asList("gps", "network", "fused"), result.publishedProviders());
+        assertEquals(Arrays.asList("gps"), session.staleProvidersCleared());
+        int removeGps = api.events.indexOf("remove:gps");
+        int addGps = api.events.indexOf("add:gps");
+        assertTrue("先清理再创建", removeGps >= 0 && addGps > removeGps);
     }
 
     @Test

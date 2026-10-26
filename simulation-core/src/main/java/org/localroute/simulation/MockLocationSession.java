@@ -35,7 +35,10 @@ public final class MockLocationSession {
     private final List<String> createdProviders = new ArrayList<>();
     private final List<String> skippedProviders = new ArrayList<>();
     private final Set<String> attemptedProviders = new HashSet<>();
+    private final List<String> staleProviders = new ArrayList<>();
     private boolean started;
+    /** 最近一次「尝试项 provider 创建失败」的说明，供诊断页展示；没有失败时为 null。 */
+    private String lastOptionalFailure;
 
     public MockLocationSession(MockProviderApi api) {
         this(api, DEFAULT_PROVIDERS);
@@ -63,6 +66,8 @@ public final class MockLocationSession {
         createdProviders.clear();
         skippedProviders.clear();
         attemptedProviders.clear();
+        staleProviders.clear();
+        lastOptionalFailure = null;
 
         for (String provider : candidateProviders) {
             boolean required = PROVIDER_GPS.equals(provider);
@@ -76,16 +81,28 @@ public final class MockLocationSession {
                 skippedProviders.add(provider);
                 continue;
             }
+            clearStaleProvider(provider);
             try {
                 api.addTestProvider(provider);
-                api.setTestProviderEnabled(provider, true);
+                // 先入账再启用：enable 失败时 rollback 才找得到这个 provider，否则会把它漏在系统里。
                 createdProviders.add(provider);
+                api.setTestProviderEnabled(provider, true);
             } catch (MockProviderException e) {
+                boolean wasCreated = createdProviders.remove(provider);
+                if (wasCreated) {
+                    removeQuietly(provider);
+                }
+                RunErrorCode code = e.errorCode() == null
+                        ? RunErrorCode.PROVIDER_SETUP_FAILED : e.errorCode();
+                String message = e.getMessage() == null ? ("创建 provider 失败：" + provider) : e.getMessage();
+                if (!required) {
+                    // gps 之外都是尝试项：失败只记录、不拖垮整次运行（见任务书第 8 步）。
+                    skippedProviders.add(provider);
+                    lastOptionalFailure = provider + "：" + message;
+                    continue;
+                }
                 rollback();
-                return ProviderSetupResult.failure(provider,
-                        e.errorCode() == null ? RunErrorCode.PROVIDER_SETUP_FAILED : e.errorCode(),
-                        e.getMessage() == null ? ("创建 provider 失败：" + provider) : e.getMessage(),
-                        skippedProviders);
+                return ProviderSetupResult.failure(provider, code, message, skippedProviders);
             }
         }
 
@@ -168,5 +185,31 @@ public final class MockLocationSession {
         }
         createdProviders.clear();
         started = false;
+    }
+
+    /**
+     * 清掉同名残留 provider。
+     *
+     * <p>测试 provider 由 system_server 持有，应用进程被杀、崩溃或 OOM 后注册可能仍在，
+     * 下次 {@code addTestProvider} 会抛 {@code IllegalArgumentException("Provider \"gps\" already exists")}。
+     * 这里在创建前先尽力移除一次（不移除也能继续，失败交给后续流程），避免应用「一次异常退出就永久不能用」。
+     */
+    private void clearStaleProvider(String provider) {
+        try {
+            api.removeTestProvider(provider);
+            staleProviders.add(provider);
+        } catch (RuntimeException ignored) {
+            // 没有残留，或当前 ROM 不允许移除：都属于正常情况。
+        }
+    }
+
+    /** 本次启动前发现并清理掉的残留 provider（诊断页展示用）。 */
+    public List<String> staleProvidersCleared() {
+        return Collections.unmodifiableList(new ArrayList<>(staleProviders));
+    }
+
+    /** 最近一次尝试项（network/fused）创建失败的说明；没有失败返回 null。 */
+    public String lastOptionalFailure() {
+        return lastOptionalFailure;
     }
 }

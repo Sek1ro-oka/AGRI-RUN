@@ -8,6 +8,7 @@ import org.localroute.core.CompiledRoute;
 import org.localroute.core.GeoPoint;
 import org.localroute.core.InvalidRouteException;
 import org.localroute.core.RouteCompiler;
+import org.localroute.core.RunConfig;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +28,28 @@ public class RouteEditorViewModel extends ViewModel {
     private boolean persisted;
 
     private static final int MAX_UNDO = 200;
+
+    // 权限弹窗期间 Activity 可能重建，待启动参数放这里才不会丢（见 MainActivity.requestPermissionsThenStart）。
+    private CompiledRoute pendingStartRoute;
+    private RunConfig pendingStartConfig;
+
+    public void setPendingStart(CompiledRoute route, RunConfig config) {
+        this.pendingStartRoute = route;
+        this.pendingStartConfig = config;
+    }
+
+    public CompiledRoute pendingStartRoute() {
+        return pendingStartRoute;
+    }
+
+    public RunConfig pendingStartConfig() {
+        return pendingStartConfig;
+    }
+
+    public void clearPendingStart() {
+        pendingStartRoute = null;
+        pendingStartConfig = null;
+    }
 
     public List<GeoPoint> points() {
         return draft.points();

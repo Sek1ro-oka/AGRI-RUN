@@ -66,6 +66,8 @@ public final class RouteMapController {
     private Style style;
     private OnMapClickListener clickListener;
     private boolean followRunner = true;
+    private boolean gestureListenerWanted;
+    private boolean gestureListenerAttached;
 
     public interface OnMapClickListener {
         void onMapClick(GeoPoint point);
@@ -102,6 +104,8 @@ public final class RouteMapController {
             clickListener.onMapClick(new GeoPoint(latLng.getLatitude(), latLng.getLongitude()));
             return true;
         });
+        // 界面可能在 map 就绪之前就调用了 registerGestureListener，这里补挂一次。
+        attachGestureListenerIfReady();
     }
 
     private void addSources(@NonNull Style loaded) {
@@ -218,7 +222,16 @@ public final class RouteMapController {
 
     /** 用户手势造成的相机移动应停止跟随；程序移动不算。 */
     public void registerGestureListener() {
-        if (map == null) {
+        gestureListenerWanted = true;
+        attachGestureListenerIfReady();
+    }
+
+    /**
+     * 地图对象是异步就绪的：界面在 attach 之后立刻调用 registerGestureListener 时 map 还是 null，
+     * 所以这里记住“想要监听”，等 onMapReady 里再补挂，避免跟随永远关不掉、运行中地图无法拖动。
+     */
+    private void attachGestureListenerIfReady() {
+        if (!gestureListenerWanted || gestureListenerAttached || map == null) {
             return;
         }
         map.addOnCameraMoveStartedListener(reason -> {
@@ -226,6 +239,7 @@ public final class RouteMapController {
                 followRunner = false;
             }
         });
+        gestureListenerAttached = true;
     }
 
     public void onSaveInstanceState(@NonNull android.os.Bundle bundle) {

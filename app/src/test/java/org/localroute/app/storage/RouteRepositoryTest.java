@@ -9,6 +9,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.localroute.app.model.RouteDefinition;
+import org.localroute.app.model.RouteJsonCodec;
 import org.localroute.app.model.RouteSummary;
 import org.localroute.core.GeoPoint;
 
@@ -130,5 +131,37 @@ public class RouteRepositoryTest {
         assertFalse(RouteRepository.isValidId("route/with/slash"));
         assertFalse(RouteRepository.isValidId("a".repeat(81)));
         assertTrue(RouteRepository.isValidId("route-20261026-120000-abcdef"));
+    }
+
+    /**
+     * 文件名与内容 id 不一致时，列表里会出现“点开说路线不存在、删也删不掉”的幽灵条目，
+     * 所以 list() 直接把它隔离到 corrupt/，而不是当成正常路线展示。
+     */
+    @Test
+    public void listQuarantinesFileWhoseNameDoesNotMatchContentId() throws Exception {
+        File dir = folder.newFolder("routes");
+        RouteRepository repository = new RouteRepository(dir);
+        byte[] payload = RouteJsonCodec.encode(route("route-content", "内容 id", 0d))
+                .getBytes(StandardCharsets.UTF_8);
+        Files.write(new File(dir, "route-filename.json").toPath(), payload);
+
+        List<RouteSummary> summaries = repository.list();
+
+        assertTrue("文件名与内容 id 不一致的条目不应出现在列表里", summaries.isEmpty());
+        assertFalse("原文件应被移走而不是留在原处", new File(dir, "route-filename.json").isFile());
+        File corrupt = new File(dir, "corrupt/route-filename.json");
+        assertTrue("应隔离到 corrupt/ 并保留原文件名", corrupt.isFile());
+        assertFalse(repository.drainWarnings().isEmpty());
+    }
+
+    @Test
+    public void saveLeavesNoTemporaryFilesBehind() throws Exception {
+        File dir = folder.newFolder("routes");
+        RouteRepository repository = new RouteRepository(dir);
+        repository.save(route("route-tmp", "临时文件", 0d));
+
+        String[] leftovers = dir.list((d, name) -> name.endsWith(".tmp"));
+        assertNotNull(leftovers);
+        assertEquals("保存成功后不应残留临时文件", 0, leftovers.length);
     }
 }

@@ -52,13 +52,12 @@
   "source": {
     "repository": "本地 git 仓库（无远端，从未推送）",
     "branch": "master",
-    "commit": "4b25157",
-    "parentCommit": "dc683ae",
-    "note": "source.zip 由 git archive HEAD 生成；SHA256SUMS.txt 在归档之后计算，所以包内校验清单可能比本目录的少一行（这是自引用校验的固有限制）"
+    "archivedAt": "2026-10-26",
+    "note": "source.zip 由 git archive HEAD 生成，归档内容即生成时 HEAD 的树；为避免自引用导致哈希漂移，本文件不写死提交号，需要精确提交时在源码树执行 git log -1。SHA256SUMS.txt 在归档之后计算，不进入 source.zip"
   },
   "artifacts": [
-    { "file": "路线工坊-0.1.0-release.apk", "module": ":app" },
-    { "file": "定位探针-0.1.0-debug.apk", "module": ":location-probe" },
+    { "file": "路线工坊-0.1.0-release.apk", "module": ":app", "sizeMB": 32.89, "signing": "本地自签名（keystore 与口令不入库）" },
+    { "file": "定位探针-0.1.0-debug.apk", "module": ":location-probe", "sizeMB": 10.59, "signing": "debug 签名" },
     { "file": "source.zip", "note": "git archive 生成的源码快照（不含构建产物与私钥）" }
   ]
 }

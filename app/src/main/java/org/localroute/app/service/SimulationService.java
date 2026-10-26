@@ -94,7 +94,7 @@ public class SimulationService extends Service {
     private long lastElapsedMs;
     private long lastNotificationAt;
     private long lastTickNanos;
-    private boolean stopped;
+    private volatile boolean stopped;
 
     private final Runnable tickRunnable = new Runnable() {
         @Override
@@ -124,15 +124,16 @@ public class SimulationService extends Service {
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
         if (action == null) {
-            stopSelf(startId);
+            DiagnosticLog.warn("收到空动作，服务退出");
+            stopAndPublishStoppedIfActive("未收到有效的运行命令");
             return START_NOT_STICKY;
         }
 
-        // 进入前台必须在 5 秒内完成；先挂一条“准备中”的通知，再执行真正的启动流程。
-        ensureForeground(RunState.STARTING, "正在准备模拟位置…");
-
         if (ACTION_START.equals(action)) {
-            handleStart();
+            // 进入前台必须在 5 秒内完成：先在主线程挂一条“准备中”的通知，真正的启动流程放到
+            // 服务自己的 Handler 线程执行，避免与 tick / 停止命令同时改状态字段。
+            ensureForeground(RunState.STARTING, "正在准备模拟位置…");
+            post(this::handleStartSafely);
         } else if (ACTION_PAUSE.equals(action)) {
             post(this::handlePause);
         } else if (ACTION_RESUME.equals(action)) {
@@ -141,9 +142,32 @@ public class SimulationService extends Service {
             post(this::handleStop);
         } else {
             DiagnosticLog.warn("未知的服务动作：" + action);
-            stopSelf(startId);
+            stopAndPublishStoppedIfActive("收到未知的运行命令：" + action);
         }
         return START_NOT_STICKY;
+    }
+
+    /** 启动流程的兜底：任何未预料的异常都要变成可见的错误状态，不能把进程崩掉。 */
+    private void handleStartSafely() {
+        try {
+            handleStart();
+        } catch (RuntimeException e) {
+            DiagnosticLog.error("启动模拟位置时出现未预料的异常：" + e, null);
+            failAndStop(RunErrorCode.PROVIDER_SETUP_FAILED, "启动模拟位置失败：" + e);
+        }
+    }
+
+    /**
+     * 没有运行任务时的退出路径：如果界面还停在运行态（服务被系统提前销毁、收到非预期命令），
+     * 先补一条「已停止」快照，避免界面永远显示运行中、停止按钮又不起作用。
+     */
+    private void stopAndPublishStoppedIfActive(String reason) {
+        RunSnapshot current = repo.current();
+        if (current != null && current.isActive()) {
+            repo.publish(baseSnapshot(RunState.STOPPED).error(null, reason).build());
+        }
+        stopForeground(STOP_FOREGROUND_REMOVE);
+        stopSelf();
     }
 
     @Nullable
@@ -224,8 +248,7 @@ public class SimulationService extends Service {
         RunRequest pending = PendingRunRegistry.take();
         if (pending == null) {
             DiagnosticLog.warn("没有待执行的运行请求，服务退出");
-            stopForeground(STOP_FOREGROUND_REMOVE);
-            stopSelf();
+            stopAndPublishStoppedIfActive("没有待执行的运行请求");
             return;
         }
 
@@ -411,8 +434,7 @@ public class SimulationService extends Service {
     private void handleStop() {
         if (request == null) {
             // 重复停止：没有任何任务时直接退出，不报错（幂等）。
-            stopForeground(STOP_FOREGROUND_REMOVE);
-            stopSelf();
+            stopAndPublishStoppedIfActive("没有正在运行的任务");
             return;
         }
         RunState state = stateMachine.state();
@@ -619,7 +641,8 @@ public class SimulationService extends Service {
 
     private void updateNotification(RunState state, @Nullable RouteEngine.Progress progress, boolean finalState,
                                     @Nullable String note) {
-        long now = System.currentTimeMillis();
+        // 用单调时钟节流：用户改系统时间或自动校时回拨时，挂钟时间会让通知长时间不刷新。
+        long now = SystemClock.elapsedRealtime();
         if (!finalState && now - lastNotificationAt < 1000L && note == null) {
             return;
         }
@@ -641,14 +664,9 @@ public class SimulationService extends Service {
         if (manager == null) {
             return;
         }
-        if (!finalState) {
-            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification,
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                            ? ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-                            : 0);
-        } else {
-            manager.notify(NOTIFICATION_ID, notification);
-        }
+        // 服务在 ACTION_START 时已经 startForeground；后续只是更新同一条通知，
+        // 用 notify() 更新即可，不必每 500 ms 重新进入前台（startForeground 更贵且会重置超时计时）。
+        manager.notify(NOTIFICATION_ID, notification);
     }
 
     private void notifyError(RunErrorCode code, String message) {
@@ -727,10 +745,21 @@ public class SimulationService extends Service {
     }
 
     private void post(Runnable runnable) {
-        if (handler == null) {
-            runnable.run();
+        Handler target = handler;
+        if (target == null) {
+            runGuarded(runnable);
             return;
         }
-        handler.post(runnable);
+        target.post(() -> runGuarded(runnable));
+    }
+
+    /** 所有服务命令都在 Handler 线程串行执行，并且不把异常抛到线程外面。 */
+    private void runGuarded(Runnable runnable) {
+        try {
+            runnable.run();
+        } catch (RuntimeException e) {
+            DiagnosticLog.error("执行服务命令时异常：" + e, null);
+            failAndStop(RunErrorCode.SCHEDULER_INTERRUPTED, "服务内部错误：" + e);
+        }
     }
 }

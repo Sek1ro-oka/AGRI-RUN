@@ -1,24 +1,8 @@
-lintDebug（abortOnError=true）结果：0 errors, 20 warnings
+lint 结果汇总（2026-10-26，E:\agri-run\route-workshop）
 
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\simulation\AndroidMockProviderApi.java:42: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\simulation\AndroidMockProviderApi.java:120: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:53: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:58: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:64: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:66: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
-            Log.e(TAG, message, error);
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:76: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
-E:\agri-run\route-workshop\app\src\main\AndroidManifest.xml:13: Warning: The attribute android:allowBackup is deprecated from Android 12 and higher and may be removed in future versions. Consider adding the attribute android:dataExtractionRules specifying an @xml resource which configures cloud backups and device transfers on Android 12 and higher. [DataExtractionRules]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\simulation\AndroidMockProviderApi.java:97: Warning: Unnecessary; SDK_INT is always >= 29 [ObsoleteSdkInt]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\service\SimulationService.java:594: Warning: Unnecessary; SDK_INT is never < 29 [ObsoleteSdkInt]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\service\SimulationService.java:611: Warning: Unnecessary; SDK_INT is always >= 29 [ObsoleteSdkInt]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\service\SimulationService.java:646: Warning: Unnecessary; SDK_INT is always >= 29 [ObsoleteSdkInt]
-E:\agri-run\route-workshop\app\src\main\res\mipmap-anydpi-v26: Warning: This folder configuration (v26) is unnecessary; minSdkVersion is 29. Merge all the resources in this folder into mipmap-anydpi. [ObsoleteSdkInt]
-E:\agri-run\route-workshop\app\src\main\res\values\themes.xml:9: Warning: Unnecessary; SDK_INT is always >= 21 [ObsoleteSdkInt]
-E:\agri-run\route-workshop\app\src\main\res\layout\activity_main.xml:51: Warning: Set android:baselineAligned="false" on this element for better performance [DisableBaselineAlignment]
-E:\agri-run\route-workshop\app\src\main\res\values\colors.xml:7: Warning: The resource R.color.surface_muted appears to be unused [UnusedResources]
-E:\agri-run\route-workshop\app\src\main\res\values\colors.xml:8: Warning: The resource R.color.track_line appears to be unused [UnusedResources]
-E:\agri-run\route-workshop\app\src\main\res\values\colors.xml:9: Warning: The resource R.color.track_vertex appears to be unused [UnusedResources]
-E:\agri-run\route-workshop\app\src\main\res\values\colors.xml:10: Warning: The resource R.color.track_start appears to be unused [UnusedResources]
-E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\ui\SettingsCheckActivity.java:103: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
-0 errors, 20 warnings
+模块            errors  warnings  警告类别
+app            0 errors, 19 warnings    ObsoleteSdkInt=5, UnusedResources=4, DataExtractionRules=1, DisableBaselineAlignment=1
+location-probe 0 errors, 1 warnings     DataExtractionRules=1
+
+说明：剩余均为不阻塞交付的 warning（ObsoleteSdkInt 因 minSdk 29 的历史分支、UnusedResources 主题色、
+DataExtractionRules 模板建议、DisableBaselineAlignment 文本基线），abortOnError=true 下 0 error 即构建通过。

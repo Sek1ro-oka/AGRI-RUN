@@ -54,7 +54,7 @@ public final class SettingsInspector {
     }
 
     public enum MockProbeResult {
-        ALLOWED, DENIED, PROVIDER_UNSUPPORTED, MANAGER_UNAVAILABLE
+        ALLOWED, ALLOWED_AFTER_CLEANUP, DENIED, PROVIDER_UNSUPPORTED, MANAGER_UNAVAILABLE
     }
 
     private SettingsInspector() {
@@ -113,6 +113,19 @@ public final class SettingsInspector {
             if (!manager.getAllProviders().contains(LocationManager.GPS_PROVIDER)) {
                 return MockProbeResult.PROVIDER_UNSUPPORTED;
             }
+            // 上次异常退出（崩溃/OOM/被划掉）可能在 system_server 里留下同名测试 provider，
+            // 此时 addTestProvider 只会抛 "already exists"。先尝试清掉残留，再正常探测。
+            boolean clearedStale = false;
+            try {
+                manager.removeTestProvider(LocationManager.GPS_PROVIDER);
+                clearedStale = true;
+                DiagnosticLog.warn("检测到上次残留的测试 provider，已清理");
+            } catch (SecurityException e) {
+                DiagnosticLog.warn("模拟位置权限探测：被系统拒绝（未选中模拟位置应用）");
+                return MockProbeResult.DENIED;
+            } catch (RuntimeException ignored) {
+                // 没有残留时 removeTestProvider 会抛 IllegalArgumentException，属正常情况。
+            }
             manager.addTestProvider(LocationManager.GPS_PROVIDER,
                     false, false, false, false, true, true, true,
                     Criteria.POWER_LOW, Criteria.ACCURACY_FINE);
@@ -121,8 +134,8 @@ public final class SettingsInspector {
             } finally {
                 manager.removeTestProvider(LocationManager.GPS_PROVIDER);
             }
-            DiagnosticLog.info("模拟位置权限探测：允许");
-            return MockProbeResult.ALLOWED;
+            DiagnosticLog.info("模拟位置权限探测：允许" + (clearedStale ? "（已清理残留 provider）" : ""));
+            return clearedStale ? MockProbeResult.ALLOWED_AFTER_CLEANUP : MockProbeResult.ALLOWED;
         } catch (SecurityException e) {
             DiagnosticLog.warn("模拟位置权限探测：被系统拒绝（未选中模拟位置应用）");
             return MockProbeResult.DENIED;

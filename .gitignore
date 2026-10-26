@@ -34,6 +34,9 @@ release-signing.properties
 *.zip
 !gradle/wrapper/*.jar
 
+# 校验清单在归档之后生成，入库就会造成「清单里 source.zip 的哈希随提交变化」的自引用漂移
+delivery/SHA256SUMS.txt
+
 # ---- 运行期证据与本机日志 ----
 evidence/*.log
 *.hprof

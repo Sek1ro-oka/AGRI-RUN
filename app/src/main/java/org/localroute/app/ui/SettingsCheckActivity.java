@@ -154,6 +154,11 @@ public class SettingsCheckActivity extends AppCompatActivity {
                 title = "系统允许模拟位置";
                 message = "可以开始运行。若第三方应用仍收不到位置，请确认它自己使用了系统定位，且没有被系统限电策略冻结。";
                 break;
+            case ALLOWED_AFTER_CLEANUP:
+                title = "系统允许模拟位置（已清理残留）";
+                message = "上次运行可能没有正常结束，检测到残留的测试 provider，已自动清理。可以开始运行；"
+                        + "如果反复出现，请在运行中用通知里的「停止」结束，或重启手机。";
+                break;
             case DENIED:
                 title = "系统拒绝了模拟位置";
                 message = "请到开发者选项 →「选择模拟位置信息应用」里选中「路线工坊」，本应用需要出现在该列表中。";
