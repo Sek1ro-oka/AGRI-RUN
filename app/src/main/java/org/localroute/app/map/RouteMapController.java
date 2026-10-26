@@ -25,6 +25,9 @@ import org.maplibre.geojson.FeatureCollection;
 import org.maplibre.geojson.LineString;
 import org.maplibre.geojson.Point;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -58,20 +61,32 @@ public final class RouteMapController {
     /** 样式加载的看门狗：超过这个时间还没回调，就认为瓦片/样式加载失败。 */
     private static final long STYLE_TIMEOUT_MS = 10_000L;
 
+    /** 瓦片探测的超时：只取一张 0 级瓦片，不需要等太久。 */
+    private static final int TILE_PROBE_TIMEOUT_MS = 4_000;
+
+    /** 探测瓦片时带的 UA：与 OSM 使用政策中「可识别应用」的要求保持一致。 */
+    private static final String USER_AGENT = "RouteWorkshop/0.1.3 (Android; local route simulation)";
+
     private static final String PREFS = "map";
     private static final String PREF_TILE_SOURCE = "tile_source";
 
-    /** 可选瓦片源。前三个是公开的 OpenStreetMap 栅格服务；「高德」是 GCJ-02 坐标系的国内瓦片。 */
+    /**
+     * 可选瓦片源。默认用「高德」：国内网络通常能直连，而 tile.openstreetmap.org
+     * 在国内经常 TLS 握手失败（实测 SSLHandshakeException），用户会只看到一张空白底图。
+     *
+     * <p>高德这组地址是非官方公开接口、且用 GCJ-02 坐标系：前者可能随时失效（失效时可切回 OSM），
+     * 后者由 {@link ChinaShift} 在显示层换算，存储与计算始终是 WGS-84。
+     */
     private static final List<TileSource> TILE_SOURCES = Arrays.asList(
+            new TileSource("amap", "高德地图（GCJ-02，非官方接口）", CoordSystem.GCJ02, 18,
+                    "© 高德地图",
+                    "https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
+                    "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
+                    "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
+                    "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}"),
             new TileSource("osm", "OpenStreetMap 官方", CoordSystem.WGS84, 19,
                     "© OpenStreetMap contributors",
                     "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
-            new TileSource("amap", "高德地图（GCJ-02，非官方接口）", CoordSystem.GCJ02, 18,
-                    "© 高德地图",
-                    "https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
-                    "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
-                    "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
-                    "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"),
             new TileSource("osmfr", "OSM France（备用）", CoordSystem.WGS84, 19,
                     "© OpenStreetMap contributors",
                     "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png"),
@@ -104,6 +119,9 @@ public final class RouteMapController {
     @Nullable
     private StatusListener statusListener;
     private String lastStatus = "";
+    /** 最近一次瓦片探测失败的原因；为空表示上一次探测是通的。 */
+    @Nullable
+    private String tileWarning;
 
     /** 瓦片源描述。 */
     public static final class TileSource {
@@ -216,6 +234,7 @@ public final class RouteMapController {
             return;
         }
         style = null;
+        tileWarning = null;
         final TileSource source = currentTileSource();
         notifyStatus("正在加载 " + source.label() + " 瓦片…");
         DiagnosticLog.info("加载地图样式：" + source.label() + " / " + source.urlTemplate());
@@ -239,7 +258,60 @@ public final class RouteMapController {
             renderRoute(currentPoints);
             DiagnosticLog.info("地图样式已加载：" + source.label());
             notifyStatus(null);
+            // 样式加载成功不代表瓦片能下载：样式是一段本地 JSON，瓦片才是网络请求。
+            // 这里单独探一次瓦片，失败就把原因留在界面上，而不是让用户看着空白地图猜。
+            probeTiles(source);
         });
+    }
+
+    /**
+     * 探一次瓦片是否能下载（取第 0 级瓦片，最省流量），失败时把原因写进状态行。
+     *
+     * <p>用独立的短连接而不是 MapLibre 内部回调：MapLibre 没有暴露“所有瓦片都失败”的事件，
+     * 而这里只需要回答一个用户问题——“底图为什么是空的”。
+     */
+    private void probeTiles(@NonNull TileSource source) {
+        final String url = source.tileUrls().get(0)
+                .replace("{z}", "0").replace("{x}", "0").replace("{y}", "0");
+        Thread thread = new Thread(() -> {
+            boolean ok = false;
+            String reason = null;
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(url).openConnection();
+                connection.setConnectTimeout(TILE_PROBE_TIMEOUT_MS);
+                connection.setReadTimeout(TILE_PROBE_TIMEOUT_MS);
+                connection.setInstanceFollowRedirects(true);
+                connection.setRequestProperty("User-Agent", USER_AGENT);
+                int code = connection.getResponseCode();
+                ok = code >= 200 && code < 400;
+                if (!ok) {
+                    reason = "HTTP " + code;
+                }
+            } catch (IOException | RuntimeException e) {
+                reason = e.getClass().getSimpleName();
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+            final boolean reachable = ok;
+            final String failure = reason;
+            mapView.post(() -> {
+                if (!reachable) {
+                    tileWarning = String.format(Locale.US,
+                            "%s 的瓦片下载失败（%s），可在菜单「地图瓦片源」换一个",
+                            source.label(), failure);
+                    DiagnosticLog.warn("瓦片探测失败：" + tileWarning);
+                    notifyStatus(tileWarning);
+                } else if (tileWarning != null) {
+                    tileWarning = null;
+                    notifyStatus(null);
+                }
+            });
+        }, "tile-probe");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private void cancelStyleTimeout() {
@@ -453,6 +525,12 @@ public final class RouteMapController {
         if (map == null || points.isEmpty()) {
             return;
         }
+        // 单点没有“边界”可算：newLatLngBounds 对单点不会放大，用户会觉得“点了没反应”，
+        // 所以这里直接给一个适合看路的层级。
+        if (points.size() == 1) {
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(points.get(0)), 16f));
+            return;
+        }
         LatLngBounds.Builder builder = new LatLngBounds.Builder();
         for (GeoPoint point : points) {
             builder.include(toDisplay(point));
@@ -460,7 +538,7 @@ public final class RouteMapController {
         try {
             map.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 96));
         } catch (RuntimeException ignored) {
-            // 单点路线无法计算边界：直接居中。
+            // 极端情况（两点几乎重合）仍算不出边界：退化为居中。
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(points.get(0)), 17f));
         }
     }
@@ -473,6 +551,15 @@ public final class RouteMapController {
         }
         LatLng target = map.getCameraPosition().target;
         return fromDisplay(target.getLatitude(), target.getLongitude());
+    }
+
+    /** 该点是否落在当前可见范围内；地图没就绪时按「不可见」处理，让调用方重新取景。 */
+    public boolean isVisible(@NonNull GeoPoint point) {
+        if (map == null) {
+            return false;
+        }
+        LatLngBounds visible = map.getProjection().getVisibleRegion().latLngBounds;
+        return visible.contains(toDisplay(point));
     }
 
     /** 跟随当前模拟位置；用户手动拖动地图后自动关闭。 */

@@ -102,7 +102,8 @@ public class MainActivity extends AppCompatActivity {
                 // 传送模式：点地图不再是加节点，而是把模拟位置直接搬过去。
                 teleportTo(point);
             } else if (viewModel.addPoint(point)) {
-                refreshDraft(false);
+                // 第一个点、或点在视野外时重新取景：否则用户看不到刚点的位置，以为没生效。
+                refreshDraft(viewModel.pointCount() == 1 || !mapController.isVisible(point));
             }
         });
         mapController.registerGestureListener();
@@ -659,7 +660,7 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
                     if (viewModel.addPoint(point)) {
-                        refreshDraft(false);
+                        refreshDraft(viewModel.pointCount() == 1 || !mapController.isVisible(point));
                     } else {
                         toast("与上一个节点重合，或已达 5000 个节点上限");
                     }
