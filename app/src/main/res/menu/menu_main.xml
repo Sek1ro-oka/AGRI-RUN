@@ -25,8 +25,16 @@
         android:title="@string/menu_save"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_export_gpx"
+        android:title="@string/menu_export_gpx"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_load"
         android:title="@string/menu_load"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_import_gpx"
+        android:title="@string/menu_import_gpx"
         app:showAsAction="never" />
     <item
         android:id="@+id/action_rename"

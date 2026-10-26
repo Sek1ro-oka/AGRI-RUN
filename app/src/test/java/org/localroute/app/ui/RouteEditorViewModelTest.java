@@ -179,4 +179,78 @@ public class RouteEditorViewModelTest {
         viewModel.cancelTeleport();
         assertEquals(1, viewModel.pointCount());
     }
+
+    // ------------------------------------------------------------ GPX 导入替换草稿
+
+    @Test
+    public void replacePointsSwapsAllPointsAndKeepsIdentity() {
+        viewModel.rename("操场");
+        String id = viewModel.routeId();
+        viewModel.addPoint(new GeoPoint(30.0d, 120.0d));
+
+        int written = viewModel.replacePoints(Arrays.asList(
+                new GeoPoint(31.0d, 121.0d),
+                new GeoPoint(31.001d, 121.001d),
+                new GeoPoint(31.002d, 121.002d)));
+
+        assertEquals(3, written);
+        assertEquals(3, viewModel.pointCount());
+        assertEquals(id, viewModel.routeId());
+        assertEquals("操场", viewModel.routeName());
+        assertTrue("导入属于未保存修改", viewModel.isDirty());
+        assertEquals(31.0d, viewModel.points().get(0).latitude(), 1e-9d);
+    }
+
+    @Test
+    public void replacePointsKeepsClosedFlag() {
+        viewModel.toggleClosed();
+        assertFalse(viewModel.isClosed());
+
+        viewModel.replacePoints(Arrays.asList(
+                new GeoPoint(31.0d, 121.0d), new GeoPoint(31.001d, 121.001d)));
+
+        assertFalse("导入不应改动闭合开关", viewModel.isClosed());
+        assertTrue(viewModel.toggleClosed());
+        assertTrue(viewModel.isClosed());
+    }
+
+    @Test
+    public void replacePointsClearsUndoHistory() {
+        viewModel.addPoint(new GeoPoint(30.0d, 120.0d));
+        assertTrue(viewModel.canUndo());
+
+        viewModel.replacePoints(Arrays.asList(
+                new GeoPoint(31.0d, 121.0d), new GeoPoint(31.001d, 121.001d)));
+
+        // 整体替换后撤销会把点清空，而不是回到导入前，所以历史必须清掉。
+        assertEquals(2, viewModel.pointCount());
+        assertTrue(viewModel.canUndo());
+        viewModel.undo();
+        assertEquals(1, viewModel.pointCount());
+    }
+
+    @Test
+    public void replacePointsDropsNullsAndCapsAtMaxPoints() {
+        java.util.List<GeoPoint> many = new java.util.ArrayList<>();
+        many.add(new GeoPoint(0d, 0d));
+        many.add(null);
+        for (int i = 1; i <= org.localroute.core.RouteCompiler.MAX_POINTS; i++) {
+            // 交替两个坐标，避免全部重合被后续编译丢掉（这里只验证点数上限）。
+            many.add(new GeoPoint(0.0001d * (i % 2), 0.0001d * (i % 3)));
+        }
+
+        int written = viewModel.replacePoints(many);
+
+        assertEquals(org.localroute.core.RouteCompiler.MAX_POINTS, written);
+        assertEquals(org.localroute.core.RouteCompiler.MAX_POINTS, viewModel.pointCount());
+    }
+
+    @Test
+    public void replacePointsWithNullEmptiesTheDraft() {
+        viewModel.addPoint(new GeoPoint(30.0d, 120.0d));
+
+        assertEquals(0, viewModel.replacePoints(null));
+        assertEquals(0, viewModel.pointCount());
+        assertFalse(viewModel.canUndo());
+    }
 }
