@@ -52,7 +52,7 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 | --- | --- | --- |
 | `路线工坊-0.1.0-release.apk` | 32.89 MB | release，本地自签名；只含 `arm64-v8a`/`armeabi-v7a` 原生库 |
 | `定位探针-0.1.0-debug.apk` | 10.59 MB | 独立包名 `org.localroute.probe`，debug 签名，用于验证系统位置 |
-| `source.zip` | 0.19 MB | `git archive HEAD` 生成；源码快照对应的提交见 `git log -1`（归档内容即该提交的树） |
+| `source.zip` | 约 0.2 MB | `git archive HEAD` 生成；源码快照对应的提交见 `git log -1`（归档内容即该提交的树） |
 
 - `apksigner verify --print-certs`：签名有效，证书 `CN=Route Workshop Local`，SHA-256 `14f0286f4624de37fc1a013f9a15514ac04981bb1f222b77b3ce7dbb38f02a9c`。
 - `aapt2 dump badging`：`package org.localroute.app`、`versionCode 1`、`versionName 0.1.0`、`minSdk 29`、`targetSdk 35`、应用名「路线工坊」、入口 `org.localroute.app.ui.MainActivity`。
