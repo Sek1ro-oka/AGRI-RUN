@@ -65,6 +65,18 @@
     <string name="toast_teleport_stop_first">已有运行任务，请先停止再传送</string>
     <string name="toast_teleport_sending">正在传送到 %1$s（速度 0，可点「停止」结束）</string>
 
+    <!-- GPX 导入 / 导出 -->
+    <string name="menu_export_gpx">导出 GPX 到文件</string>
+    <string name="menu_import_gpx">从 GPX 文件导入</string>
+    <string name="gpx_default_name">路线</string>
+    <string name="toast_gpx_export_need_points">至少要有 2 个节点才能导出 GPX</string>
+    <string name="toast_gpx_exported">已导出 %1$d 个点到 GPX 文件</string>
+    <string name="toast_gpx_export_failed">导出 GPX 失败：%1$s</string>
+    <string name="toast_gpx_imported">已导入 %1$d 个点</string>
+    <string name="toast_gpx_imported_skipped">已导入 %1$d 个点（跳过 %2$d 个点）</string>
+    <string name="toast_gpx_parse_failed">GPX 解析失败：%1$s</string>
+    <string name="toast_gpx_read_failed">读取 GPX 文件失败：%1$s</string>
+
     <!-- 设置检查页 -->
     <string name="settings_title">设置检查</string>
     <string name="settings_recheck">重新检查</string>

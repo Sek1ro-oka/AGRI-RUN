@@ -169,6 +169,33 @@ public class RouteEditorViewModel extends ViewModel {
         undoStack.clear();
     }
 
+    /**
+     * 用一批外部来源的点整体替换草稿点（目前用于 GPX 导入）。
+     *
+     * <p>保留路线 ID、名称与「闭合」开关——导入的是点，不是一条新路线；
+     * 长度不是 2 个点也不拦，让用户接着编辑。历史撤销栈会清空：
+     * 一次导入是「整体替换」，逐点撤销回不到导入前的状态，留着只会误导。
+     *
+     * @return 实际写入的点数（已去掉 {@code null} 与超上限的部分）
+     */
+    public int replacePoints(List<GeoPoint> newPoints) {
+        List<GeoPoint> points = new ArrayList<>();
+        if (newPoints != null) {
+            for (GeoPoint point : newPoints) {
+                if (point == null) {
+                    continue;
+                }
+                if (points.size() >= RouteCompiler.MAX_POINTS) {
+                    break;
+                }
+                points.add(point);
+            }
+        }
+        applyPoints(points);
+        undoStack.clear();
+        return points.size();
+    }
+
     /** 载入已保存路线作为当前草稿。 */
     public void load(RouteDefinition route) {
         draft = route;

@@ -3,6 +3,7 @@ package org.localroute.app.ui;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
@@ -34,14 +35,19 @@ import org.localroute.app.settings.SettingsInspector;
 import org.localroute.app.storage.RouteRepository;
 import org.localroute.core.CompiledRoute;
 import org.localroute.core.GeoPoint;
+import org.localroute.core.GpxCodec;
 import org.localroute.core.InvalidRouteException;
 import org.localroute.core.RouteCompiler;
 import org.localroute.core.RunConfig;
 import org.localroute.core.RunState;
 import org.maplibre.android.MapLibre;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -59,6 +65,10 @@ public class MainActivity extends AppCompatActivity {
     private RouteEditorViewModel viewModel;
     private RouteMapController mapController;
     private ActivityResultLauncher<String[]> permissionLauncher;
+    /** 「导出 GPX 到文件」：输入是建议文件名，结果是用户选中的目标 Uri。 */
+    private ActivityResultLauncher<String> createGpxLauncher;
+    /** 「从 GPX 文件导入」：输入是 MIME 过滤列表，结果是选中的源 Uri。 */
+    private ActivityResultLauncher<String[]> openGpxLauncher;
 
     private RunSnapshot snapshot = RunSnapshot.idle();
     // 待启动参数放在 ViewModel 里：权限弹窗期间旋转屏幕时 Activity 会重建，字段会丢失，
@@ -80,6 +90,12 @@ public class MainActivity extends AppCompatActivity {
         viewModel = new ViewModelProvider(this).get(RouteEditorViewModel.class);
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissionResult);
+        // 文件选择用 SAF：不申请存储权限，用户自己决定读写哪份文件。
+        createGpxLauncher = registerForActivityResult(
+                new ActivityResultContracts.CreateDocument("application/gpx+xml"),
+                this::onExportTargetChosen);
+        openGpxLauncher = registerForActivityResult(
+                new ActivityResultContracts.OpenDocument(), this::onImportSourceChosen);
 
         mapController = RouteMapController.attach(binding.mapView, point -> {
             if (viewModel.isTeleportMode()) {
@@ -669,6 +685,158 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ---------------------------------------------------------------- GPX 导入 / 导出
+
+    /** 菜单「导出 GPX 到文件」：先拦点数，再由系统文件选择器决定落在哪里。 */
+    private void exportGpx() {
+        List<GeoPoint> points = viewModel.points();
+        if (points.size() < 2) {
+            // 一个点连不成路线，导出也没有意义。
+            toast(getString(R.string.toast_gpx_export_need_points));
+            return;
+        }
+        createGpxLauncher.launch(defaultGpxFileName());
+    }
+
+    /** 用户选好（或取消）导出目标：取消时 uri 为 null，静默返回。 */
+    private void onExportTargetChosen(Uri uri) {
+        if (uri == null) {
+            return;
+        }
+        // 草稿是不可变快照，这里再复制一份，后台线程就不用碰 ViewModel。
+        List<GeoPoint> points = new ArrayList<>(viewModel.points());
+        String name = viewModel.displayName();
+        ioExecutor.execute(() -> {
+            try {
+                String xml = GpxCodec.export(points, name);
+                try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+                    if (out == null) {
+                        throw new IOException("系统没有返回可写的输出流");
+                    }
+                    out.write(xml.getBytes(StandardCharsets.UTF_8));
+                    out.flush();
+                }
+                DiagnosticLog.info("GPX 已导出：" + points.size() + " 个点");
+                runOnUiThreadIfAlive(() -> toast(getString(R.string.toast_gpx_exported, points.size())));
+            } catch (IOException | RuntimeException e) {
+                DiagnosticLog.error("导出 GPX 失败", e);
+                runOnUiThreadIfAlive(() -> toast(getString(R.string.toast_gpx_export_failed, describe(e))));
+            }
+        });
+    }
+
+    /** 菜单「从 GPX 文件导入」。 */
+    private void importGpx() {
+        openGpxLauncher.launch(new String[]{
+                "application/gpx+xml", "application/xml", "text/xml", "*/*"});
+    }
+
+    /** 用户选好（或取消）导入来源：取消时 uri 为 null，静默返回。 */
+    private void onImportSourceChosen(Uri uri) {
+        if (uri == null) {
+            return;
+        }
+        ioExecutor.execute(() -> {
+            String xml;
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null) {
+                    throw new IOException("系统没有返回可读的输入流");
+                }
+                xml = readAllText(in);
+            } catch (IOException | RuntimeException e) {
+                DiagnosticLog.error("读取 GPX 文件失败", e);
+                runOnUiThreadIfAlive(() -> toast(getString(R.string.toast_gpx_read_failed, describe(e))));
+                return;
+            }
+
+            GpxCodec.ParseResult result;
+            try {
+                result = GpxCodec.parse(xml);
+            } catch (InvalidRouteException e) {
+                // 按错误码提示：解析器只抛出 ROUTE_INVALID，没有消息时退回错误码。
+                String detail = e.getMessage() == null ? e.errorCode().name() : e.getMessage();
+                DiagnosticLog.warn("GPX 解析失败：" + detail);
+                runOnUiThreadIfAlive(() -> toast(getString(R.string.toast_gpx_parse_failed, detail)));
+                return;
+            } catch (RuntimeException e) {
+                DiagnosticLog.error("GPX 解析异常", e);
+                runOnUiThreadIfAlive(() -> toast(getString(R.string.toast_gpx_parse_failed, describe(e))));
+                return;
+            }
+
+            List<GeoPoint> imported = new ArrayList<>(result.points());
+            int dropped = result.droppedPointCount();
+            if (!result.warnings().isEmpty()) {
+                DiagnosticLog.warn("GPX 导入跳过 " + dropped + " 个点："
+                        + summarizeWarnings(result.warnings()));
+            }
+            runOnUiThreadIfAlive(() -> {
+                // 只替换点：路线 ID、名称、「闭合」开关都保持用户当前的选择。
+                int written = viewModel.replacePoints(imported);
+                refreshDraft(true);
+                toast(dropped > 0
+                        ? getString(R.string.toast_gpx_imported_skipped, written, dropped)
+                        : getString(R.string.toast_gpx_imported, written));
+                DiagnosticLog.info("GPX 已导入：" + written + " 个点");
+            });
+        });
+    }
+
+    /**
+     * 默认文件名：把 {@code /\:*?"<>|} 与空白统一换成 {@code -}；名称为空时用「路线」+ 时间戳。
+     *
+     * <p>SAF 只是建议名字，用户可以改，所以这里不追求唯一。
+     */
+    private String defaultGpxFileName() {
+        String raw = viewModel.routeName() == null ? "" : viewModel.routeName().trim();
+        if (raw.isEmpty()) {
+            raw = getString(R.string.gpx_default_name) + " "
+                    + new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new java.util.Date());
+        }
+        String cleaned = raw.replaceAll("[\\\\/:*?\"<>|\\s]+", "-").replaceAll("^-+|-+$", "");
+        if (cleaned.isEmpty()) {
+            cleaned = getString(R.string.gpx_default_name) + "-"
+                    + new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new java.util.Date());
+        }
+        return cleaned + ".gpx";
+    }
+
+    /** 读成字符串；不能用 {@code InputStream.readAllBytes()}，那是 API 33 才有的。 */
+    private static String readAllText(InputStream in) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream(8192);
+        byte[] chunk = new byte[8192];
+        int read;
+        while ((read = in.read(chunk)) != -1) {
+            buffer.write(chunk, 0, read);
+        }
+        return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    /** 后台任务回来时界面可能已经在选文件期间被销毁，此时不要再弹 toast。 */
+    private void runOnUiThreadIfAlive(Runnable action) {
+        runOnUiThread(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                action.run();
+            }
+        });
+    }
+
+    private static String describe(Throwable error) {
+        String message = error.getMessage();
+        return message == null || message.trim().isEmpty()
+                ? error.getClass().getSimpleName() : message;
+    }
+
+    /** 警告可能上百条，日志里只留前 3 条，其余只报总数。 */
+    private static String summarizeWarnings(List<String> warnings) {
+        int shown = Math.min(warnings.size(), 3);
+        StringBuilder text = new StringBuilder(String.join("；", warnings.subList(0, shown)));
+        if (warnings.size() > shown) {
+            text.append("…（共 ").append(warnings.size()).append(" 条）");
+        }
+        return text.toString();
+    }
+
     // ---------------------------------------------------------------- 菜单
 
     private boolean onMenuItemClick(MenuItem item) {
@@ -693,8 +861,16 @@ public class MainActivity extends AppCompatActivity {
             saveRoute();
             return true;
         }
+        if (id == R.id.action_export_gpx) {
+            exportGpx();
+            return true;
+        }
         if (id == R.id.action_load) {
             showLoadDialog();
+            return true;
+        }
+        if (id == R.id.action_import_gpx) {
+            importGpx();
             return true;
         }
         if (id == R.id.action_rename) {
