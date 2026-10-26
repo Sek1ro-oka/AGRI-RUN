@@ -65,7 +65,7 @@
 | 地图太老，想用高德/百度 | 菜单「地图瓦片源」新增 **高德地图**（GCJ-02）。高德底图与 WGS-84 之间自动做双向换算（新增 `ChinaShift`：正向公式 + 5 次不动点迭代求逆），在高德底图上点选的点也会先转回 WGS-84 再存，因此换底图不会让路线漂移。百度未接入（其瓦片是 BD-09 私有矢量接口，需要官方 SDK key；见 `docs/ISSUES.md` I-036） |
 | 「还没办法真正实现虚拟定位」 | 新增**位置自检**：诊断页每 3 秒读一次 `LocationManager.getLastKnownLocation(gps/network/fused)`，与前台服务最后提交的坐标对比，给出「系统已接受（偏差 X 米，带模拟标记）／偏差过大／未收到／无模拟标记」四种结论并解释该怀疑谁。若自检显示 gps 已接受而目标 App 仍不动，说明是目标 App 自己过滤模拟位置（本应用无权、也不应绕过） |
 
-测试：124 个 JVM 用例（route-core 63 / simulation-core 24 / app 37），lint 0 error（app 16 warning、探针 1 warning）。
+测试：**144 个 JVM 用例**（route-core 78 / simulation-core 24 / app 42），lint 0 error（app 16 warning、探针 1 warning）；另有 API 35 模拟器实测记录，见 `docs/04_模拟器实测记录.md`。
 当时的真机行为（传送是否立刻生效、高德底图是否可达、自检四种结论的真实表现）尚未实测；0.1.3 已在模拟器上补齐大部分，
 真机仍未复验，见 `delivery/KNOWN_ISSUES_已知问题.md`。
 
