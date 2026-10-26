@@ -21,6 +21,17 @@
         android:paddingVertical="8dp"
         android:text="@string/diagnostics_coordinate_log" />
 
+    <TextView
+        android:id="@+id/textSelfCheck"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFF8E1"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="10dp"
+        android:text="@string/self_check_idle"
+        android:textIsSelectable="true"
+        android:textSize="12sp" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"

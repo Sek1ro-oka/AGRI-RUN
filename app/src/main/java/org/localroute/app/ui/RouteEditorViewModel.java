@@ -47,6 +47,25 @@ public class RouteEditorViewModel extends ViewModel {
         pendingSinglePoint = null;
     }
 
+    /**
+     * 传送选点模式（0.1.2）：进入后，下一次点地图不再是「加节点」，而是把模拟位置传送过去。
+     *
+     * <p>放在 ViewModel 里是因为选点期间旋转屏幕会重建 Activity，模式状态不能丢。
+     */
+    private boolean teleportMode;
+
+    public boolean isTeleportMode() {
+        return teleportMode;
+    }
+
+    public void beginTeleport() {
+        teleportMode = true;
+    }
+
+    public void cancelTeleport() {
+        teleportMode = false;
+    }
+
     public void setPendingStart(CompiledRoute route, RunConfig config) {
         this.pendingStartRoute = route;
         this.pendingStartConfig = config;

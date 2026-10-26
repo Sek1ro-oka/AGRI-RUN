@@ -82,7 +82,10 @@ public class MainActivity extends AppCompatActivity {
                 new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissionResult);
 
         mapController = RouteMapController.attach(binding.mapView, point -> {
-            if (viewModel.addPoint(point)) {
+            if (viewModel.isTeleportMode()) {
+                // 传送模式：点地图不再是加节点，而是把模拟位置直接搬过去。
+                teleportTo(point);
+            } else if (viewModel.addPoint(point)) {
                 refreshDraft(false);
             }
         });
@@ -252,6 +255,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String hintText(RunState state) {
+        if (viewModel.isTeleportMode() && !snapshot.isActive()) {
+            return getString(R.string.hint_teleport_mode);
+        }
         if (state == RunState.RUNNING && snapshot.singlePoint()) {
             return getString(R.string.hint_single_point_running) + "，点「停止」结束";
         }
@@ -540,6 +546,41 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    // ---------------------------------------------------------------- 传送（0.1.2）
+
+    private void toggleTeleportMode() {
+        if (viewModel.isTeleportMode()) {
+            cancelTeleportMode();
+            return;
+        }
+        if (snapshot.isActive()) {
+            toast(getString(R.string.toast_teleport_stop_first));
+            return;
+        }
+        viewModel.beginTeleport();
+        render();
+        toast(getString(R.string.toast_teleport_pick));
+    }
+
+    private void cancelTeleportMode() {
+        viewModel.cancelTeleport();
+        render();
+        toast(getString(R.string.toast_teleport_cancelled));
+    }
+
+    /** 把模拟位置传送到地图上点中的那一点：复用单点模式（速度 0，位置钉住，可停止）。 */
+    private void teleportTo(GeoPoint point) {
+        if (snapshot.isActive()) {
+            toast(getString(R.string.toast_teleport_stop_first));
+            return;
+        }
+        viewModel.cancelTeleport();
+        render();
+        DiagnosticLog.info("界面请求传送到：" + point.format());
+        requestPermissionsThenSendPoint(point);
+        toast(getString(R.string.toast_teleport_sending, point.format()));
+    }
+
     // ---------------------------------------------------------------- 地图/闭合（0.1.1）
 
     private void toggleClosed() {
@@ -634,6 +675,10 @@ public class MainActivity extends AppCompatActivity {
         int id = item.getItemId();
         if (id == R.id.action_single_point) {
             showSinglePointDialog();
+            return true;
+        }
+        if (id == R.id.action_teleport) {
+            toggleTeleportMode();
             return true;
         }
         if (id == R.id.action_toggle_closed) {

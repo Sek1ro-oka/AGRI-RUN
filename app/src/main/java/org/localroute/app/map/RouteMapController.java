@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.core.ChinaShift;
 import org.localroute.core.GeoPoint;
 import org.maplibre.android.camera.CameraUpdateFactory;
 import org.maplibre.android.geometry.LatLng;
@@ -60,14 +61,30 @@ public final class RouteMapController {
     private static final String PREFS = "map";
     private static final String PREF_TILE_SOURCE = "tile_source";
 
-    /** 可选瓦片源。全部是公开的 OpenStreetMap 栅格服务，按 OSM 使用政策注明署名。 */
+    /** 可选瓦片源。前三个是公开的 OpenStreetMap 栅格服务；「高德」是 GCJ-02 坐标系的国内瓦片。 */
     private static final List<TileSource> TILE_SOURCES = Arrays.asList(
-            new TileSource("osm", "OpenStreetMap 官方",
-                    "https://tile.openstreetmap.org/{z}/{x}/{y}.png", 19),
-            new TileSource("osmfr", "OSM France（备用）",
-                    "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png", 19),
-            new TileSource("osmde", "OSM Germany（备用）",
-                    "https://tile.openstreetmap.de/{z}/{x}/{y}.png", 18));
+            new TileSource("osm", "OpenStreetMap 官方", CoordSystem.WGS84, 19,
+                    "© OpenStreetMap contributors",
+                    "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
+            new TileSource("amap", "高德地图（GCJ-02，非官方接口）", CoordSystem.GCJ02, 18,
+                    "© 高德地图",
+                    "https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+                    "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+                    "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+                    "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"),
+            new TileSource("osmfr", "OSM France（备用）", CoordSystem.WGS84, 19,
+                    "© OpenStreetMap contributors",
+                    "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png"),
+            new TileSource("osmde", "OSM Germany（备用）", CoordSystem.WGS84, 18,
+                    "© OpenStreetMap contributors",
+                    "https://tile.openstreetmap.de/{z}/{x}/{y}.png"));
+
+    /** 瓦片底图的坐标系。应用内部一律 WGS-84，只有画/点 GCJ-02 底图时才需要换算。 */
+    public enum CoordSystem {
+        WGS84,
+        GCJ02
+    }
+
 
     private final MapView mapView;
     @Nullable
@@ -92,14 +109,19 @@ public final class RouteMapController {
     public static final class TileSource {
         private final String id;
         private final String label;
-        private final String urlTemplate;
+        private final CoordSystem coords;
         private final int maxZoom;
+        private final String attribution;
+        private final List<String> tileUrls;
 
-        TileSource(String id, String label, String urlTemplate, int maxZoom) {
+        TileSource(String id, String label, CoordSystem coords, int maxZoom,
+                   String attribution, String... tileUrls) {
             this.id = id;
             this.label = label;
-            this.urlTemplate = urlTemplate;
+            this.coords = coords;
             this.maxZoom = maxZoom;
+            this.attribution = attribution;
+            this.tileUrls = Arrays.asList(tileUrls);
         }
 
         public String id() {
@@ -110,8 +132,21 @@ public final class RouteMapController {
             return label;
         }
 
+        public CoordSystem coords() {
+            return coords;
+        }
+
+        /** 第一个模板（诊断/日志用）。 */
         public String urlTemplate() {
-            return urlTemplate;
+            return tileUrls.get(0);
+        }
+
+        public List<String> tileUrls() {
+            return tileUrls;
+        }
+
+        public String attribution() {
+            return attribution;
         }
 
         public int maxZoom() {
@@ -167,7 +202,7 @@ public final class RouteMapController {
             if (clickListener == null) {
                 return false;
             }
-            clickListener.onMapClick(new GeoPoint(latLng.getLatitude(), latLng.getLongitude()));
+            clickListener.onMapClick(fromDisplay(latLng.getLatitude(), latLng.getLongitude()));
             return true;
         });
         // 界面可能在 map 就绪之前就调用了 registerGestureListener，这里补挂一次。
@@ -221,16 +256,24 @@ public final class RouteMapController {
      * 有了背景层至少能看到“有底图、只是没瓦片”，再配合状态提示就能定位问题。
      */
     private static String buildStyleJson(TileSource source) {
+        StringBuilder tiles = new StringBuilder("[");
+        for (int i = 0; i < source.tileUrls().size(); i++) {
+            if (i > 0) {
+                tiles.append(',');
+            }
+            tiles.append('"').append(source.tileUrls().get(i)).append('"');
+        }
+        tiles.append(']');
         return "{"
                 + "\"version\":8,"
-                + "\"name\":\"OSM Raster " + source.id() + "\","
+                + "\"name\":\"Raster " + source.id() + "\","
                 + "\"sources\":{"
                 + "\"osm\":{"
                 + "\"type\":\"raster\","
-                + "\"tiles\":[\"" + source.urlTemplate() + "\"],"
+                + "\"tiles\":" + tiles + ","
                 + "\"tileSize\":256,"
                 + "\"maxzoom\":" + source.maxZoom() + ","
-                + "\"attribution\":\"© OpenStreetMap contributors\""
+                + "\"attribution\":\"" + source.attribution() + "\""
                 + "}},"
                 + "\"layers\":["
                 + "{\"id\":\"" + LAYER_BACKGROUND + "\",\"type\":\"background\","
@@ -251,6 +294,33 @@ public final class RouteMapController {
 
     public int currentTileSourceIndex() {
         return clampIndex(tileSourceIndex);
+    }
+
+    private boolean usesGcj02() {
+        return currentTileSource().coords() == CoordSystem.GCJ02;
+    }
+
+    /** 应用内部坐标（WGS-84）→ 当前底图坐标；高德一类 GCJ-02 底图需要先偏移。 */
+    private LatLng toDisplay(@NonNull GeoPoint point) {
+        if (usesGcj02()) {
+            GeoPoint shifted = ChinaShift.wgs84ToGcj02(point.latitude(), point.longitude());
+            return new LatLng(shifted.latitude(), shifted.longitude());
+        }
+        return new LatLng(point.latitude(), point.longitude());
+    }
+
+    /** 底图坐标 → 应用内部 WGS-84；用户在高德底图上点选的位置要转回来再存。 */
+    private GeoPoint fromDisplay(double latitude, double longitude) {
+        if (usesGcj02()) {
+            GeoPoint wgs = ChinaShift.gcj02ToWgs84(latitude, longitude);
+            return new GeoPoint(wgs.latitude(), wgs.longitude());
+        }
+        return new GeoPoint(latitude, longitude);
+    }
+
+    private Point toDisplayPoint(@NonNull GeoPoint point) {
+        LatLng display = toDisplay(point);
+        return Point.fromLngLat(display.getLongitude(), display.getLatitude());
     }
 
     /** 切换瓦片源并立即重试；返回是否真的切换了。 */
@@ -333,25 +403,24 @@ public final class RouteMapController {
         List<Feature> lineFeatures = new ArrayList<>();
         if (points.size() >= 2) {
             for (GeoPoint point : points) {
-                ring.add(Point.fromLngLat(point.longitude(), point.latitude()));
+                ring.add(toDisplayPoint(point));
             }
             if (closed) {
-                ring.add(Point.fromLngLat(points.get(0).longitude(), points.get(0).latitude()));
+                ring.add(toDisplayPoint(points.get(0)));
             }
             lineFeatures.add(Feature.fromGeometry(LineString.fromLngLats(ring)));
         } else if (points.size() == 1) {
             // 只有一个节点时画不出折线，至少用一个极小线段占位，避免图层看起来“什么都没有”。
-            GeoPoint only = points.get(0);
-            ring.add(Point.fromLngLat(only.longitude(), only.latitude()));
-            ring.add(Point.fromLngLat(only.longitude(), only.latitude()));
+            Point only = toDisplayPoint(points.get(0));
+            ring.add(only);
+            ring.add(only);
             lineFeatures.add(Feature.fromGeometry(LineString.fromLngLats(ring)));
         }
         setGeoJson(SOURCE_LINE, FeatureCollection.fromFeatures(lineFeatures));
 
         List<Feature> vertexFeatures = new ArrayList<>();
         for (GeoPoint point : points) {
-            vertexFeatures.add(Feature.fromGeometry(
-                    Point.fromLngLat(point.longitude(), point.latitude())));
+            vertexFeatures.add(Feature.fromGeometry(toDisplayPoint(point)));
         }
         setGeoJson(SOURCE_VERTICES, FeatureCollection.fromFeatures(vertexFeatures));
     }
@@ -366,7 +435,7 @@ public final class RouteMapController {
             return;
         }
         setGeoJson(SOURCE_RUNNER, FeatureCollection.fromFeatures(new Feature[]{
-                Feature.fromGeometry(Point.fromLngLat(position.longitude(), position.latitude()))}));
+                Feature.fromGeometry(toDisplayPoint(position))}));
     }
 
     private void setGeoJson(String sourceId, FeatureCollection collection) {
@@ -386,25 +455,24 @@ public final class RouteMapController {
         }
         LatLngBounds.Builder builder = new LatLngBounds.Builder();
         for (GeoPoint point : points) {
-            builder.include(new LatLng(point.latitude(), point.longitude()));
+            builder.include(toDisplay(point));
         }
         try {
             map.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 96));
         } catch (RuntimeException ignored) {
             // 单点路线无法计算边界：直接居中。
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(
-                    new LatLng(points.get(0).latitude(), points.get(0).longitude()), 17f));
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(points.get(0)), 17f));
         }
     }
 
-    /** 当前地图中心；地图还没就绪时返回 null（用于「发送单点位置」预填）。 */
+    /** 当前地图中心（WGS-84）；地图还没就绪时返回 null（用于「发送单点位置」预填）。 */
     @Nullable
     public GeoPoint cameraCenter() {
         if (map == null) {
             return null;
         }
         LatLng target = map.getCameraPosition().target;
-        return new GeoPoint(target.getLatitude(), target.getLongitude());
+        return fromDisplay(target.getLatitude(), target.getLongitude());
     }
 
     /** 跟随当前模拟位置；用户手动拖动地图后自动关闭。 */
@@ -412,8 +480,8 @@ public final class RouteMapController {
         if (map == null || !followRunner) {
             return;
         }
-        map.animateCamera(CameraUpdateFactory.newLatLngZoom(
-                new LatLng(position.latitude(), position.longitude()), Math.max(16f, map.getCameraPosition().zoom)));
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(position),
+                Math.max(16f, map.getCameraPosition().zoom)));
     }
 
     public void setFollowRunner(boolean follow) {

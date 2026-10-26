@@ -7,6 +7,10 @@
         android:title="@string/menu_single_point"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_teleport"
+        android:title="@string/menu_teleport"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_toggle_closed"
         android:checkable="true"
         android:checked="true"

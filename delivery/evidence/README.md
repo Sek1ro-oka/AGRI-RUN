@@ -4,8 +4,8 @@
 
 | 文件 | 内容 |
 | --- | --- |
-| `build-and-test-run.log` | 最后一次全量验证的完整 Gradle 输出：`--rerun-tasks` 强制重跑三个模块的单元测试，再跑 `:app:lintDebug`、`:location-probe:lintDebug`、`:app:assembleRelease`、`:app:assembleDebug`、`:location-probe:assembleDebug`；开头记录时间与工具链路径，结尾 `GRADLE_EXIT=0`、`BUILD SUCCESSFUL` |
-| `lint-summary.txt` | 两个模块 `lintDebug` 的 error/warning 统计与 warning 类别（最终 0 error） |
+| `build-and-test-run.log` | 0.1.2 的全量验证输出（2026-10-27 重跑，124 个用例）：完整 Gradle 输出：`--rerun-tasks` 强制重跑三个模块的单元测试，再跑 `:app:lintDebug`、`:location-probe:lintDebug`、`:app:assembleRelease`、`:app:assembleDebug`、`:location-probe:assembleDebug`；开头记录时间与工具链路径，结尾 `GRADLE_EXIT=0`、`BUILD SUCCESSFUL` |
+| `lint-summary.txt` | 两个模块 `lintDebug` 的 error/warning 统计与 warning 类别（0.1.2：app 0 error / 16 warning，探针 0 error / 1 warning） |
 | `gradle-version.txt` | `gradlew --version`：Gradle 8.11.1、Launcher JVM 21.0.3、Daemon JVM `D:\Java\jdk-21` |
 | `java-version.txt` | 构建用 JDK 版本 |
 | `adb-devices.txt` | `adb devices -l` 的原始输出：**只有表头，没有设备**——这是本轮「无真机」的直接证据 |

@@ -161,4 +161,22 @@ public class RouteEditorViewModelTest {
         viewModel.clearPendingSinglePoint();
         assertNull(viewModel.pendingSinglePoint());
     }
+
+    @Test
+    public void teleportModeStartsOffAndCanBeToggled() {
+        assertFalse(viewModel.isTeleportMode());
+        viewModel.beginTeleport();
+        assertTrue(viewModel.isTeleportMode());
+        viewModel.cancelTeleport();
+        assertFalse(viewModel.isTeleportMode());
+    }
+
+    @Test
+    public void teleportModeDoesNotTouchDraftPoints() {
+        viewModel.addPoint(new GeoPoint(30.0d, 120.0d));
+        viewModel.beginTeleport();
+        assertEquals(1, viewModel.pointCount());
+        viewModel.cancelTeleport();
+        assertEquals(1, viewModel.pointCount());
+    }
 }

@@ -9,6 +9,8 @@ import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.MenuItem;
 import android.widget.Toast;
 
@@ -19,10 +21,13 @@ import androidx.core.content.ContextCompat;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityDiagnosticsBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.app.diagnostics.SystemLocationReader;
 import org.localroute.app.model.RouteSummary;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.storage.RouteRepository;
+import org.localroute.core.GeoPoint;
+import org.localroute.simulation.LocationVerifier;
 
 import java.io.File;
 import java.util.List;
@@ -37,6 +42,16 @@ public class DiagnosticsActivity extends AppCompatActivity {
 
     private ActivityDiagnosticsBinding binding;
     private RouteRepository repository;
+
+    /** 自检每 3 秒刷新一次：运行中看得到「系统读回的位置」跟着动，才说明模拟位置真的在生效。 */
+    private final Handler selfCheckHandler = new Handler(Looper.getMainLooper());
+    private final Runnable selfCheckTick = new Runnable() {
+        @Override
+        public void run() {
+            updateSelfCheck();
+            selfCheckHandler.postDelayed(this, 3_000L);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,6 +83,14 @@ public class DiagnosticsActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         refreshReport();
+        selfCheckHandler.removeCallbacks(selfCheckTick);
+        selfCheckHandler.post(selfCheckTick);
+    }
+
+    @Override
+    protected void onPause() {
+        selfCheckHandler.removeCallbacks(selfCheckTick);
+        super.onPause();
     }
 
     @Override
@@ -153,6 +176,49 @@ public class DiagnosticsActivity extends AppCompatActivity {
         }
 
         binding.textReport.setText(builder.toString());
+        updateSelfCheck();
+    }
+
+    /** 「系统到底收没收到」——把应用提交的坐标和系统读回的坐标放一起对比。 */
+    private void updateSelfCheck() {
+        RunSnapshot snapshot = SimulationStateRepo.get().current();
+        if (!snapshot.hasPosition()) {
+            binding.textSelfCheck.setText(R.string.self_check_no_data);
+            return;
+        }
+        GeoPoint expected = new GeoPoint(snapshot.latitude(), snapshot.longitude());
+        StringBuilder builder = new StringBuilder();
+        builder.append(getString(R.string.self_check_expected,
+                expected.format(), snapshot.providersText())).append('\n');
+
+        List<SystemLocationReader.Probe> probes = SystemLocationReader.readAll(this);
+        if (probes.isEmpty()) {
+            builder.append("没有定位权限，无法读回系统位置；请在系统设置里授予「精确位置」。\n");
+            binding.textSelfCheck.setText(builder.toString());
+            return;
+        }
+        for (SystemLocationReader.Probe probe : probes) {
+            if (!probe.hasFix()) {
+                LocationVerifier.Verdict verdict = LocationVerifier.evaluate(
+                        expected, null, false, LocationVerifier.DEFAULT_TOLERANCE_METERS);
+                builder.append(probe.provider).append("：").append(probe.note).append('\n')
+                        .append("  结论：")
+                        .append(LocationVerifier.explain(verdict, -1d, probe.provider))
+                        .append('\n');
+                continue;
+            }
+            GeoPoint observed = probe.point();
+            double distance = LocationVerifier.distanceMeters(expected, observed);
+            LocationVerifier.Verdict verdict = LocationVerifier.evaluate(
+                    expected, observed, probe.markedMock(), LocationVerifier.DEFAULT_TOLERANCE_METERS);
+            builder.append(String.format(Locale.US, "%s：%s · 模拟标记 %s · %.1f 秒前\n",
+                    probe.provider, observed.format(), probe.markedMock() ? "是" : "否",
+                    probe.ageMillis() / 1000d));
+            builder.append("  结论：")
+                    .append(LocationVerifier.explain(verdict, distance, probe.provider))
+                    .append('\n');
+        }
+        binding.textSelfCheck.setText(builder.toString());
     }
 
     private String versionText() {

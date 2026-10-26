@@ -2,13 +2,13 @@
   "application": {
     "name": "路线工坊",
     "packageName": "org.localroute.app",
-    "versionName": "0.1.1",
-    "versionCode": 2,
+    "versionName": "0.1.2",
+    "versionCode": 3,
     "minSdk": 29,
     "targetSdk": 35,
     "compileSdk": 35,
     "language": "java",
-    "buildDate": "2026-10-26",
+    "buildDate": "2026-10-27",
     "buildType": "release (self-signed, local only)"
   },
   "probe": {
@@ -43,6 +43,13 @@
   ],
   "externalData": [
     {
+      "name": "AMap raster tiles (optional, non-official endpoint)",
+      "url": "https://webrd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+      "coordinateSystem": "GCJ-02 (converted to WGS-84 in app via ChinaShift)",
+      "license": "No public license / unofficial endpoint; selectable only, OSM remains default",
+      "attribution": "© 高德地图"
+    },
+    {
       "name": "OpenStreetMap raster tiles (default)",
       "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
@@ -64,11 +71,11 @@
   "source": {
     "repository": "本地 git 仓库（无远端，从未推送）",
     "branch": "master",
-    "archivedAt": "2026-10-26",
+    "archivedAt": "2026-10-27",
     "note": "source.zip 由 git archive HEAD 生成，归档内容即生成时 HEAD 的树；为避免自引用导致哈希漂移，本文件不写死提交号，需要精确提交时在源码树执行 git log -1。SHA256SUMS.txt 在归档之后计算，不进入 source.zip"
   },
   "artifacts": [
-    { "file": "路线工坊-0.1.1-release.apk", "module": ":app", "sizeMB": 32.91, "signing": "本地自签名（keystore 与口令不入库）" },
+    { "file": "路线工坊-0.1.2-release.apk", "module": ":app", "sizeMB": 32.91, "signing": "本地自签名（keystore 与口令不入库）" },
     { "file": "定位探针-0.1.0-debug.apk", "module": ":location-probe", "sizeMB": 10.59, "signing": "debug 签名" },
     { "file": "source.zip", "note": "git archive 生成的源码快照（不含构建产物与私钥）" }
   ]

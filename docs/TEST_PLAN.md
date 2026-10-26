@@ -96,3 +96,34 @@ Set-Location E:\agri-run\route-workshop
 .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest --console=plain
 # BUILD SUCCESSFUL：56 + 16 + 35 = 107 个用例，0 失败
 ```
+
+## 0.1.2 新增套件与用例
+
+现状：**12 个套件、124 个 JVM 用例**（route-core 63 / simulation-core 24 / app 37）。
+
+| 套件 | 用例数 | 覆盖 |
+| --- | --- | --- |
+| `ChinaShiftTest` | 7 | 境内外判定、境外恒等、北京偏移量级、往返 < 0.5 米、极端点仍合法 |
+| `LocationVerifierTest` | 8 | 一致/超差/未收到/无模拟标记/无期望五种判定、距离计算、文案含「目标 App」 |
+| `RouteEditorViewModelTest` | 14（+2） | 传送模式默认关、可开关、开关不动草稿点 |
+| `RouteCompilerTest` | 17 | 已含 0.1.1 的 5 个不闭合用例 |
+| `RouteJsonCodecTest` | 9 | 含 `closed=false` 往返且编译为原路返回 |
+
+执行命令：
+
+```powershell
+$env:JAVA_HOME='D:\Java\jdk-21'; $env:ANDROID_HOME='E:\Android\Sdk'
+Set-Location E:\agri-run\route-workshop
+.\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest `
+  :app:lintDebug :location-probe:lintDebug `
+  :app:assembleRelease :app:assembleDebug :location-probe:assembleDebug --console=plain
+# 63 + 24 + 37 = 124
+```
+
+### 0.1.2 的人工检查项（需真机）
+
+| 编号 | 检查 | 期望 |
+| --- | --- | --- |
+| T29 | 菜单「传送到地图选点」→ 点地图任意点 | 通知与页面立刻显示「单点 · 速度 0.0」，独立读取（探针）在那一点收到坐标；再点菜单或「停止」结束 |
+| T30 | 菜单「地图瓦片源」→ 高德地图（GCJ-02） | 底图变成中文高德；在 0.1.1 里画好的路线换源后仍贴合街道；在高德底图上新点的点，换回 OSM 后位置不漂移 |
+| T31 | 诊断页「位置自检」区块 | 运行时显示「系统已接受（偏差 X 米，带模拟标记）」；停止后显示「应用最后提交」历史坐标 |

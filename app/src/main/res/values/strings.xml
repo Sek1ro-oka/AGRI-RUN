@@ -57,6 +57,14 @@
     <string name="hint_single_point_running">单点位置发送中（速度 0）</string>
     <string name="tile_source_title">地图瓦片源</string>
 
+    <!-- 0.1.2 新增：传送选点 -->
+    <string name="menu_teleport">传送到地图选点</string>
+    <string name="hint_teleport_mode">传送选点：在地图上点一下，模拟位置就传送到那一点；再点一次菜单可取消</string>
+    <string name="toast_teleport_pick">已进入传送选点，请在地图上点目标位置</string>
+    <string name="toast_teleport_cancelled">已取消传送选点</string>
+    <string name="toast_teleport_stop_first">已有运行任务，请先停止再传送</string>
+    <string name="toast_teleport_sending">正在传送到 %1$s（速度 0，可点「停止」结束）</string>
+
     <!-- 设置检查页 -->
     <string name="settings_title">设置检查</string>
     <string name="settings_recheck">重新检查</string>
@@ -70,4 +78,8 @@
     <string name="diagnostics_copy">复制全部</string>
     <string name="diagnostics_clear_log">清空日志</string>
     <string name="diagnostics_coordinate_log">记录坐标日志（默认关闭）</string>
+    <string name="self_check_idle">位置自检：还没有提交过位置</string>
+    <string name="self_check_expected">应用最后提交：%1$s（%2$s）</string>
+    <string name="self_check_probe">%1$s：%2$s</string>
+    <string name="self_check_no_data">位置自检：还没有提交过位置，先点「开始」或「传送」，这里会显示系统实际读回什么。</string>
 </resources>
