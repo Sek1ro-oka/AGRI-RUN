@@ -1,8 +1,128 @@
-lint 结果汇总（2026-10-26，E:\agri-run\route-workshop）
+# lint 摘要（0.1.1，2026-10-26 23:52:35)
 
-模块            errors  warnings  警告类别
-app            0 errors, 19 warnings    ObsoleteSdkInt=5, UnusedResources=4, DataExtractionRules=1, DisableBaselineAlignment=1
-location-probe 0 errors, 1 warnings     DataExtractionRules=1
+## :app:lintDebug
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\simulation\AndroidMockProviderApi.java:42: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+            Log.w(TAG, "鏌ヨ provider 鍒楄〃澶辫触锛? + provider, e);
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\simulation\AndroidMockProviderApi.java:120: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+            Log.d(TAG, "绉婚櫎娴嬭瘯 provider 鏃跺拷鐣ュ紓甯革細" + provider + " / " + e);
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:53: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+        Log.i(TAG, message);
+        ~~~~~~~~~~~~~~~~~~~
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:58: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+        Log.w(TAG, message);
+        ~~~~~~~~~~~~~~~~~~~
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:64: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+            Log.e(TAG, message);
+            ~~~~~~~~~~~~~~~~~~~
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:66: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+            Log.e(TAG, message, error);
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\diagnostics\DiagnosticLog.java:76: Warning: Using 'Log' instead of 'Timber' [LogNotTimber from com.jakewharton.timber:timber:{version}]
+        Log.d(TAG, message);
+        ~~~~~~~~~~~~~~~~~~~
 
-说明：剩余均为不阻塞交付的 warning（ObsoleteSdkInt 因 minSdk 29 的历史分支、UnusedResources 主题色、
-DataExtractionRules 模板建议、DisableBaselineAlignment 文本基线），abortOnError=true 下 0 error 即构建通过。
+   Explanation for issues of type "LogNotTimber":
+   Since Timber is included in the project, it is likely that calls to Log
+   should instead be going to Timber.
+
+   Vendor: JakeWharton/timber
+   Identifier: com.jakewharton.timber:timber:{version}
+   Feedback: https://github.com/JakeWharton/timber/issues
+
+E:\agri-run\route-workshop\app\src\main\AndroidManifest.xml:28: Warning: The attribute android:allowBackup is deprecated from Android 12 and higher and may be removed in future versions. Consider adding the attribute android:dataExtractionRules specifying an @xml resource which configures cloud backups and device transfers on Android 12 and higher. [DataExtractionRules]
+        android:allowBackup="false"
+                             ~~~~~
+
+   Explanation for issues of type "DataExtractionRules":
+   Before Android 12, the attributes android:allowBackup and
+   android:fullBackupContent were used to configure all forms of backup,
+   including cloud backups, device-to-device transfers and adb backup.
+
+   In Android 12 and higher, these attributes have been deprecated and will
+   only apply to cloud backups. You should instead use the attribute
+   android:dataExtractionRules, specifying an @xml resource that configures
+   which files to back up, for cloud backups and for device-to-device
+   transfers, separately. If your minSdkVersion supports older versions,
+   you'll still want to specify an android:fullBackupContent resource if the
+   default behavior is not right for your app.
+
+   https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   https://goo.gle/DataExtractionRules
+
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\simulation\AndroidMockProviderApi.java:97: Warning: Unnecessary; SDK_INT is always >= 29 [ObsoleteSdkInt]
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\service\SimulationService.java:687: Warning: Unnecessary; SDK_INT is never < 29 [ObsoleteSdkInt]
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\service\SimulationService.java:704: Warning: Unnecessary; SDK_INT is always >= 29 [ObsoleteSdkInt]
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+E:\agri-run\route-workshop\app\src\main\res\mipmap-anydpi-v26: Warning: This folder configuration (v26) is unnecessary; minSdkVersion is 29. Merge all the resources in this folder into mipmap-anydpi. [ObsoleteSdkInt]
+E:\agri-run\route-workshop\app\src\main\res\values\themes.xml:9: Warning: Unnecessary; SDK_INT is always >= 21 [ObsoleteSdkInt]
+        <item name="android:statusBarColor" tools:targetApi="21">?attr/colorSurface</item>
+                                            ~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "ObsoleteSdkInt":
+   This check flags version checks that are not necessary, because the
+   minSdkVersion (or surrounding known API level) is already at least as high
+   as the version checked for.
+
+   Similarly, it also looks for resources in -vNN folders, such as values-v14
+   where the version qualifier is less than or equal to the minSdkVersion,
+   where the contents should be merged into the best folder.
+
+E:\agri-run\route-workshop\app\src\main\res\layout\activity_main.xml:65: Warning: Set android:baselineAligned="false" on this element for better performance [DisableBaselineAlignment]
+        <LinearLayout
+         ~~~~~~~~~~~~
+
+   Explanation for issues of type "DisableBaselineAlignment":
+   When a LinearLayout is used to distribute the space proportionally between
+   nested layouts, the baseline alignment property should be turned off to
+   make the layout computation faster.
+
+E:\agri-run\route-workshop\app\src\main\java\org\localroute\app\ui\SettingsCheckActivity.java:103: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        title.setText(check.title() + "  " + statusLabel(check.status()));
+                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "SetTextI18n":
+   When calling TextView#setText
+   * Never call Number#toString() to format numbers; it will not handle
+   fraction separators and locale-specific digits properly. Consider using
+   String#format with proper format specifications (%d or %f) instead.
+   * Do not pass a string literal (e.g. "Hello") to display text. Hardcoded
+   text can not be properly translated to other languages. Consider using
+   Android resource strings instead.
+   * Do not build messages by concatenating text chunks. Such messages can not
+   be properly translated.
+
+   https://developer.android.com/guide/topics/resources/localization.html
+
+0 errors, 15 warnings
+
+
+## :location-probe:lintDebug
+E:\agri-run\route-workshop\location-probe\src\main\AndroidManifest.xml:10: Warning: The attribute android:dataExtractionRules only applies for Android 12 and higher; since minSdkVersion is API 29 you should also set android:fullBackupContent [DataExtractionRules]
+        android:dataExtractionRules="@xml/data_extraction_rules"
+                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "DataExtractionRules":
+   Before Android 12, the attributes android:allowBackup and
+   android:fullBackupContent were used to configure all forms of backup,
+   including cloud backups, device-to-device transfers and adb backup.
+
+   In Android 12 and higher, these attributes have been deprecated and will
+   only apply to cloud backups. You should instead use the attribute
+   android:dataExtractionRules, specifying an @xml resource that configures
+   which files to back up, for cloud backups and for device-to-device
+   transfers, separately. If your minSdkVersion supports older versions,
+   you'll still want to specify an android:fullBackupContent resource if the
+   default behavior is not right for your app.
+
+   https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   https://goo.gle/DataExtractionRules
+
+0 errors, 1 warnings
+
