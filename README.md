@@ -134,3 +134,10 @@ delivery/         交付物：APK、源码包、使用说明、测试报告、�
 
 测试：**173 个 JVM 用例**（route-core 102 / simulation-core 24 / app 47），lint 0 error（app 29 warning）；模拟器实测记录见 `docs/06_0.2.0_变更与实测.md`。
 仍未做：官方高德/百度 SDK（缺 Key）、悬浮地图与搜索、常用点、真机复验。
+
+## 10. 补充：可编辑配速与地图 Key 适配层（0.2.0 build 6）
+
+- 配速改为三种具名预设（行走 5.0 / 跑步 9.0 / 骑行 15.0 km/h，单击套用、长按改值、可恢复默认），保留手动输入；模拟器首屏已验证按钮文案。
+- 新增 `MapProviders` 适配层：Key 从 `local.properties` 的 `amapKey=` 注入 `BuildConfig.AMAP_KEY`，不进仓库；无 Key 时明确提示「当前使用非官方栅格瓦片」，有 Key 也只标「待接入」——`MapProvidersTest` 断言不会谎称官方 SDK 已生效。
+- 用例总数 173 → **185**（新增 `SpeedPresetsTest` 8、`MapProvidersTest` 4）；lint 仍 0 error、app 29 warning。
+- 版本：`versionName 0.2.0`、`versionCode 6`，签名证书 SHA-256 仍为 `14f0286f…02a9c`（同一把本地 key，可覆盖安装 build 5）。

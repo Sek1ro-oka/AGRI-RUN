@@ -2,6 +2,7 @@ package org.localroute.app.ui;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -9,6 +10,7 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.view.MenuItem;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
@@ -20,9 +22,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 
+import org.localroute.app.BuildConfig;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityMainBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.app.map.MapProviders;
 import org.localroute.app.map.RouteMapController;
 import org.localroute.app.model.RouteDefinition;
 import org.localroute.app.model.RouteJsonCodec;
@@ -32,6 +36,7 @@ import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.SettingsInspector;
+import org.localroute.app.settings.SpeedPresets;
 import org.localroute.app.storage.RouteRepository;
 import org.localroute.core.CompiledRoute;
 import org.localroute.core.EndBehavior;
@@ -72,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<String[]> openGpxLauncher;
 
     private RunSnapshot snapshot = RunSnapshot.idle();
+    private SpeedPresets speedPresets;
     /** 跨应用悬浮控制条（审查 C）；没授权时它自己什么都不做。 */
     private org.localroute.app.overlay.OverlayPanel overlayPanel;
     private boolean overlayEnabled;
@@ -94,6 +100,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         repository = new RouteRepository(new File(getFilesDir(), "routes"));
+        speedPresets = new SpeedPresets(preferenceStore("speed_presets"));
         viewModel = new ViewModelProvider(this).get(RouteEditorViewModel.class);
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissionResult);
@@ -177,11 +184,23 @@ public class MainActivity extends AppCompatActivity {
                 toast("当前没有运行中的任务");
             }
         });
-        // 常用配速：没在跑时只是填进输入框，跑起来时直接下发改速命令（R-009）。
-        binding.buttonPresetWalk.setOnClickListener(v -> applySpeedPreset(3d));
-        binding.buttonPresetJog.setOnClickListener(v -> applySpeedPreset(6d));
-        binding.buttonPresetRun.setOnClickListener(v -> applySpeedPreset(9d));
-        binding.buttonPresetRide.setOnClickListener(v -> applySpeedPreset(12d));
+        // 三种可编辑配速（行走 / 跑步 / 骑行）：单击套用，长按改数值，写进偏好。
+        binding.buttonPresetWalk.setOnClickListener(v -> applySpeedPreset(speedPresets.walk()));
+        binding.buttonPresetRun.setOnClickListener(v -> applySpeedPreset(speedPresets.run()));
+        binding.buttonPresetRide.setOnClickListener(v -> applySpeedPreset(speedPresets.ride()));
+        binding.buttonPresetWalk.setOnLongClickListener(v -> {
+            showPresetEditor(0);
+            return true;
+        });
+        binding.buttonPresetRun.setOnLongClickListener(v -> {
+            showPresetEditor(1);
+            return true;
+        });
+        binding.buttonPresetRide.setOnLongClickListener(v -> {
+            showPresetEditor(2);
+            return true;
+        });
+        renderPresets();
 
         if (savedInstanceState == null) {
             binding.inputSpeed.setText(String.format(Locale.US, "%.1f", RunConfig.DEFAULT_SPEED_KMH));
@@ -455,6 +474,103 @@ public class MainActivity extends AppCompatActivity {
         } else {
             toast(getString(R.string.toast_speed_no_effect, kmh));
         }
+    }
+
+    /**
+     * 按钮上显示「行走 5.0」这种「角色 + 当前值」，让用户知道单击会用多少。
+     */
+    private void renderPresets() {
+        binding.buttonPresetWalk.setText(getString(R.string.speed_preset_walk_value,
+                SpeedPresets.format(speedPresets.walk())));
+        binding.buttonPresetRun.setText(getString(R.string.speed_preset_run_value,
+                SpeedPresets.format(speedPresets.run())));
+        binding.buttonPresetRide.setText(getString(R.string.speed_preset_ride_value,
+                SpeedPresets.format(speedPresets.ride())));
+    }
+
+    /**
+     * 长按配速按钮改数值；改完立即写偏好并刷新按钮文案，非法输入只提示不保存。
+     */
+    private void showPresetEditor(int index) {
+        String[] names = {
+                getString(R.string.speed_preset_walk),
+                getString(R.string.speed_preset_run),
+                getString(R.string.speed_preset_ride)
+        };
+        double current = speedPresets.get(index);
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setText(SpeedPresets.format(current));
+        input.setSelection(input.getText().length());
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        FrameLayout wrapper = new FrameLayout(this);
+        wrapper.setPadding(padding, padding / 2, padding, 0);
+        wrapper.addView(input);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.dialog_preset_title, names[index]))
+                .setView(wrapper)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNeutralButton(R.string.dialog_preset_reset, (d, w) -> {
+                    speedPresets.set(index, defaultPreset(index));
+                    renderPresets();
+                    toast(getString(R.string.toast_preset_saved, names[index],
+                            SpeedPresets.format(speedPresets.get(index))));
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        // 自己接管「确定」：先校验再关窗，避免输入非法时对话框已消失。
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String raw = input.getText().toString().trim();
+                    double kmh;
+                    try {
+                        kmh = Double.parseDouble(raw);
+                    } catch (NumberFormatException e) {
+                        toast(getString(R.string.toast_preset_invalid));
+                        return;
+                    }
+                    if (Double.isNaN(kmh) || kmh < SpeedPresets.MIN_KMH || kmh > SpeedPresets.MAX_KMH) {
+                        toast(getString(R.string.toast_preset_range,
+                                SpeedPresets.MIN_KMH, SpeedPresets.MAX_KMH));
+                        return;
+                    }
+                    speedPresets.set(index, kmh);
+                    renderPresets();
+                    dialog.dismiss();
+                    toast(getString(R.string.toast_preset_saved, names[index],
+                            SpeedPresets.format(speedPresets.get(index))));
+                }));
+        dialog.show();
+    }
+
+    private double defaultPreset(int index) {
+        switch (index) {
+            case 0:
+                return SpeedPresets.DEFAULT_WALK_KMH;
+            case 1:
+                return SpeedPresets.DEFAULT_RUN_KMH;
+            default:
+                return SpeedPresets.DEFAULT_RIDE_KMH;
+        }
+    }
+
+    /**
+     * 把 SharedPreferences 适配成 {@link SpeedPresets.Store}，让配速逻辑能在纯 JVM 里测。
+     */
+    private SpeedPresets.Store preferenceStore(String name) {
+        SharedPreferences prefs = getSharedPreferences(name, MODE_PRIVATE);
+        return new SpeedPresets.Store() {
+            @Override
+            public String get(String key, String fallback) {
+                return prefs.getString(key, fallback);
+            }
+
+            @Override
+            public void put(String key, String value) {
+                prefs.edit().putString(key, value).apply();
+            }
+        };
     }
 
     private RunConfig readConfigFromInputs() {
@@ -742,6 +858,10 @@ public class MainActivity extends AppCompatActivity {
                     }
                     mapController.selectTileSource(which);
                     toast("已切换到「" + sources.get(which).label() + "」，正在重新加载");
+                    // 切到高德时顺带说明 Key 状态：有 Key 也只是「待接入 SDK」，没 Key 就走瓦片。
+                    if ("amap".equals(sources.get(which).id())) {
+                        toast(MapProviders.note(BuildConfig.AMAP_KEY));
+                    }
                 })
                 .setNegativeButton("取消", null)
                 .show();

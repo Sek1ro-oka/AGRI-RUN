@@ -94,11 +94,18 @@
     <string name="self_check_expected">应用最后提交：%1$s（%2$s）</string>
     <string name="self_check_probe">%1$s：%2$s</string>
     <string name="self_check_no_data">位置自检：还没有提交过位置，先点「开始」或「传送」，这里会显示系统实际读回什么。</string>
-    <string name="speed_presets_label">配速：</string>
-    <string name="speed_preset_walk">3</string>
-    <string name="speed_preset_jog">6</string>
-    <string name="speed_preset_run">9</string>
-    <string name="speed_preset_ride">12</string>
+    <string name="speed_presets_label">配速（长按可改）：</string>
+    <string name="speed_preset_walk">行走</string>
+    <string name="speed_preset_run">跑步</string>
+    <string name="speed_preset_ride">骑行</string>
+    <string name="speed_preset_walk_value">行走 %1$s</string>
+    <string name="speed_preset_run_value">跑步 %1$s</string>
+    <string name="speed_preset_ride_value">骑行 %1$s</string>
+    <string name="dialog_preset_title">修改「%1$s」配速</string>
+    <string name="dialog_preset_reset">恢复默认</string>
+    <string name="toast_preset_saved">已保存「%1$s」配速：%2$s km/h</string>
+    <string name="toast_preset_invalid">请输入数字，例如 9.5</string>
+    <string name="toast_preset_range">配速需在 %1$.1f—%2$.1f km/h 之间</string>
     <string name="toast_speed_applied">已改速为 %1$.1f km/h（位置不跳变）</string>
     <string name="toast_speed_no_effect">当前没有运行中的任务，已填入 %1$.1f km/h</string>    <string name="overlay_status">%1$s · %2$s km/h · %3$s m</string>
     <string name="overlay_pause">暂停</string>

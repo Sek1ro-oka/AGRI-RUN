@@ -228,3 +228,10 @@ API 35 / x86_64 的 AVD，把整条链路真的跑了一遍。**模拟器不是�
 ### 9.4 仍未实测
 
 真机（真我 GT Neo5）复验、锁屏/切应用/强杀重开、通知控制、悬浮窗授权流程、官方高德/百度 SDK。这些项目和之前一样保留在 `KNOWN_ISSUES_已知问题.md` 与本表第 5 节，没有因为「模拟器跑通了」而被标成已验证。
+
+## 10. 补充：可编辑配速与地图 Key 适配层（0.2.0 build 6）
+
+- 配速改为三种具名预设（行走 5.0 / 跑步 9.0 / 骑行 15.0 km/h，单击套用、长按改值、可恢复默认），保留手动输入；模拟器首屏已验证按钮文案。
+- 新增 `MapProviders` 适配层：Key 从 `local.properties` 的 `amapKey=` 注入 `BuildConfig.AMAP_KEY`，不进仓库；无 Key 时明确提示「当前使用非官方栅格瓦片」，有 Key 也只标「待接入」——`MapProvidersTest` 断言不会谎称官方 SDK 已生效。
+- 用例总数 173 → **185**（新增 `SpeedPresetsTest` 8、`MapProvidersTest` 4）；lint 仍 0 error、app 29 warning。
+- 版本：`versionName 0.2.0`、`versionCode 6`，签名证书 SHA-256 仍为 `14f0286f…02a9c`（同一把本地 key，可覆盖安装 build 5）。
