@@ -84,3 +84,15 @@ MapBackendPolicy             纯 Java 判定：Key + SUPPORTED_ABIS → 用哪�
   这条恰好反证了「release 只含 arm so、只能装真机」。
 - 仍未验证：真机上的 SDK 渲染、Key 鉴权是否通过（Key 需绑定包名 `org.localroute.app` 与
   签名 SHA-1 `B8:CB:D6:D9:...:7B:2F`）。
+## 0.2.2 真机反馈修复（2026-10-27）
+
+真机（arm64 + AMAP_KEY）报告「日志说已启用高德 SDK，但界面一片空白、点不了地图、也传送不了」。两个原因，都已修：
+
+1. **MapLibre 视图仍在最上层**：`activity_main.xml` 里的 `MapView`（MapLibre）是常驻控件，高德 SDK 的 MapView 被 `addView(..., 0, ...)` 插到它下面。MapLibre 画的是自己的空白画布并吃掉触摸事件，于是既看不见高德底图，也点不到地图（传送依赖点击）。
+   修法：`MainActivity` 选择 SDK 引擎后立刻 `binding.mapView.setVisibility(View.GONE)`（`app/src/main/java/org/localroute/app/ui/MainActivity.java`），把触摸让给 SDK 地图。
+2. **`getMap()` 在构造时为 null**：高德 `MapView` 的异步初始化在真机上可能晚于构造，原实现直接判失败后再也不重试。
+   修法：`AmapRouteMapView` 增加 `setupDone` 标记，构造时取一次、`onResume` 再取一次，拿到非空 map 才 `setup()`；失败时状态提示改为「稍后会自动重试」。
+
+同时新增菜单「定位到当前位置」（`R.id.action_locate_me` → `MainActivity.locateMe()`）：先读 GPS/网络/fused 的最后一次定位；都读不到时用 `LocationManager.getCurrentLocation(GPS)` 请求一次实时定位，拿到后 `focusOn` + 红色跑者标记。整段流程有 `DiagnosticLog` 记录（`定位：...`），便于真机上排查。
+
+**验证层次**：该项只能在 arm 真机验证；本机 x86_64 模拟器按策略退回瓦片引擎，因此本次只验证了「瓦片引擎 + 定位到当前位置」（模拟器上 `adb logcat -s RouteWorkshop` 能看到 `定位到当前位置：31.230000,121.473700 via gps`，截图 `evidence-emu/53-locate-ok.png`）。

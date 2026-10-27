@@ -21,6 +21,7 @@ import com.amap.api.maps.model.MarkerOptions;
 import com.amap.api.maps.model.Polyline;
 import com.amap.api.maps.model.PolylineOptions;
 
+import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.core.ChinaShift;
 import org.localroute.core.GeoPoint;
 
@@ -61,6 +62,7 @@ public final class AmapRouteMapView implements RouteMapHost {
     @Nullable
     private GeoPoint following;
     private boolean followingEnabled;
+    private boolean setupDone;
     private String lastStatus = "";
 
     public AmapRouteMapView(Context context, FrameLayout container,
@@ -79,15 +81,25 @@ public final class AmapRouteMapView implements RouteMapHost {
         container.addView(mapView, 0, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         mapView.onCreate(null);
+        // 注意：getMap() 在 onCreate 之后仍可能返回 null（SDK 内部异步初始化），
+        // 真机上就曾因此整块地图空白且收不到点击。这里先试一次，失败则等 onResume 再试。
         this.map = mapView.getMap();
-        setup();
+        if (this.map != null) {
+            setup();
+        } else if (DiagnosticLog.isCoordinateLoggingEnabled()) {
+            DiagnosticLog.info("高德 MapView.getMap() 暂时为 null，等 onResume 再取一次");
+        }
     }
 
     private void setup() {
-        if (map == null) {
-            notifyStatus("高德 SDK 初始化失败（getMap 返回 null），请改用瓦片底图");
+        if (setupDone) {
             return;
         }
+        if (map == null) {
+            notifyStatus("高德 SDK 还没准备好（getMap 返回 null），稍后会自动重试；仍不行请改用瓦片底图");
+            return;
+        }
+        setupDone = true;
         map.getUiSettings().setZoomControlsEnabled(false);
         map.getUiSettings().setScaleControlsEnabled(true);
         map.setOnMapClickListener(latLng -> {
@@ -194,6 +206,14 @@ public final class AmapRouteMapView implements RouteMapHost {
     }
 
     @Override
+    public void focusOn(GeoPoint point) {
+        if (map == null) {
+            return;
+        }
+        followingEnabled = false;
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(point), 16f));
+    }
+    @Override
     public void renderRunner(@Nullable GeoPoint position) {
         if (map == null) {
             return;
@@ -269,6 +289,13 @@ public final class AmapRouteMapView implements RouteMapHost {
     @Override
     public void onResume() {
         mapView.onResume();
+        if (!setupDone) {
+            // getMap 可能在构造时为 null，onResume 之后才有值；补上一次 setup。
+            map = mapView.getMap();
+            if (map != null) {
+                setup();
+            }
+        }
     }
 
     @Override

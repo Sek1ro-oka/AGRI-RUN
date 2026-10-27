@@ -30,6 +30,9 @@ public interface RouteMapHost {
 
     void fitRoute(List<GeoPoint> points);
 
+    /** 把镜头移到某个点并放大（定位到当前位置、外部跳转都用它）。 */
+    void focusOn(GeoPoint point);
+
     void renderRunner(@Nullable GeoPoint position);
 
     void followRunner(@Nullable GeoPoint position);

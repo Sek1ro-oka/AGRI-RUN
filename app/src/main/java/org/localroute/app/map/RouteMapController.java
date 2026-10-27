@@ -570,6 +570,14 @@ public final class RouteMapController implements RouteMapHost {
     }
 
     /** 更新当前模拟位置；{@code position == null} 时清除。 */
+    @Override
+    public void focusOn(@NonNull GeoPoint point) {
+        if (map == null) {
+            return;
+        }
+        followRunner = false;
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(point), 16f));
+    }
     public void renderRunner(@Nullable GeoPoint position) {
         cachedRunner = position;
         drawRunner();

@@ -128,6 +128,9 @@ public class MainActivity extends AppCompatActivity {
                 BuildConfig.AMAP_KEY, java.util.Arrays.asList(Build.SUPPORTED_ABIS));
         DiagnosticLog.info("地图引擎：" + backend.reason());
         if (backend.usesAmapSdk()) {
+            // 关键：MapLibre 的 MapView 仍铺在同一个 FrameLayout 里，且盖在新加的 SDK 地图上面，
+            // 会遮住 SDK 底图并吃掉触摸事件（表现为「一片空白 + 点不了地图」）。SDK 模式下必须把它藏起来。
+            binding.mapView.setVisibility(android.view.View.GONE);
             try {
                 mapController = new AmapRouteMapView(this, binding.mapContainer, mapClick);
             } catch (Throwable error) {
@@ -860,6 +863,68 @@ public class MainActivity extends AppCompatActivity {
                 : getString(R.string.menu_overlay_off));
     }
 
+    /** 菜单「定位到当前位置」：先读最后一次定位，读不到就请求一次实时定位，拿到了把地图居中放大。 */
+    private void locateMe() {
+        if (!org.localroute.app.diagnostics.SystemLocationReader.hasFinePermission(this)) {
+            permissionLauncher.launch(new String[]{
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION});
+            toast("先允许定位权限，再点一次「定位到当前位置」");
+            return;
+        }
+        final android.location.LocationManager locationManager =
+                (android.location.LocationManager) getSystemService(android.content.Context.LOCATION_SERVICE);
+        if (locationManager == null || !locationManager.isLocationEnabled()) {
+            toast("系统定位开关是关的，请先打开");
+            return;
+        }
+        DiagnosticLog.info("定位：开始读取缓存位置");
+        java.util.List<org.localroute.app.diagnostics.SystemLocationReader.Probe> probes =
+                org.localroute.app.diagnostics.SystemLocationReader.readAll(this);
+        org.localroute.app.diagnostics.SystemLocationReader.Probe best = null;
+        for (org.localroute.app.diagnostics.SystemLocationReader.Probe probe : probes) {
+            DiagnosticLog.info(String.format(java.util.Locale.US, "定位：%s available=%s fix=%s note=%s",
+                    probe.provider, probe.available, probe.hasFix(), probe.note));
+            if (!probe.hasFix()) {
+                continue;
+            }
+            if (best == null || probe.ageMillis() < best.ageMillis()) {
+                best = probe;
+            }
+        }
+        if (best != null) {
+            showLocated(best.point(), best.provider);
+            return;
+        }
+        toast("正在请求一次实时定位…");
+        DiagnosticLog.info("定位：缓存里没有可用位置，改为请求一次实时定位");
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                locationManager.getCurrentLocation(android.location.LocationManager.GPS_PROVIDER, null,
+                        getMainExecutor(), location -> {
+                            if (location == null) {
+                                toast("还没拿到定位：请到空旷处，或先用其它地图应用定位一次再试");
+                                return;
+                            }
+                            showLocated(new org.localroute.core.GeoPoint(
+                                    location.getLatitude(), location.getLongitude()), location.getProvider());
+                        });
+            } else {
+                toast("系统版本较低，请先用其它地图应用定位一次再试");
+            }
+        } catch (SecurityException | IllegalArgumentException error) {
+            DiagnosticLog.warn("定位：请求实时定位失败 " + error);
+            toast("请求定位失败：" + error.getMessage());
+        }
+    }
+
+    private void showLocated(org.localroute.core.GeoPoint here, String provider) {
+        mapController.focusOn(here);
+        mapController.renderRunner(here);
+        toast(String.format(java.util.Locale.US, "已定位到当前位置：%.6f, %.6f（%s）",
+                here.latitude(), here.longitude(), provider));
+        DiagnosticLog.info("定位到当前位置：" + here.format() + " via " + provider);
+    }
     private void showTileSourceDialog() {
         if (!(mapController instanceof RouteMapController)) {
             // 高德官方 SDK 的底图由 SDK 自己提供，没有「瓦片源」概念。
@@ -1108,6 +1173,10 @@ public class MainActivity extends AppCompatActivity {
         int id = item.getItemId();
         if (id == R.id.action_single_point) {
             showSinglePointDialog();
+            return true;
+        }
+        if (id == R.id.action_locate_me) {
+            locateMe();
             return true;
         }
         if (id == R.id.action_teleport) {

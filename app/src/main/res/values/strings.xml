@@ -144,4 +144,6 @@
     <string name="length_single_run">单程 %1$.1f 米</string>
     <string name="length_loop">单圈 %1$.1f 米</string>
     <string name="length_shuttle">往返 %1$.1f 米（单程 %2$.1f 米）</string>
-    <string name="toast_loops_fixed_for_single">开口单程只走一次，次数已固定为 1</string></resources>
+    <string name="toast_loops_fixed_for_single">开口单程只走一次，次数已固定为 1</string>    <!-- 0.2.2：SDK 地图层级修复 + 定位到当前位置 -->
+    <string name="menu_locate_me">定位到当前位置</string>
+</resources>

@@ -20,6 +20,11 @@
         android:title="@string/menu_teleport_slots"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_locate_me"
+        android:title="@string/menu_locate_me"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_map_source"
         android:title="@string/menu_map_source"
         app:showAsAction="never" />
