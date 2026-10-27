@@ -72,3 +72,15 @@ MapBackendPolicy             纯 Java 判定：Key + SUPPORTED_ABIS → 用哪�
   底图正常加载、路线与配速等界面无回归（`delivery/evidence/emulator/012-0.2.1-瓦片引擎在x86_64上回退正常.png`）。
 - ❌ SDK 渲染路径（真机上的瓦片清晰度、手势、`animateCamera` 取景、标记图标）**未实测**。
 - ❌ 未在真机上验证 Key 校验结果；若高德侧 Key 未绑定本机 SHA-1，会走回退分支。
+
+## 2026-10-27 追加：Key 已配置
+
+- 用户提供的 Key 写在 `local.properties` 的 `amapKey=`（32 位，文件被 `.gitignore` 排除，不进 source.zip）。
+- 构建产物核对：`BuildConfig.AMAP_KEY` 非空；`aapt2 dump xmltree app-debug.apk --file AndroidManifest.xml`
+  显示 `com.amap.api.v2.apikey` 的 `value` 为该 32 位串；`com.amap.api:3dmap:10.0.600` 的 arm so 在包内。
+- 模拟器（x86_64）实测：debug 包可安装并正常启动，日志仍为
+  「当前架构 x86_64 不在高德 SDK 支持范围（仅 arm），退回栅格瓦片底图」——Key 已打包，但**架构闸门按预期拦住了 SDK**。
+- release 包（arm-only）在 x86_64 模拟器上安装失败：`INSTALL_FAILED_NO_MATCHING_ABIS`，
+  这条恰好反证了「release 只含 arm so、只能装真机」。
+- 仍未验证：真机上的 SDK 渲染、Key 鉴权是否通过（Key 需绑定包名 `org.localroute.app` 与
+  签名 SHA-1 `B8:CB:D6:D9:...:7B:2F`）。
