@@ -39,6 +39,8 @@ public final class OverlayPanel {
     private static final int[] SLOT_LABELS = {R.string.overlay_slot_a, R.string.overlay_slot_b,
             R.string.overlay_slot_c};
 
+    private static final String KEY_COLLAPSED = "overlay_collapsed";
+
     private static android.content.SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
@@ -78,6 +80,9 @@ public final class OverlayPanel {
     private LinearLayout root;
     private TextView statusView;
     private TextView actionView;
+    private LinearLayout content;
+    private TextView toggleView;
+    private boolean collapsed;
     private WindowManager.LayoutParams params;
     private boolean running;
 
@@ -164,14 +169,23 @@ public final class OverlayPanel {
         root.setBackground(background);
         root.setElevation(dp(6));
 
+        // 折叠开关：展开时显示「−」，点一下收成只剩一个「+」，避免挡住底下 App 的界面。
+        LinearLayout header = new LinearLayout(context);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        root.addView(header, matchWrap());
+
         statusView = new TextView(context);
         statusView.setTextColor(Color.WHITE);
         statusView.setTextSize(12f);
-        root.addView(statusView, matchWrap());
+        statusView.setOnTouchListener(new DragListener());
+        content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(statusView, matchWrap());
+        root.addView(content, matchWrap());
 
         LinearLayout buttons = new LinearLayout(context);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
-        root.addView(buttons, matchWrap());
+        content.addView(buttons, matchWrap());
 
         actionView = makeButton(buttons, R.string.overlay_pause);
         actionView.setOnClickListener(v -> {
@@ -188,7 +202,7 @@ public final class OverlayPanel {
         // 快捷传送：A / B / C 三个槽位（跨应用点一下就把当前位置挪过去，速度 0、复用同一个定位会话）。
         LinearLayout slots = new LinearLayout(context);
         slots.setOrientation(LinearLayout.HORIZONTAL);
-        root.addView(slots, matchWrap());
+        content.addView(slots, matchWrap());
         for (int i = 0; i < SLOT_KEYS.length; i++) {
             final int index = i;
             TextView slot = makeButton(slots, SLOT_LABELS[i]);
@@ -215,12 +229,46 @@ public final class OverlayPanel {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
+        toggleView = new TextView(context);
+        toggleView.setTextColor(Color.WHITE);
+        toggleView.setTextSize(15f);
+        toggleView.setGravity(Gravity.CENTER);
+        toggleView.setMinWidth(dp(40));
+        toggleView.setPadding(dp(12), dp(4), dp(12), dp(4));
+        GradientDrawable toggleBackground = new GradientDrawable();
+        toggleBackground.setColor(Color.parseColor("#55FFFFFF"));
+        toggleBackground.setCornerRadius(dp(8));
+        toggleView.setBackground(toggleBackground);
+        toggleView.setOnClickListener(v -> setCollapsed(!collapsed, true));
+        header.addView(toggleView, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = dp(12);
         params.y = dp(96);
-        root.setOnTouchListener(new DragListener());
+        // 拖动只挂在状态行上：根部挂触摸监听会把按钮的点击一起吃掉。
+        setCollapsed(prefs(context).getBoolean(KEY_COLLAPSED, false), false);
     }
 
+    /** 折叠/展开：折叠后只留一个「+」，展开后按钮变成「−」。状态记在 SharedPreferences 里。 */
+    private void setCollapsed(boolean value, boolean persist) {
+        collapsed = value;
+        if (content != null) {
+            content.setVisibility(value ? View.GONE : View.VISIBLE);
+        }
+        if (toggleView != null) {
+            toggleView.setText(value ? "+" : "−");
+        }
+        if (persist) {
+            prefs(context).edit().putBoolean(KEY_COLLAPSED, value).apply();
+        }
+        if (root != null && params != null && root.getParent() != null) {
+            try {
+                windowManager.updateViewLayout(root, params);
+            } catch (RuntimeException ignored) {
+                // 悬浮窗已被移除。
+            }
+        }
+    }
     private TextView makeButton(LinearLayout parent, int textRes) {
         TextView button = new TextView(context);
         button.setText(textRes);

@@ -2,8 +2,8 @@
   "application": {
     "name": "路线工坊",
     "packageName": "org.localroute.app",
-    "versionName": "0.2.2",
-    "versionCode": 9,
+    "versionName": "0.2.3",
+    "versionCode": 10,
     "minSdk": 29,
     "targetSdk": 35,
     "compileSdk": 35,
@@ -89,7 +89,7 @@
     "note": "source.zip 由 git archive HEAD 生成；为避免自引用导致哈希漂移，本文件不写死提交号；远端仓库不含 APK/ZIP、keystore 与 local.properties（见 .gitignore）"
   },
   "artifacts": [
-    { "file": "路线工坊-0.2.2-release.apk", "module": ":app", "versionName": "0.2.2", "versionCode": 9, "sizeMB": 69.07, "signing": "本地自签名（keystore 与口令不入库）" },
+    { "file": "路线工坊-0.2.3-release.apk", "module": ":app", "versionName": "0.2.3", "versionCode": 10, "sizeMB": 69.07, "signing": "本地自签名（keystore 与口令不入库）" },
     { "file": "定位探针-0.1.0-debug.apk", "module": ":location-probe", "sizeMB": 10.59, "signing": "debug 签名" },
     { "file": "source.zip", "note": "git archive 生成的源码快照（不含构建产物与私钥）" }
   ]
