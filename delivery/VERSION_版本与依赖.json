@@ -2,8 +2,8 @@
     "application":  {
                         "name":  "路线工坊",
                         "packageName":  "org.localroute.app",
-                        "versionName":  "0.2.0",
-                        "versionCode":  6,
+                        "versionName":  "0.2.1",
+                        "versionCode":  8,
                         "minSdk":  29,
                         "targetSdk":  35,
                         "compileSdk":  35,
@@ -148,11 +148,11 @@
                },
     "artifacts":  [
                       {
-                          "file":  "路线工坊-0.2.0-release.apk",
+                          "file":  "路线工坊-0.2.1-release.apk",
                           "module":  ":app",
-                          "versionName":  "0.2.0",
-                          "versionCode":  6,
-                          "sizeMB":  32.96,
+                          "versionName":  "0.2.1",
+                          "versionCode":  8,
+                          "sizeMB":  69.07,
                           "signing":  "本地自签名（keystore 与口令不入库）"
                       },
                       {
@@ -165,5 +165,10 @@
                           "file":  "source.zip",
                           "note":  "git archive 生成的源码快照（不含构建产物与私钥）"
                       }
-                  ]
+                  ],
+    "mapEngines":  {
+                       "defaultFallback":  "MapLibre 13.7.1 + 高德栅格瓦片（GCJ-02，显示层换算）",
+                       "optional":  "高德官方 3D SDK 10.0.600（com.amap.api:3dmap，需 AMAP_KEY + arm ABI）",
+                       "policy":  "app/src/main/java/org/localroute/app/map/MapBackendPolicy.java"
+                   }
 }

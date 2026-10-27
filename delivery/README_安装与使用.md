@@ -7,7 +7,7 @@
 
 | 文件 | 包名 | 作用 |
 | --- | --- | --- |
-| `路线工坊-0.2.0-release.apk` | `org.localroute.app` | 主程序（versionCode 7，可覆盖安装 0.1.0—0.1.2 并保留路线） |
+| `路线工坊-0.2.1-release.apk` | `org.localroute.app` | 主程序（versionCode 7，可覆盖安装 0.1.0—0.1.2 并保留路线） |
 | `定位探针-0.1.0-debug.apk` | `org.localroute.probe` | 旁证工具：独立读取系统位置，确认坐标真的进了系统（探针本版未改动） |
 
 > 定位探针用的是 debug 包（包名带 `.debug` 后缀的是主程序的调试包，二者可共存，但**只需要装 release 主程序**）。
@@ -20,7 +20,7 @@
 
 ```powershell
 $adb = 'E:\Android\Sdk\platform-tools\adb.exe'
-& $adb install -r 路线工坊-0.2.0-release.apk
+& $adb install -r 路线工坊-0.2.1-release.apk
 & $adb install -r 定位探针-0.1.0-debug.apk
 ```
 

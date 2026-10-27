@@ -46,7 +46,7 @@ import java.util.Locale;
  *   <li>提供多个瓦片源，用户可以在界面里切换并重试。</li>
  * </ol>
  */
-public final class RouteMapController {
+public final class RouteMapController implements RouteMapHost {
 
     private static final String SOURCE_LINE = "route-line";
     private static final String SOURCE_VERTICES = "route-vertices";
@@ -142,7 +142,7 @@ public final class RouteMapController {
     @Nullable
     private Runnable styleTimeout;
     @Nullable
-    private StatusListener statusListener;
+    private RouteMapHost.StatusListener statusListener;
     private String lastStatus = "";
     /** 最近一次瓦片探测失败的原因；为空表示上一次探测是通的。 */
     @Nullable
@@ -201,9 +201,8 @@ public final class RouteMapController {
         void onMapClick(GeoPoint point);
     }
 
-    /** 地图状态回调：{@code message == null} 表示已就绪。 */
-    public interface StatusListener {
-        void onStatusChanged(@Nullable String message);
+    /** 地图状态回调：{@code message == null} 表示已就绪；沿用 {@link RouteMapHost.StatusListener}。 */
+    public interface StatusListener extends RouteMapHost.StatusListener {
     }
 
     private RouteMapController(MapView mapView) {
@@ -220,7 +219,8 @@ public final class RouteMapController {
         return controller;
     }
 
-    public void setStatusListener(@Nullable StatusListener listener) {
+    @Override
+    public void setStatusListener(@Nullable RouteMapHost.StatusListener listener) {
         this.statusListener = listener;
         if (listener != null && !lastStatus.isEmpty()) {
             listener.onStatusChanged(lastStatus);
@@ -703,6 +703,12 @@ public final class RouteMapController {
         mapView.onDestroy();
     }
 
+    @Override
+    public String engineLabel() {
+        return "MapLibre + 高德瓦片";
+    }
+
+    @Override
     public void onLowMemory() {
         mapView.onLowMemory();
     }

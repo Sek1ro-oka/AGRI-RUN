@@ -1,7 +1,7 @@
-# 测试结果报告 — 路线工坊 0.2.0
+# 测试结果报告 — 路线工坊 0.2.1
 
 - 测试日期：2026-10-27（Asia/Hong_Kong）
-- 被测版本：`org.localroute.app` versionName 0.2.0 / versionCode 7（release，本地自签名）
+- 被测版本：`org.localroute.app` versionName 0.2.1 / versionCode 8（release，本地自签名）
 - 测试主机：Windows 11，CPU/内存见 `docs/environment.md`
 - 构建工具链：JDK 21.0.3（`D:\Java\jdk-21`）、Gradle 8.11.1、AGP 8.9.2、Android SDK 35、build-tools 35.0.0
 - **测试机**：真机（真我 GT Neo5）仍未接入自动化；本轮按用户要求装了 **API 35 x86_64 模拟器**，
@@ -32,6 +32,7 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 | simulation-core | `MockLocationSessionTest` | 16 | 0 | gps→network→fused 创建顺序、不支持项跳过并记录、可选 provider 创建失败只跳过不影响 gps、可选 provider 启用失败被撤掉并跳过、gps 启用失败整体回滚、上次崩溃残留的 provider 先清理再创建、`SecurityException` 映射为 `MOCK_APP_NOT_SELECTED`、重复 start 不重建、publish 写入全部 provider 且字段完整、publish 失败映射 `PUBLISH_FAILED`、未 start 时 publish 抛异常、stop 只移除本次创建且幂等、remove 抛异常不外泄、候选必须含 gps、stop 先停用再移除（部分 ROM 只认停用） |
 | app | `RouteJsonCodecTest` | 9 | 0 | 编解码往返、字段与顺序、单点草稿可保存但编译报 `ROUTE_INVALID`、`closed:false` 往返保留并编译成往返路线、未知 `schemaVersion` 拒绝、空 id 拒绝、坐标越界拒绝、超 5000 点拒绝 |
 | app | `RouteRepositoryTest` | 10 | 0 | 保存/加载往返、列表按更新时间倒序、id 生成格式、非法 id 拒绝、删除幂等、损坏文件移入 `corrupt/` 保留原文件名且不被覆盖、文件名为 A 而内容 id 为 B 时被隔离不进列表、原子写不残留 `.tmp` |
+| app | `MapBackendPolicyTest`（0.2.1 新增） | 9 | 0 | 无 Key / 空白 Key / null Key / arm64 / armv7 / x86_64 回退 / 架构信息缺失 / 混合 ABI 取 arm / ABI 大小写 |
 | app | `RouteEditorViewModelTest` | 19 | 0 | 加点/撤销/清空/闭合、点数上限、单圈长度随点变化、草稿（<2 点）不可运行、手动经纬度输入解析（先纬后经、非法值拒绝）、速度与圈数校验、保存后重新加载名字与点；**闭合开关**：切换后 dirty、圈长变长、文案含「原路返回」、`toDefinition().closed()` 同步、载入不闭合路线保持不闭合；单点请求暂存与清理；传送模式默认关、可开关、开关不影响草稿点 |
 | route-core | `GpxCodecTest`（0.2.0 新增） | 15 | 0 | 编码含声明/`trk`/`trkseg`/`trkpt` 与 6 位小数、名称转义、空点集拒绝、解码往返保序、忽略 `wpt`/`rte`、缺 `lat`/`lon` 抛异常、非数字与越界拒绝、XML 声明缺失仍可解析、空白文件拒绝、Doctype 被禁用（XXE） |
 | app | `RunRequestTest`（新增） | 4 | 0 | 路线请求携带路线与配置、单点请求无路线且速度默认、单点拒绝 null、每个请求有独立 id |
@@ -56,13 +57,13 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
-| `路线工坊-0.2.0-release.apk` | 32.93 MB | release，本地自签名；只含 `arm64-v8a`/`armeabi-v7a` 原生库 |
+| `路线工坊-0.2.1-release.apk` | 69.07 MB（含高德 SDK 的 arm so） | release，本地自签名；只含 `arm64-v8a`/`armeabi-v7a` 原生库 |
 | `定位探针-0.1.0-debug.apk` | 10.59 MB | 独立包名 `org.localroute.probe`，debug 签名，用于验证系统位置（本版未改动） |
 | `source.zip` | 约 0.2 MB | `git archive HEAD` 生成；源码快照对应的提交见 `git log -1`（归档内容即该提交的树） |
 
 - 调试包 `app-debug.apk` 因为额外打了 `x86_64`（模拟器用），体积涨到 48.12 MB；release 不受影响。
 - `apksigner verify --print-certs`：签名有效，证书 `CN=Route Workshop Local`，SHA-256 `14f0286f4624de37fc1a013f9a15514ac04981bb1f222b77b3ce7dbb38f02a9c`（与 0.1.0—0.1.2 同一把 key，可覆盖安装）。
-- `aapt2 dump badging`：`package org.localroute.app`、`versionCode 7`、`versionName 0.2.0`、`minSdk 29`、`targetSdk 35`、应用名「路线工坊」、入口 `org.localroute.app.ui.MainActivity`；
+- `aapt2 dump badging`：`package org.localroute.app`、`versionCode 8`、`versionName 0.2.1`、`minSdk 29`、`targetSdk 35`、应用名「路线工坊」、入口 `org.localroute.app.ui.MainActivity`；
   权限清单里包含 `android.permission.ACCESS_MOCK_LOCATION`（这就是修好“模拟位置应用列表里没有本应用”的关键）。
 - 探针包名 `org.localroute.probe`，权限只有 FINE/COARSE 定位。
 
@@ -118,7 +119,7 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 模拟器上已经做完的（T29—T35）不必重复；下面这些必须在真机上按顺序做：
 
 1. 手机打开「开发者选项 → 选择模拟位置信息应用」，选中「路线工坊」（0.1.1 起才会出现在列表里）。
-2. 安装 `路线工坊-0.2.0-release.apk`，授予定位权限与通知权限，确认系统定位开关开启。
+2. 安装 `路线工坊-0.2.1-release.apk`，授予定位权限与通知权限，确认系统定位开关开启。
 3. 按 `README_安装与使用.md` 画一条路线（或手动输入 `samples/` 里的合成坐标），速度 9 km/h、1 圈，点「开始」。
 4. 同时安装 `定位探针-0.1.0-debug.apk`，在探针里点「开始监听」，应看到每秒约 2 条 `模拟位置` 标记的坐标，且沿路线移动。
 5. 依次执行 T16（锁屏 10 分钟）、T17（通知按钮）、T18（旋转）、T20（杀进程后重开）、T22（连停 20 次）、
@@ -235,3 +236,16 @@ API 35 / x86_64 的 AVD，把整条链路真的跑了一遍。**模拟器不是�
 - 新增 `MapProviders` 适配层：Key 从 `local.properties` 的 `amapKey=` 注入 `BuildConfig.AMAP_KEY`，不进仓库；无 Key 时明确提示「当前使用非官方栅格瓦片」，有 Key 也只标「待接入」——`MapProvidersTest` 断言不会谎称官方 SDK 已生效。
 - 用例总数 173 → **185**（新增 `SpeedPresetsTest` 8、`MapProvidersTest` 4）；lint 仍 0 error、app 29 warning。
 - 版本：`versionName 0.2.0`、`versionCode 7`，签名证书 SHA-256 仍为 `14f0286f…02a9c`（同一把本地 key，可覆盖安装 build 5）。
+
+## 11. 0.2.1：高德官方 SDK 可选引擎（2026-10-27）
+
+| 项 | 结果 |
+| --- | --- |
+| 引擎抽象 | 新增 `RouteMapHost`，`RouteMapController`（瓦片）与 `AmapRouteMapView`（SDK）各自实现；`MainActivity` 只依赖接口 |
+| 判定逻辑 | `MapBackendPolicy.choose(amapKey, SUPPORTED_ABIS)`：无 Key → 瓦片；含 arm → SDK；只有 x86 → 瓦片；9 个单测覆盖 |
+| 依赖 | `com.amap.api:3dmap:10.0.600`（arm so，release 只留 arm64/armv7） |
+| 清单 | 新增 `com.amap.api.v2.apikey` meta-data（值来自 `local.properties` 的 `AMAP_KEY`，不入库） |
+| 编译验证 | `assembleRelease`/`assembleDebug` 通过；release 内确认 `lib/arm64-v8a/libAMapSDK_MAP_v10_0_600.so` 与 `lib/armeabi-v7a/...` |
+| 回退验证（模拟器 API 35 x86_64） | 日志 `地图引擎：当前架构 x86_64 不在高德 SDK 支持范围（仅 arm），退回栅格瓦片底图`；底图、选点、配速、悬浮条无回归（`delivery/evidence/emulator/012-0.2.1-瓦片引擎在x86_64上回退正常.png`） |
+| 体积 | release 32.98 MB → 69.07 MB；debug 84.36 MB |
+| **未验证** | SDK 渲染路径（真机上的瓦片、取景、点击、标记）完全没有跑过——本机没有 arm 设备/arm 模拟器，v10.0.600 不提供 x86 so |

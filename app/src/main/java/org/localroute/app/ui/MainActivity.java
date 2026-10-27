@@ -27,7 +27,11 @@ import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityMainBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.map.MapProviders;
+import org.localroute.app.map.AmapRouteMapView;
+import org.localroute.app.map.MapBackendPolicy;
 import org.localroute.app.map.RouteMapController;
+import org.localroute.app.map.RouteMapHost;
+import org.localroute.app.BuildConfig;
 import org.localroute.app.model.RouteDefinition;
 import org.localroute.app.model.RouteJsonCodec;
 import org.localroute.app.model.RouteSummary;
@@ -69,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
     private RouteRepository repository;
     private RouteEditorViewModel viewModel;
-    private RouteMapController mapController;
+    private RouteMapHost mapController;
     private ActivityResultLauncher<String[]> permissionLauncher;
     /** 「导出 GPX 到文件」：输入是建议文件名，结果是用户选中的目标 Uri。 */
     private ActivityResultLauncher<String> createGpxLauncher;
@@ -111,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
         openGpxLauncher = registerForActivityResult(
                 new ActivityResultContracts.OpenDocument(), this::onImportSourceChosen);
 
-        mapController = RouteMapController.attach(binding.mapView, point -> {
+        RouteMapController.OnMapClickListener mapClick = point -> {
             if (viewModel.isTeleportMode()) {
                 // 传送模式：点地图不再是加节点，而是把模拟位置直接搬过去。
                 teleportTo(point);
@@ -119,7 +123,21 @@ public class MainActivity extends AppCompatActivity {
                 // 第一个点、或点在视野外时重新取景：否则用户看不到刚点的位置，以为没生效。
                 refreshDraft(viewModel.pointCount() == 1 || !mapController.isVisible(point));
             }
-        });
+        };
+        MapBackendPolicy.Decision backend = MapBackendPolicy.choose(
+                BuildConfig.AMAP_KEY, java.util.Arrays.asList(Build.SUPPORTED_ABIS));
+        DiagnosticLog.info("地图引擎：" + backend.reason());
+        if (backend.usesAmapSdk()) {
+            try {
+                mapController = new AmapRouteMapView(this, binding.mapContainer, mapClick);
+            } catch (Throwable error) {
+                // 动态库缺失/Key 被拒等运行时问题不该让应用起不来，直接退回瓦片底图。
+                DiagnosticLog.warn("高德 SDK 初始化失败，改用瓦片底图：" + error);
+                mapController = RouteMapController.attach(binding.mapView, mapClick);
+            }
+        } else {
+            mapController = RouteMapController.attach(binding.mapView, mapClick);
+        }
         mapController.registerGestureListener();
         // 地图加载失败时把原因显示在底部，避免用户只看到一块不动的底图。
         mapController.setStatusListener(message -> {
@@ -843,8 +861,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showTileSourceDialog() {
+        if (!(mapController instanceof RouteMapController)) {
+            // 高德官方 SDK 的底图由 SDK 自己提供，没有「瓦片源」概念。
+            toast("当前使用" + mapController.engineLabel() + "，底图由 SDK 提供，无需切换瓦片源");
+            return;
+        }
+        RouteMapController tiles = (RouteMapController) mapController;
         List<RouteMapController.TileSource> sources = RouteMapController.tileSources();
-        int current = mapController.currentTileSourceIndex();
+        int current = tiles.currentTileSourceIndex();
         String[] labels = new String[sources.size()];
         for (int i = 0; i < sources.size(); i++) {
             labels[i] = (i == current ? "✓ " : "") + sources.get(i).label();
@@ -856,7 +880,7 @@ public class MainActivity extends AppCompatActivity {
                         toast("已经是当前瓦片源");
                         return;
                     }
-                    mapController.selectTileSource(which);
+                    tiles.selectTileSource(which);
                     toast("已切换到「" + sources.get(which).label() + "」，正在重新加载");
                     // 切到高德时顺带说明 Key 状态：有 Key 也只是「待接入 SDK」，没 Key 就走瓦片。
                     if ("amap".equals(sources.get(which).id())) {

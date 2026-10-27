@@ -37,6 +37,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RouteWorkshop">
 
+        <!-- 高德官方 SDK 的 Key（local.properties 的 AMAP_KEY）；为空时自动使用栅格瓦片底图。 -->
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="${amapKey}" />
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"

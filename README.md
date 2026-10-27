@@ -3,7 +3,7 @@
 一个**完全离线**的 Android 小工具：在地图上点出一条闭合路线，设置速度与圈数，然后用**Android 系统模拟位置**把
 “沿这条路线匀速跑 N 圈”的坐标源源不断地喂给系统，让第三方运动 App 以为你在跑圈。
 
-- 包名：`org.localroute.app`　版本：0.2.0（versionCode 5）
+- 包名：`org.localroute.app`　版本：0.2.1（versionCode 8）
 - 最低系统：Android 10（API 29），编译 SDK 35
 - 无账号、无网络请求（地图瓦片除外）、无服务器、数据只存在手机本地
 - 附带一个独立包名的小工具 **定位探针**（`org.localroute.probe`），用来独立验证“系统确实收到了坐标”
@@ -35,7 +35,7 @@
 
 ## 快速开始
 
-1. 安装 `delivery/路线工坊-0.2.0-release.apk`（另附 `定位探针` APK）。
+1. 安装 `delivery/路线工坊-0.2.1-release.apk`（另附 `定位探针` APK）。
 2. 手机 **开发者选项 → 选择模拟位置信息应用 → 路线工坊**（0.1.1 起本应用才会出现在这个列表里）。
 3. 打开 App 授予定位权限，打开系统定位；菜单「设置检查」逐项确认全部通过。
 4. 地图上点 3–4 个点围出一圈，填速度与圈数，点「开始」。
@@ -141,3 +141,10 @@ delivery/         交付物：APK、源码包、使用说明、测试报告、�
 - 新增 `MapProviders` 适配层：Key 从 `local.properties` 的 `amapKey=` 注入 `BuildConfig.AMAP_KEY`，不进仓库；无 Key 时明确提示「当前使用非官方栅格瓦片」，有 Key 也只标「待接入」——`MapProvidersTest` 断言不会谎称官方 SDK 已生效。
 - 用例总数 173 → **185**（新增 `SpeedPresetsTest` 8、`MapProvidersTest` 4）；lint 仍 0 error、app 29 warning。
 - 版本：`versionName 0.2.0`、`versionCode 6`，签名证书 SHA-256 仍为 `14f0286f…02a9c`（同一把本地 key，可覆盖安装 build 5）。
+
+## 0.2.1 变更（高德官方 SDK 可选引擎）
+
+- 新增 `RouteMapHost` 抽象与 `AmapRouteMapView`：`local.properties` 填 `AMAP_KEY`、且设备是 arm（arm64-v8a / armeabi-v7a）时启用高德官方 3D SDK；其余情况（模拟器、无 Key、SDK 初始化失败）自动退回原瓦片底图，不会白屏。
+- 判定逻辑在 `MapBackendPolicy`（9 个单测）：Key 为空 → 瓦片；含 arm → SDK；只有 x86 → 瓦片。
+- 代价：release APK 从 32.98 MB 增到 **69.07 MB**（两份 arm so）。SDK 路径**未在任何设备上跑过**，只在模拟器验证了回退路径；细节与风险见 `docs/07_地图引擎与高德SDK.md`。
+- 测试：**194 个 JVM 用例**（route-core 102 / simulation-core 24 / app 68），lint 0 error（app 31 warning）。
