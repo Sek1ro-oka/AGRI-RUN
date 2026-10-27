@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat;
 
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityDiagnosticsBinding;
+import org.localroute.app.simulation.GmsFlpBackend;
 import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.diagnostics.SystemLocationReader;
 import org.localroute.app.model.RouteSummary;
@@ -64,6 +65,12 @@ public class DiagnosticsActivity extends AppCompatActivity {
         }
         repository = new RouteRepository(new File(getFilesDir(), "routes"));
 
+        binding.switchGmsFlp.setChecked(getSharedPreferences("ui", MODE_PRIVATE).getBoolean("gms_flp_enabled", false));
+        binding.switchGmsFlp.setOnCheckedChangeListener((button, checked) -> {
+            getSharedPreferences("ui", MODE_PRIVATE).edit().putBoolean("gms_flp_enabled", checked).apply();
+            DiagnosticLog.info("GMS FLP 后端开关：" + (checked ? "开启（下次运行生效）" : "关闭"));
+            refreshGmsStatus();
+        });
         binding.switchCoordinates.setChecked(DiagnosticLog.isCoordinateLoggingEnabled());
         binding.switchCoordinates.setOnCheckedChangeListener((button, checked) -> {
             DiagnosticLog.setCoordinateLoggingEnabled(this, checked);
@@ -77,6 +84,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
         });
 
         refreshReport();
+        refreshGmsStatus();
     }
 
     @Override
@@ -102,6 +110,16 @@ public class DiagnosticsActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    /** 记录 GMS FLP 后端的开关与可用性：第三方客户端是否走 FLP，靠这里先判断。 */
+    private void refreshGmsStatus() {
+        boolean enabled = getSharedPreferences("ui", MODE_PRIVATE)
+                .getBoolean("gms_flp_enabled", false);
+        boolean available = GmsFlpBackend.isPlayServicesAvailable(this);
+        binding.textGmsFlp.setText(getString(R.string.gms_flp_status,
+                enabled ? "已开启" : "已关闭",
+                available ? "可用" : "不可用",
+                GmsFlpBackend.unavailableReason(this)));
+    }
     private void refreshReport() {
         StringBuilder builder = new StringBuilder();
 
@@ -210,12 +228,13 @@ public class DiagnosticsActivity extends AppCompatActivity {
             GeoPoint observed = probe.point();
             double distance = LocationVerifier.distanceMeters(expected, observed);
             LocationVerifier.Verdict verdict = LocationVerifier.evaluate(
-                    expected, observed, probe.markedMock(), LocationVerifier.DEFAULT_TOLERANCE_METERS);
+                    expected, observed, probe.markedMock(), LocationVerifier.DEFAULT_TOLERANCE_METERS,
+                    probe.ageMillis(), LocationVerifier.DEFAULT_STALE_AFTER_MS);
             builder.append(String.format(Locale.US, "%s：%s · 模拟标记 %s · %.1f 秒前\n",
                     probe.provider, observed.format(), probe.markedMock() ? "是" : "否",
                     probe.ageMillis() / 1000d));
             builder.append("  结论：")
-                    .append(LocationVerifier.explain(verdict, distance, probe.provider))
+                    .append(LocationVerifier.explain(verdict, distance, probe.provider, probe.ageMillis()))
                     .append('\n');
         }
         binding.textSelfCheck.setText(builder.toString());

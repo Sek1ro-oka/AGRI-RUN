@@ -1,220 +1,394 @@
 package org.localroute.probe;
 
 import android.Manifest;
-import android.content.Context;
+import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
+import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.text.format.DateFormat;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
 
 import org.localroute.probe.databinding.ActivityProbeBinding;
+import org.localroute.simulation.ChannelStats;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * 定位探针：独立包名（org.localroute.probe）从系统 LocationManager 读取位置。
+ * 独立的多通道接收探针：只通过公开定位接口读取，不读主应用的内部状态。
  *
- * <p>存在意义是“旁证”：主 App 用模拟位置输出坐标后，用这个完全独立的应用读系统位置，
- * 如果这里看到坐标在动、且标记为 mock，就说明模拟位置真的进了系统（任务书第 12 步、T15）。
- *
- * <p>它只做读取与展示：不写任何数据、不读主 App 的存储、不需要任何特殊权限，
- * 也不判断“是谁在提供位置”——第三方来源的真实性应由使用者自行确认。
+ * <p>通道：gps / network / framework fused（平台融合）/ Criteria 选中的 provider / Google Play
+ * services FLP（设备具备时）。每条通道单独统计，缺 GMS、缺权限、来源不存在都显式说明，
+ * 不会悄悄换成 GPS 然后标成「FLP 通过」。
  */
-public class ProbeActivity extends AppCompatActivity implements LocationListener {
+// 权限在 startListening() 里检查；每条订阅/读取都单独 try/catch SecurityException。
+@SuppressLint("MissingPermission")
+public class ProbeActivity extends AppCompatActivity {
 
-    private static final String[] PROVIDERS = {
-            LocationManager.GPS_PROVIDER,
-            LocationManager.NETWORK_PROVIDER,
-    };
-    private static final int REQUEST_LOCATION = 1001;
-    /** 与主 App 的默认 tick 对齐，便于观察 500ms 一次的更新。 */
+    private static final String TAG = "RouteProbe";
+    private static final int REQUEST_CODE = 1001;
     private static final long MIN_TIME_MS = 500L;
     private static final float MIN_DISTANCE_M = 0f;
-    private static final int MAX_LINES = 400;
+    private static final int MAX_LINES = 600;
+
+    private static final String CHANNEL_GPS = "gps";
+    private static final String CHANNEL_NETWORK = "network";
+    private static final String CHANNEL_FUSED = "fused(framework)";
+    private static final String CHANNEL_CRITERIA = "criteria";
+    private static final String CHANNEL_GMS = "gms-flp";
 
     private ActivityProbeBinding binding;
     private LocationManager locationManager;
+    private FusedLocationProviderClient fusedClient;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Map<String, ChannelStats> stats = new LinkedHashMap<>();
+    private final List<String> lines = new ArrayList<>();
+
     private boolean listening;
-    private int fixCount;
-    private Location lastLocation;
-    private double travelledMeters;
-    private long startedAtElapsedMs;
-    private final java.util.ArrayDeque<String> lines = new java.util.ArrayDeque<>();
+    private long listenStartedNanos;
+    private long lastFrameNanos;
+    private String criteriaProvider = "";
+    private String gmsStatus = "未启动";
+
+    private final LocationListener listener = new LocationListener() {
+        @Override
+        public void onLocationChanged(@NonNull Location location) {
+            handleLocation(channelOf(location.getProvider()), location);
+        }
+
+        @Override
+        public void onProviderEnabled(@NonNull String provider) {
+            append("provider 已启用：" + provider);
+        }
+
+        @Override
+        public void onProviderDisabled(@NonNull String provider) {
+            append("provider 已禁用：" + provider);
+        }
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {
+            append("provider 状态变化：" + provider + " status=" + status);
+        }
+    };
+
+    private final LocationCallback gmsCallback = new LocationCallback() {
+        @Override
+        public void onLocationResult(@NonNull LocationResult result) {
+            for (Location location : result.getLocations()) {
+                handleLocation(CHANNEL_GMS, location);
+            }
+        }
+    };
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityProbeBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         setSupportActionBar(binding.toolbar);
 
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        binding.buttonListen.setOnClickListener(v -> startListening());
-        binding.buttonStop.setOnClickListener(v -> stopListening(true));
+        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        binding.textStatus.setText(R.string.probe_idle_hint);
+        binding.buttonListen.setOnClickListener(v -> {
+            if (listening) {
+                append(getString(R.string.probe_already_listening));
+                return;
+            }
+            startListening();
+        });
+        binding.buttonStop.setOnClickListener(v -> stopListening());
         binding.buttonClear.setOnClickListener(v -> {
             lines.clear();
-            binding.textLog.setText("");
-            fixCount = 0;
-            travelledMeters = 0d;
-            lastLocation = null;
-            updateStatus(getString(R.string.probe_cleared));
+            binding.textLog.setText(R.string.probe_cleared);
         });
-
-        updateStatus(getString(R.string.probe_idle_hint));
-        reportProvidersState();
-
-        // 探针只是旁证工具：已有权限时自动开始监听，省掉一次点击（也便于自动化验证）。
-        if (hasLocationPermission()) {
-            binding.getRoot().post(this::startListening);
-        }
-    }
-
-    private void reportProvidersState() {
-        appendLine("系统定位开关：" + (isLocationEnabled() ? "开" : "关"));
-        for (String provider : PROVIDERS) {
-            boolean supported;
-            try {
-                supported = locationManager.getAllProviders().contains(provider);
-            } catch (RuntimeException e) {
-                supported = false;
-            }
-            appendLine(String.format(Locale.US, "provider %s：%s", provider, supported ? "存在" : "不存在"));
-        }
-        appendLine("提示：先启动主 App 的模拟，再点“开始监听”。");
-    }
-
-    private boolean isLocationEnabled() {
-        // minSdk 29 ≥ P，因此不需要再判断版本。
-        return locationManager.isLocationEnabled();
+        binding.buttonReport.setOnClickListener(v -> showReport());
+        updateCounters();
     }
 
     private void startListening() {
-        if (listening) {
-            updateStatus(getString(R.string.probe_already_listening));
-            return;
-        }
-        if (!hasLocationPermission()) {
+        if (!hasFinePermission()) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION},
-                    REQUEST_LOCATION);
+                            Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_CODE);
             return;
         }
-        if (!isLocationEnabled()) {
-            updateStatus(getString(R.string.probe_location_disabled));
+        if (locationManager == null || !locationManager.isLocationEnabled()) {
+            append(getString(R.string.probe_location_disabled));
             return;
         }
 
-        int attached = 0;
-        for (String provider : PROVIDERS) {
-            try {
-                locationManager.requestLocationUpdates(provider, MIN_TIME_MS, MIN_DISTANCE_M, this,
-                        Looper.getMainLooper());
-                attached++;
-                Location last = locationManager.getLastKnownLocation(provider);
-                if (last != null) {
-                    onLocationChanged(last);
-                }
-            } catch (SecurityException e) {
-                appendLine("无权监听 " + provider + "：" + e.getMessage());
-            } catch (IllegalArgumentException e) {
-                appendLine("provider 不可用：" + provider);
-            }
-        }
-        if (attached == 0) {
-            updateStatus(getString(R.string.probe_no_provider));
-            return;
-        }
+        stats.clear();
+        listenStartedNanos = SystemClock.elapsedRealtimeNanos();
+        lastFrameNanos = 0L;
         listening = true;
-        startedAtElapsedMs = SystemClock.elapsedRealtime();
-        binding.buttonListen.setEnabled(false);
-        updateStatus(getString(R.string.probe_listening));
-        appendLine("开始监听 " + attached + " 个 provider（间隔 " + MIN_TIME_MS + " 毫秒）");
+        append("开始监听：" + new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date()));
+
+        // 1) gps / network / framework fused：都是 LocationManager 的 provider。
+        List<String> subscribed = new ArrayList<>();
+        for (String provider : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused"}) {
+            String channel = channelOf(provider);
+            boolean exists;
+            try {
+                exists = locationManager.isProviderEnabled(provider);
+            } catch (RuntimeException error) {
+                exists = false;
+            }
+            if (!exists) {
+                append("通道 " + channel + "：UNAVAILABLE（provider 不存在或未启用）");
+                continue;
+            }
+            try {
+                locationManager.requestLocationUpdates(provider, MIN_TIME_MS, MIN_DISTANCE_M, listener,
+                        Looper.getMainLooper());
+                subscribed.add(provider);
+                append("通道 " + channel + "：已订阅");
+            } catch (SecurityException error) {
+                append("通道 " + channel + "：PERMISSION_DENIED（" + error.getMessage() + "）");
+            } catch (RuntimeException error) {
+                append("通道 " + channel + "：UNAVAILABLE（" + error + "）");
+            }
+            Location cached = null;
+            try {
+                cached = locationManager.getLastKnownLocation(provider);
+            } catch (SecurityException ignored) {
+                // 权限在调用之间被撤回。
+            }
+            if (cached != null) {
+                append("通道 " + channel + "：缓存位置 " + describe(cached) + "（last-known，非连续回调）");
+            }
+        }
+
+        // 2) Criteria：复现「按条件选择来源」的客户端，并记录它实际选中了谁。
+        Criteria criteria = new Criteria();
+        criteria.setAccuracy(Criteria.ACCURACY_FINE);
+        criteria.setAltitudeRequired(false);
+        criteria.setBearingRequired(true);
+        criteria.setSpeedRequired(true);
+        criteria.setCostAllowed(true);
+        criteria.setPowerRequirement(Criteria.POWER_LOW);
+        criteriaProvider = locationManager.getBestProvider(criteria, true) == null
+                ? "" : locationManager.getBestProvider(criteria, true);
+        if (criteriaProvider.isEmpty()) {
+            append("通道 " + CHANNEL_CRITERIA + "：UNAVAILABLE（没有满足条件的 provider）");
+        } else if (subscribed.contains(criteriaProvider)) {
+            append("通道 " + CHANNEL_CRITERIA + "：Criteria 选中 " + criteriaProvider + "（已在上面的订阅里）");
+        } else {
+            try {
+                locationManager.requestLocationUpdates(criteriaProvider, MIN_TIME_MS, MIN_DISTANCE_M, listener,
+                        Looper.getMainLooper());
+                append("通道 " + CHANNEL_CRITERIA + "：Criteria 选中 " + criteriaProvider + "，已订阅");
+            } catch (RuntimeException error) {
+                append("通道 " + CHANNEL_CRITERIA + "：订阅失败（" + error + "）");
+            }
+        }
+
+        // 3) Google Play services FLP：与 framework provider 是两条不同的通道，不能互相替代。
+        int availability = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this);
+        if (availability != ConnectionResult.SUCCESS) {
+            gmsStatus = "UNAVAILABLE（Google Play services 状态码 " + availability + "）";
+            append("通道 " + CHANNEL_GMS + "：" + gmsStatus);
+        } else {
+            fusedClient = LocationServices.getFusedLocationProviderClient(this);
+            LocationRequest request = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, MIN_TIME_MS)
+                    .setMinUpdateIntervalMillis(MIN_TIME_MS / 2)
+                    .setMaxUpdateDelayMillis(0L)
+                    .build();
+            fusedClient.requestLocationUpdates(request, gmsCallback, Looper.getMainLooper())
+                    .addOnSuccessListener(unused -> {
+                        gmsStatus = "订阅中";
+                        append("通道 " + CHANNEL_GMS + "：已订阅（官方 FLP 模拟接口之外的常规读取）");
+                    })
+                    .addOnFailureListener(error -> {
+                        gmsStatus = "订阅失败（" + error + "）";
+                        append("通道 " + CHANNEL_GMS + "：" + gmsStatus);
+                    });
+            fusedClient.getLastLocation()
+                    .addOnSuccessListener(location -> {
+                        if (location != null) {
+                            append("通道 " + CHANNEL_GMS + "：缓存位置 " + describe(location)
+                                    + "（last-known，非连续回调）");
+                        }
+                    })
+                    .addOnFailureListener(error ->
+                            append("通道 " + CHANNEL_GMS + "：读取缓存失败（" + error + "）"));
+        }
+
+        binding.textStatus.setText(R.string.probe_listening);
+        append(getString(R.string.probe_listening));
+        updateCounters();
     }
 
-    private void stopListening(boolean fromUser) {
+    private void stopListening() {
         if (!listening) {
-            if (fromUser) {
-                updateStatus(getString(R.string.probe_not_listening));
-            }
+            append(getString(R.string.probe_not_listening));
             return;
         }
-        locationManager.removeUpdates(this);
+        try {
+            locationManager.removeUpdates(listener);
+        } catch (RuntimeException ignored) {
+            // provider 已经不可用。
+        }
+        if (fusedClient != null) {
+            fusedClient.removeLocationUpdates(gmsCallback);
+            fusedClient = null;
+        }
         listening = false;
-        binding.buttonListen.setEnabled(true);
-        long listenedMs = SystemClock.elapsedRealtime() - startedAtElapsedMs;
-        String summary = getString(R.string.probe_stopped_summary, fixCount,
-                String.format(Locale.US, "%.1f", travelledMeters),
-                String.format(Locale.US, "%.1f", listenedMs / 1000d));
-        updateStatus(summary);
-        appendLine(summary);
+        long seconds = Math.max(0L, (SystemClock.elapsedRealtimeNanos() - listenStartedNanos) / 1_000_000_000L);
+        append(getString(R.string.probe_stopped_summary, totalFrames(), formatMeters(totalDistance()), seconds));
+        append("各通道汇总：");
+        for (ChannelStats channel : stats.values()) {
+            append("  · " + channel.summary());
+        }
+        binding.textStatus.setText(getString(R.string.probe_status_counters,
+                totalFrames(), formatMeters(totalDistance()),
+                listening ? getString(R.string.probe_listening) : "已停止"));
     }
 
-    @Override
-    public void onLocationChanged(@NonNull Location location) {
-        fixCount++;
-        if (lastLocation != null) {
-            travelledMeters += lastLocation.distanceTo(location);
+    private void handleLocation(String channel, Location location) {
+        long now = SystemClock.elapsedRealtimeNanos();
+        long latencyMs = listenStartedNanos == 0L ? -1L : (now - listenStartedNanos) / 1_000_000L;
+        long frameGapMs = lastFrameNanos == 0L ? -1L : (now - lastFrameNanos) / 1_000_000L;
+        lastFrameNanos = now;
+
+        ChannelStats channelStats = stats.get(channel);
+        if (channelStats == null) {
+            channelStats = new ChannelStats(channel);
+            stats.put(channel, channelStats);
         }
-        lastLocation = location;
+        channelStats.addFrame(now, location.getLatitude(), location.getLongitude(),
+                location.hasSpeed(), location.hasSpeed() ? location.getSpeed() : 0d,
+                isMock(location), latencyMs);
 
-        String provider = location.getProvider() == null ? "?" : location.getProvider();
-        String mockFlag = isMock(location) ? "模拟位置" : "未标记模拟";
-        String line = String.format(Locale.US,
-                "%s  %s  lat=%.6f lon=%.6f  acc=%.1fm  spd=%.2fm/s  brg=%.0f°  %s",
-                DateFormat.format("HH:mm:ss", new Date(location.getTime())),
-                provider,
-                location.getLatitude(),
-                location.getLongitude(),
-                location.hasAccuracy() ? location.getAccuracy() : -1f,
-                location.hasSpeed() ? location.getSpeed() : -1f,
-                location.hasBearing() ? location.getBearing() : -1f,
-                mockFlag);
-        appendLine(line);
+        String line = String.format(Locale.US, "%s %s 间隔=%s %s",
+                new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date()),
+                channel, frameGapMs < 0 ? "首帧" : frameGapMs + "ms", describe(location));
+        append(line);
+        updateCounters();
+    }
 
-        String status = getString(R.string.probe_status_counters, fixCount,
-                String.format(Locale.US, "%.1f", travelledMeters), mockFlag);
-        updateStatus(status);
+    private String describe(Location location) {
+        long ageMs = location.getElapsedRealtimeNanos() == 0L
+                ? -1L : (SystemClock.elapsedRealtimeNanos() - location.getElapsedRealtimeNanos()) / 1_000_000L;
+        return String.format(Locale.US,
+                "%.6f,%.6f acc=%s 年龄=%s%s%s %s",
+                location.getLatitude(), location.getLongitude(),
+                location.hasAccuracy() ? String.format(Locale.US, "%.1fm", location.getAccuracy()) : "无",
+                ageMs < 0 ? "未知" : String.format(Locale.US, "%.1fs", ageMs / 1000d),
+                location.hasSpeed() ? String.format(Locale.US, " spd=%.2fm/s", location.getSpeed()) : " 无速度",
+                location.hasBearing() ? String.format(Locale.US, " brg=%.0f°", location.getBearing()) : " 无航向",
+                isMock(location) ? "模拟位置" : "未标记模拟");
+    }
+
+    private String channelOf(String provider) {
+        if (LocationManager.GPS_PROVIDER.equals(provider)) {
+            return CHANNEL_GPS;
+        }
+        if (LocationManager.NETWORK_PROVIDER.equals(provider)) {
+            return CHANNEL_NETWORK;
+        }
+        if ("fused".equals(provider)) {
+            return CHANNEL_FUSED;
+        }
+        if (provider != null && provider.equals(criteriaProvider)) {
+            return CHANNEL_CRITERIA;
+        }
+        return provider == null ? "unknown" : provider;
     }
 
     private boolean isMock(Location location) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             return location.isMock();
         }
         return location.isFromMockProvider();
     }
 
-    @SuppressWarnings("deprecation")
-    @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-        // 仅为兼容 minSdk 29 保留；新版系统不再回调。
+    private void showReport() {
+        StringBuilder report = new StringBuilder();
+        report.append("多通道接收报告\n");
+        report.append("GMS FLP 状态：").append(gmsStatus).append('\n');
+        report.append("Criteria 选中：").append(criteriaProvider.isEmpty() ? "无" : criteriaProvider).append('\n');
+        for (ChannelStats channel : stats.values()) {
+            report.append(channel.summary()).append('\n');
+        }
+        if (stats.isEmpty()) {
+            report.append("还没有收到任何通道的位置：先点「开始监听」，再在主应用里开始运行。\n");
+        }
+        append("—— 报告 ——");
+        for (String line : report.toString().split("\n")) {
+            append(line);
+        }
+        android.content.ClipboardManager clipboard =
+                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("probe-report", report.toString()));
+            append("（报告已复制到剪贴板，方便贴进问题记录）");
+        }
     }
 
-    @Override
-    public void onProviderEnabled(@NonNull String provider) {
-        appendLine("provider 已启用：" + provider);
+    private void updateCounters() {
+        binding.textStatus.setText(getString(R.string.probe_status_counters,
+                totalFrames(), formatMeters(totalDistance()),
+                listening ? getString(R.string.probe_listening) : "未监听"));
     }
 
-    @Override
-    public void onProviderDisabled(@NonNull String provider) {
-        appendLine("provider 已禁用：" + provider);
+    private int totalFrames() {
+        int total = 0;
+        for (ChannelStats channel : stats.values()) {
+            total += channel.totalFrames();
+        }
+        return total;
     }
 
-    private boolean hasLocationPermission() {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+    private double totalDistance() {
+        double total = 0d;
+        for (ChannelStats channel : stats.values()) {
+            total = Math.max(total, channel.travelledMeters());
+        }
+        return total;
+    }
+
+    private static String formatMeters(double meters) {
+        return String.format(Locale.US, "%.1f", meters);
+    }
+
+    private void append(String line) {
+        lines.add(line);
+        while (lines.size() > MAX_LINES) {
+            lines.remove(0);
+        }
+        binding.textLog.setText(android.text.TextUtils.join("\n", lines));
+        binding.scroll.post(() -> binding.scroll.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private boolean hasFinePermission() {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
@@ -222,50 +396,23 @@ public class ProbeActivity extends AppCompatActivity implements LocationListener
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != REQUEST_LOCATION) {
+        if (requestCode != REQUEST_CODE) {
             return;
         }
-        if (hasLocationPermission()) {
+        boolean granted = grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        if (granted) {
             startListening();
         } else {
-            updateStatus(getString(R.string.probe_permission_missing));
-        }
-    }
-
-    private void updateStatus(String text) {
-        binding.textStatus.setText(text);
-    }
-
-    private void appendLine(String line) {
-        boolean trimming = lines.size() >= MAX_LINES;
-        if (trimming) {
-            lines.removeFirst();
-        }
-        lines.addLast(line);
-        if (trimming) {
-            binding.textLog.setText(String.join("\n", lines));
-        } else {
-            if (lines.size() > 1) {
-                binding.textLog.append("\n");
-            }
-            binding.textLog.append(line);
-        }
-        binding.scroll.post(() -> binding.scroll.fullScroll(android.view.View.FOCUS_DOWN));
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // 回到前台自动恢复监听（onStop 时会停掉）。
-        if (!listening && hasLocationPermission()) {
-            startListening();
+            append(getString(R.string.probe_permission_missing));
         }
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        // 界面不可见时停止监听，避免后台耗电；数据已在界面上留痕。
-        stopListening(false);
+        if (listening) {
+            stopListening();
+        }
     }
 }

@@ -21,6 +21,21 @@
         android:paddingVertical="8dp"
         android:text="@string/diagnostics_coordinate_log" />
 
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchGmsFlp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/gms_flp_toggle"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/textGmsFlp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/gms_flp_idle"
+        android:textSize="12sp" />
     <TextView
         android:id="@+id/textSelfCheck"
         android:layout_width="match_parent"

@@ -146,4 +146,6 @@
     <string name="length_shuttle">往返 %1$.1f 米（单程 %2$.1f 米）</string>
     <string name="toast_loops_fixed_for_single">开口单程只走一次，次数已固定为 1</string>    <!-- 0.2.2：SDK 地图层级修复 + 定位到当前位置 -->
     <string name="menu_locate_me">定位到当前位置</string>
-</resources>
+    <string name="gms_flp_toggle">启用 Google Play services 模拟位置（第二条输出通道）</string>
+    <string name="gms_flp_idle">GMS FLP 后端：未开启</string>
+    <string name="gms_flp_status">GMS FLP 后端：%1$s · Play services %2$s · %3$s</string></resources>

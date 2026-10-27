@@ -50,13 +50,18 @@ public final class AndroidMockProviderApi implements MockProviderApi {
     @SuppressLint("WrongConstant")
     public void addTestProvider(String provider) throws MockProviderException {
         requireManager();
+        // 按 provider 声明属性：GPS 用卫星、高功耗、高精度；network 用网络、低功耗、粗精度；
+        // 其余（fused 等）按低功耗走。原先三个 provider 全用同一组属性，会让
+        // 依赖 Criteria 选择的客户端把你当成另一个来源，这里改为分别声明。
+        boolean satellite = LocationManager.GPS_PROVIDER.equals(provider);
+        boolean network = LocationManager.NETWORK_PROVIDER.equals(provider);
+        int power = satellite ? Criteria.POWER_HIGH : Criteria.POWER_LOW;
+        int accuracy = satellite ? Criteria.ACCURACY_FINE : Criteria.ACCURACY_COARSE;
         try {
-            // 参数含义：requiresNetwork/requiresSatellite/requiresCell/hasMonetaryCost 均为 false，
-            // 支持海拔、速度、方向；功耗与精度按 GPS 级别声明。
             locationManager.addTestProvider(provider,
-                    false, false, false, false,
+                    network, satellite, false, false,
                     true, true, true,
-                    Criteria.POWER_LOW, Criteria.ACCURACY_FINE);
+                    power, accuracy);
         } catch (SecurityException e) {
             throw new MockProviderException(RunErrorCode.MOCK_APP_NOT_SELECTED,
                     "系统拒绝了测试 provider 请求：请先在开发者选项里把本应用设为模拟位置信息应用", e);
@@ -67,6 +72,17 @@ public final class AndroidMockProviderApi implements MockProviderApi {
             throw new MockProviderException(RunErrorCode.PROVIDER_SETUP_FAILED,
                     "注册测试 provider 失败：" + provider + "（" + e.getMessage() + "）", e);
         }
+    }
+
+    /** 供诊断页记录：这个 provider 以哪一组属性注册（便于和 Criteria 选择做对照）。 */
+    public static String describeProperties(String provider) {
+        if (LocationManager.GPS_PROVIDER.equals(provider)) {
+            return "requiresSatellite=true, power=POWER_HIGH, accuracy=ACCURACY_FINE";
+        }
+        if (LocationManager.NETWORK_PROVIDER.equals(provider)) {
+            return "requiresNetwork=true, power=POWER_LOW, accuracy=ACCURACY_COARSE";
+        }
+        return "power=POWER_LOW, accuracy=ACCURACY_COARSE";
     }
 
     @Override

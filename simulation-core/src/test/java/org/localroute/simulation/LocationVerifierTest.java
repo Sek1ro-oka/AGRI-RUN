@@ -57,12 +57,44 @@ public class LocationVerifierTest {
     }
 
     @Test
-    public void explain_acceptedBlamesTargetApp() {
+    public void explain_acceptedDescribesEvidenceBoundaryWithoutBlamingTarget() {
         String text = LocationVerifier.explain(
                 LocationVerifier.Verdict.ACCEPTED, 1.5, "gps");
         assertTrue(text, text.contains("gps"));
-        assertTrue(text, text.contains("已收下"));
-        assertTrue(text, text.contains("目标 App"));
+        assertTrue(text, text.contains("回读与本次模拟输出一致"));
+        // 这一句曾经把结论推到「问题在目标 App」，超出了单次回读能证明的范围。
+        assertTrue(text, !text.contains("问题在目标 App"));
+        assertTrue(text, text.contains("尚未验证"));
+    }
+
+    @Test
+    public void evaluate_reportsStaleCacheEvenWhenCoordinatesMatch() {
+        LocationVerifier.Verdict verdict = LocationVerifier.evaluate(
+                HERE, HERE, true, 20d, 30_000L, 5_000L);
+        assertEquals(LocationVerifier.Verdict.STALE, verdict);
+    }
+
+    @Test
+    public void evaluate_unknownAgeIsNotTreatedAsStale() {
+        LocationVerifier.Verdict verdict = LocationVerifier.evaluate(HERE, HERE, true, 20d);
+        assertEquals(LocationVerifier.Verdict.ACCEPTED, verdict);
+    }
+
+    @Test
+    public void explain_staleSaysItIsOnlyCachedEvidence() {
+        String text = LocationVerifier.explain(
+                LocationVerifier.Verdict.STALE, 0.4, "gps", 30_000L);
+        assertTrue(text, text.contains("30 秒前"));
+        assertTrue(text, text.contains("曾经收到过"));
+        assertTrue(text, text.contains("连续接收"));
+    }
+
+    @Test
+    public void explain_notMarkedMockOnlyReportsObservation() {
+        String text = LocationVerifier.explain(
+                LocationVerifier.Verdict.NOT_MARKED_MOCK, 2.0, "network", 1_200L);
+        assertTrue(text, text.contains("没有模拟标记"));
+        assertTrue(text, !text.contains("当作真实位置"));
     }
 
     @Test

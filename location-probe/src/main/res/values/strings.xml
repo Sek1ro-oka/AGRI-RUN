@@ -12,6 +12,7 @@
     <string name="probe_listening">监听中……</string>
     <string name="probe_not_listening">当前没有在监听。</string>
     <string name="probe_permission_missing">缺少定位权限，无法监听。</string>
-    <string name="probe_stopped_summary">已停止：共 %1$d 个位置，累计位移 %2$s 米，监听 %3$s 秒</string>
+    <string name="probe_stopped_summary">已停止：共 %1$d 个位置，累计位移 %2$s 米，监听 %3$d 秒</string>
     <string name="probe_status_counters">已收 %1$d 个位置 · 累计位移 %2$s 米 · %3$s</string>
+    <string name="probe_report">复制报告</string>
 </resources>

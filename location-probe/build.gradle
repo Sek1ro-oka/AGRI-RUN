@@ -42,4 +42,6 @@ android {
 dependencies {
     implementation libs.androidx.appcompat
     implementation libs.google.material
+    implementation project(':simulation-core')
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
 }

@@ -38,6 +38,8 @@ import org.localroute.core.RunConfig;
 import org.localroute.core.RunErrorCode;
 import org.localroute.core.RunState;
 import org.localroute.simulation.MockFix;
+import org.localroute.app.simulation.GmsFlpBackend;
+import org.localroute.app.simulation.LocationOutputBackend;
 import org.localroute.simulation.MockLocationSession;
 import org.localroute.simulation.MockProviderException;
 import org.localroute.simulation.ProviderSetupResult;
@@ -104,6 +106,8 @@ public class SimulationService extends Service {
     private String runId = "";
     private String routeName = "";
     private MockLocationSession session;
+    /** GMS FLP 模拟后端；未启用或不可用时为 null。 */
+    private GmsFlpBackend gmsBackend;
     private org.localroute.core.ActiveElapsedClock clock;
     private RouteEngine.Progress lastProgress;
     /** 单点模式要固定发送的坐标；路线模式为 null。 */
@@ -330,7 +334,7 @@ public class SimulationService extends Service {
         teleportGeneration++;
         DiagnosticLog.info("传送目标改为 " + point.format() + "（会话不变）");
         try {
-            session.publish(fixForPoint(point, SystemClock.elapsedRealtimeNanos()));
+            publishFix(fixForPoint(point, SystemClock.elapsedRealtimeNanos()));
         } catch (MockProviderException e) {
             failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(),
                     e.getMessage());
@@ -410,7 +414,8 @@ public class SimulationService extends Service {
 
         RouteEngine.Progress first = RouteEngine.progressAt(route, config, 0L);
         try {
-            session.publish(fixFor(first, 0d, SystemClock.elapsedRealtimeNanos()));
+            startGmsBackendIfEnabled();
+            publishFix(fixFor(first, 0d, SystemClock.elapsedRealtimeNanos()));
             DiagnosticLog.fix("首次提交 " + first.positionText());
         } catch (MockProviderException e) {
             failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(), e.getMessage());
@@ -438,7 +443,8 @@ public class SimulationService extends Service {
     private void startSinglePointRun() {
         long now = SystemClock.elapsedRealtimeNanos();
         try {
-            session.publish(fixForPoint(singlePoint, now));
+            startGmsBackendIfEnabled();
+            publishFix(fixForPoint(singlePoint, now));
             DiagnosticLog.fix("单点位置首次提交 " + singlePoint.format());
         } catch (MockProviderException e) {
             failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(), e.getMessage());
@@ -492,7 +498,7 @@ public class SimulationService extends Service {
             final int generation = teleportGeneration;
             final org.localroute.core.GeoPoint target = singlePoint;
             try {
-                session.publish(fixForPoint(target, now));
+                publishFix(fixForPoint(target, now));
             } catch (MockProviderException e) {
                 failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(), e.getMessage());
                 return;
@@ -522,7 +528,7 @@ public class SimulationService extends Service {
         double speed = paused ? 0d : speedMps;
 
         try {
-            session.publish(fixFor(progress, speed, now));
+            publishFix(fixFor(progress, speed, now));
         } catch (MockProviderException e) {
             failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(), e.getMessage());
             return;
@@ -719,6 +725,36 @@ public class SimulationService extends Service {
     // ---------------------------------------------------------------- 清理
 
     /** 幂等清理：停调度、移除测试 provider、释放 WakeLock、清零计时。 */
+    /** 当前是否允许启用 GMS FLP 后端（默认关闭，避免影响其它使用 FLP 的应用）。 */
+    private boolean gmsFlpEnabled() {
+        return getSharedPreferences("ui", MODE_PRIVATE).getBoolean("gms_flp_enabled", false);
+    }
+
+    /** 一条帧同时送所有已启用的输出后端：framework 测试 provider 与 GMS FLP。 */
+    private void publishFix(MockFix fix) throws MockProviderException {
+        if (session != null) {
+            session.publish(fix);
+        }
+        if (gmsBackend != null) {
+            gmsBackend.publish(fix);
+        }
+    }
+
+    /** 启动 GMS FLP 后端；不可用时只记原因，不影响 framework 通道。 */
+    private void startGmsBackendIfEnabled() {
+        if (!gmsFlpEnabled()) {
+            DiagnosticLog.info("GMS FLP 后端：未启用（可在诊断页打开）");
+            return;
+        }
+        gmsBackend = new GmsFlpBackend(this);
+        LocationOutputBackend.Result result = gmsBackend.start();
+        DiagnosticLog.info("GMS FLP 后端：" + result.message());
+        if (result.success()) {
+            publishedProviders.add(GmsFlpBackend.ID);
+        } else {
+            DiagnosticLog.warn("GMS FLP 后端不可用：" + result.message());
+        }
+    }
     private void cleanupEverything() {
         stopped = true;
         if (handler != null) {
@@ -726,6 +762,11 @@ public class SimulationService extends Service {
         }
         if (session != null) {
             session.stop();
+        if (gmsBackend != null) {
+            gmsBackend.stop();
+            DiagnosticLog.info("GMS FLP 后端已停止：" + gmsBackend.statusText());
+            gmsBackend = null;
+        }
             session = null;
         }
         releaseWakeLock();
