@@ -263,4 +263,54 @@ public class RouteEngineTest {
         assertThrows(InvalidRouteException.class, () -> RouteCompiler.compile(Arrays.asList(
                 new GeoPoint(0d, 0d), new GeoPoint(rejectedLat, 0d))));
     }
-}
+
+    @Test
+    public void progressForDistance_stopAtEnd_finishesExactlyAtLastVertex() throws Exception {
+        CompiledRoute route = RouteCompiler.compile(squareRoute().closedRing().subList(0, 4),
+                EndBehavior.STOP_AT_END);
+        double lap = route.lapLengthMeters();
+        RouteEngine.Progress done = RouteEngine.progressForDistance(route, 1, lap, 2.5d);
+
+        assertTrue(done.finished());
+        assertEquals(1, done.completedLoops());
+        assertTrue("完成帧必须落在最后一个节点",
+                done.latitude() == route.vertex(route.vertexCount() - 1).latitude()
+                        && done.longitude() == route.vertex(route.vertexCount() - 1).longitude());
+        assertEquals(lap, done.distanceMeters(), 1e-9d);
+    }
+
+    @Test
+    public void progressForDistance_neverOvershootsTargetDistance() throws Exception {
+        CompiledRoute route = RouteCompiler.compile(squareRoute().closedRing().subList(0, 4),
+                EndBehavior.STOP_AT_END);
+        double lap = route.lapLengthMeters();
+        RouteEngine.Progress done = RouteEngine.progressForDistance(route, 1, lap * 3d, 2.5d);
+        assertTrue(done.finished());
+        assertEquals("距离要夹到目标", lap, done.distanceMeters(), 1e-9d);
+        assertEquals(1, done.completedLoops());
+    }
+
+    @Test
+    public void progressForDistance_midWayReportsPartialRun() throws Exception {
+        CompiledRoute route = RouteCompiler.compile(squareRoute().closedRing().subList(0, 4),
+                EndBehavior.STOP_AT_END);
+        double lap = route.lapLengthMeters();
+        RouteEngine.Progress half = RouteEngine.progressForDistance(route, 3, lap * 0.5d, 1.0d);
+        assertFalse(half.finished());
+        assertEquals(0, half.completedLoops());
+        assertEquals("单程策略下目标圈数被规范为 1", 1, half.targetLoops());
+        assertEquals(lap * 0.5d, half.distanceMeters(), 1e-9d);
+    }
+
+    @Test
+    public void progressAt_stopAtEnd_doesNotWrapBackToStart() throws Exception {
+        CompiledRoute route = RouteCompiler.compile(squareRoute().closedRing().subList(0, 4),
+                EndBehavior.STOP_AT_END);
+        RunConfig config = new RunConfig(36d, 1);
+        // 时间给到远超单程，位置也只能停在终点。
+        RouteEngine.Progress late = RouteEngine.progressAt(route, config,
+                nanosForSeconds(route.lapLengthMeters() * 10d));
+        assertTrue(late.finished());
+        GeoPoint end = route.vertex(route.vertexCount() - 1);
+        assertTrue(late.latitude() == end.latitude() && late.longitude() == end.longitude());
+    }}

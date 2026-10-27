@@ -288,4 +288,21 @@ public class GpxCodecTest {
         assertEquals(1, result.points().size());
         assertEquals("解析失败不应写标准错误流", "", captured.toString("UTF-8").trim());
     }
-}
+
+    @Test
+    public void multiSegmentFileOnlyImportsTheFirstSegment() throws Exception {
+        String xml = "<?xml version=\"1.0\"?><gpx version=\"1.1\"><trk><trkseg>"
+                + "<trkpt lat=\"30.0\" lon=\"120.0\"/><trkpt lat=\"30.0\" lon=\"120.001\"/>"
+                + "</trkseg><trkseg><trkpt lat=\"31.0\" lon=\"121.0\"/>"
+                + "<trkpt lat=\"31.0\" lon=\"121.001\"/></trkseg></trk></gpx>";
+        GpxCodec.ParseResult result = GpxCodec.parse(xml);
+        assertEquals("只导入第一段", 2, result.points().size());
+        assertTrue(result.points().get(0).isNear(new GeoPoint(30.0d, 120.0d), 0.01d));
+        boolean warned = false;
+        for (String warning : result.warnings()) {
+            if (warning.contains("只导入第一段")) {
+                warned = true;
+            }
+        }
+        assertTrue("应提示多段只取第一段：" + result.warnings(), warned);
+    }}

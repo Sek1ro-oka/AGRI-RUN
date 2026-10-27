@@ -94,4 +94,33 @@
     <string name="self_check_expected">应用最后提交：%1$s（%2$s）</string>
     <string name="self_check_probe">%1$s：%2$s</string>
     <string name="self_check_no_data">位置自检：还没有提交过位置，先点「开始」或「传送」，这里会显示系统实际读回什么。</string>
-</resources>
+    <string name="speed_presets_label">配速：</string>
+    <string name="speed_preset_walk">3</string>
+    <string name="speed_preset_jog">6</string>
+    <string name="speed_preset_run">9</string>
+    <string name="speed_preset_ride">12</string>
+    <string name="toast_speed_applied">已改速为 %1$.1f km/h（位置不跳变）</string>
+    <string name="toast_speed_no_effect">当前没有运行中的任务，已填入 %1$.1f km/h</string>    <string name="overlay_status">%1$s · %2$s km/h · %3$s m</string>
+    <string name="overlay_pause">暂停</string>
+    <string name="overlay_resume">继续</string>
+    <string name="overlay_stop">停止</string>
+    <string name="overlay_state_running">运行中</string>
+    <string name="overlay_state_paused">已暂停</string>
+    <string name="overlay_state_starting">准备中</string>
+    <string name="menu_overlay">悬浮控制条（跨应用）</string>
+    <string name="menu_overlay_no_permission">需要先授予「显示在其他应用上层」权限</string>
+    <string name="menu_overlay_on">悬浮控制条已开启：运行中切到别的应用也能暂停/停止</string>
+    <string name="menu_overlay_off">悬浮控制条已关闭</string>
+    <string name="settings_overlay_title">悬浮控制条权限</string>
+    <string name="settings_overlay_hint">允许后，运行中在别的应用上也能暂停或停止</string>
+    <string name="settings_overlay_grant">去授权</string>
+    <string name="settings_overlay_ok">已授权</string>
+    <string name="settings_overlay_missing">未授权</string>
+    <string name="option_connect_first">将当前末点连接到第一个点</string>
+    <string name="label_end_behavior">到终点</string>
+    <string name="end_stop_at_end">停止</string>
+    <string name="end_shuttle">原路往返</string>
+    <string name="length_single_run">单程 %1$.1f 米</string>
+    <string name="length_loop">单圈 %1$.1f 米</string>
+    <string name="length_shuttle">往返 %1$.1f 米（单程 %2$.1f 米）</string>
+    <string name="toast_loops_fixed_for_single">开口单程只走一次，次数已固定为 1</string></resources>

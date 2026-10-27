@@ -71,8 +71,10 @@ public class RouteEditorViewModelTest {
         viewModel.addPoint(new GeoPoint(30.001d, 120.001d));
         CompiledRoute route = viewModel.compileOrNull();
         assertNotNull(route);
-        assertTrue("单圈应大于 0", route.lapLengthMeters() > 0d);
-        assertTrue(viewModel.validationMessage().contains("单圈"));
+        assertTrue("单程应大于 0", route.lapLengthMeters() > 0d);
+        // 审查方案 5.2：新草稿默认开口「到终点停止」，不是绕圈也不是往返。
+        assertFalse("默认策略不应首尾相接", route.wraps());
+        assertTrue(viewModel.validationMessage().contains("单程"));
         assertTrue(viewModel.validationMessage().contains("3 个节点"));
     }
 
@@ -117,26 +119,26 @@ public class RouteEditorViewModelTest {
         viewModel.addPoint(new GeoPoint(30.0d, 120.001d));
         viewModel.addPoint(new GeoPoint(30.001d, 120.001d));
 
+        // 审查 R-001 / 方案 5.2：新路线默认开口「到终点停止」，闭合要用户显式勾选。
+        assertFalse("新画的路线默认不闭合", viewModel.isClosed());
+        CompiledRoute openedByDefault = viewModel.compileOrNull();
+        assertNotNull(openedByDefault);
+        assertFalse(openedByDefault.closed());
+        assertFalse("默认不应回跳起点", openedByDefault.wraps());
+        assertTrue(viewModel.validationMessage().contains("单程"));
+
+        assertTrue("切一次应变成闭合", viewModel.toggleClosed());
+        assertTrue("切换闭合状态属于未保存修改", viewModel.isDirty());
         CompiledRoute closed = viewModel.compileOrNull();
         assertNotNull(closed);
-        assertTrue(viewModel.isClosed());
         assertTrue(closed.closed());
         assertTrue(viewModel.validationMessage().contains("闭合"));
-
-        boolean nowClosed = viewModel.toggleClosed();
-        assertFalse("切换后应变成不闭合", nowClosed);
-        assertTrue("切换闭合状态属于未保存修改", viewModel.isDirty());
-
-        CompiledRoute opened = viewModel.compileOrNull();
-        assertNotNull(opened);
-        assertFalse(opened.closed());
-        assertTrue("往返一圈一定比直接闭合更长",
-                opened.lapLengthMeters() > closed.lapLengthMeters());
-        assertTrue(viewModel.validationMessage().contains("原路返回"));
-        assertFalse(viewModel.toDefinition().closed());
-
-        assertTrue("再切一次应恢复闭合", viewModel.toggleClosed());
+        assertTrue("闭合一圈（含闭合边）比单程更长",
+                closed.lapLengthMeters() > openedByDefault.lapLengthMeters());
         assertTrue(viewModel.toDefinition().closed());
+
+        assertFalse("再切一次应恢复不闭合", viewModel.toggleClosed());
+        assertFalse(viewModel.toDefinition().closed());
     }
 
     @Test
@@ -203,15 +205,17 @@ public class RouteEditorViewModelTest {
 
     @Test
     public void replacePointsKeepsClosedFlag() {
-        viewModel.toggleClosed();
+        // 默认不闭合；先显式打开闭合，导入后应保持「闭合」。
         assertFalse(viewModel.isClosed());
+        assertTrue(viewModel.toggleClosed());
+        assertTrue(viewModel.isClosed());
 
         viewModel.replacePoints(Arrays.asList(
                 new GeoPoint(31.0d, 121.0d), new GeoPoint(31.001d, 121.001d)));
 
-        assertFalse("导入不应改动闭合开关", viewModel.isClosed());
-        assertTrue(viewModel.toggleClosed());
-        assertTrue(viewModel.isClosed());
+        assertTrue("导入不应改动闭合开关", viewModel.isClosed());
+        assertFalse(viewModel.toggleClosed());
+        assertFalse(viewModel.isClosed());
     }
 
     @Test
@@ -253,4 +257,45 @@ public class RouteEditorViewModelTest {
         assertEquals(0, viewModel.pointCount());
         assertFalse(viewModel.canUndo());
     }
-}
+
+    @Test
+    public void checkingClosedSwitchesToLoopAndUncheckingReturnsToStopAtEnd() {
+        viewModel.addPoint(new GeoPoint(30.0d, 120.0d));
+        viewModel.addPoint(new GeoPoint(30.0d, 120.001d));
+        viewModel.addPoint(new GeoPoint(30.001d, 120.001d));
+        assertEquals(org.localroute.core.EndBehavior.STOP_AT_END, viewModel.endBehavior());
+
+        assertTrue(viewModel.toggleClosed());
+        assertEquals("勾选闭合就是绕圈", org.localroute.core.EndBehavior.LOOP, viewModel.endBehavior());
+
+        assertFalse("取消勾选回到默认的到终点停止，而不是悄悄变成往返",
+                viewModel.toggleClosed());
+        assertEquals(org.localroute.core.EndBehavior.STOP_AT_END, viewModel.endBehavior());
+    }
+
+    @Test
+    public void choosingShuttleKeepsGeometryOpen() {
+        viewModel.addPoint(new GeoPoint(30.0d, 120.0d));
+        viewModel.addPoint(new GeoPoint(30.0d, 120.001d));
+        viewModel.setEndBehavior(org.localroute.core.EndBehavior.SHUTTLE);
+        assertFalse("往返不是闭合几何", viewModel.isClosed());
+        assertTrue(viewModel.isDirty());
+        assertEquals(org.localroute.core.EndBehavior.SHUTTLE, viewModel.toDefinition().endBehavior());
+        CompiledRoute route = viewModel.compileOrNull();
+        assertNotNull(route);
+        assertTrue(route.wraps());
+    }
+    @Test
+    public void setEndBehaviorIsIgnoredWhileClosed() {
+        viewModel.addPoint(new GeoPoint(30.0d, 120.0d));
+        viewModel.addPoint(new GeoPoint(30.0d, 120.001d));
+        viewModel.toggleClosed();
+        assertEquals(org.localroute.core.EndBehavior.LOOP, viewModel.endBehavior());
+
+        // 真机 0.2.0 崩溃点：闭合时单选被程序性恢复会回调 setEndBehavior(STOP_AT_END)。
+        viewModel.setEndBehavior(org.localroute.core.EndBehavior.STOP_AT_END);
+        assertEquals(org.localroute.core.EndBehavior.LOOP, viewModel.endBehavior());
+        viewModel.setEndBehavior(org.localroute.core.EndBehavior.SHUTTLE);
+        assertEquals(org.localroute.core.EndBehavior.LOOP, viewModel.endBehavior());
+        assertTrue(viewModel.isClosed());
+    }}

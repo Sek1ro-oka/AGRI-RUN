@@ -151,6 +151,10 @@ public final class GpxCodec {
 
         List<RawPoint> rawPoints = readPoints(text);
         List<String> warnings = new ArrayList<>();
+        int segments = countSegments(text);
+        if (segments > 1) {
+            warnings.add("文件含 " + segments + " 段轨迹，为避免段间被连成直线，只导入第一段：" + segments + " 段中其余段请另存为单独文件");
+        }
         List<GeoPoint> points = new ArrayList<>(Math.min(rawPoints.size(), RouteCompiler.MAX_POINTS));
         int dropped = 0;
         boolean truncated = false;
@@ -244,25 +248,57 @@ public final class GpxCodec {
             // 致命错误照常抛出（由下方 catch 退到正则），可恢复错误直接忽略，正好符合容错要求。
             builder.setErrorHandler(new DefaultHandler());
             Document document = builder.parse(new InputSource(new StringReader(xml)));
-            NodeList nodes = document.getElementsByTagName("*");
+            // 多段轨迹（多个 trkseg）只取第一段：GPX 里段与段之间没有连线语义，
+            // 拼在一起会在末点与下一段首点之间画出一条不存在的长直线（审查 G / R-0xx）。
             List<RawPoint> rawPoints = new ArrayList<>();
-            for (int i = 0; i < nodes.getLength(); i++) {
-                Node node = nodes.item(i);
-                if (node.getNodeType() != Node.ELEMENT_NODE) {
-                    continue;
-                }
-                Element element = (Element) node;
-                if (!isPointElement(element)) {
-                    continue;
-                }
-                rawPoints.add(new RawPoint(rawPoints.size() + 1,
-                        element.getAttribute("lat"), element.getAttribute("lon")));
-            }
+            collectPoints(document.getDocumentElement(), rawPoints, new int[] {0});
             return rawPoints;
         } catch (ParserConfigurationException | SAXException | IOException | RuntimeException e) {
             // 容错：不是良构 XML（含带 DTD 被拒）时交给正则，能取多少取多少。
             return null;
         }
+    }
+
+    /**
+     * 按文档顺序收集轨迹点，但只保留第一段 trkseg：段与段之间没有连线语义，
+     * 拼在一起会画出一条不存在的长直线（审查 G）。
+     */
+    private static void collectPoints(Element parent, List<RawPoint> out, int[] segmentIndex) {
+        NodeList children = parent.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() != Node.ELEMENT_NODE) {
+                continue;
+            }
+            Element element = (Element) child;
+            String tag = element.getTagName();
+            if ("trkseg".equals(tag) || "trkseg".equalsIgnoreCase(tag)) {
+                segmentIndex[0]++;
+                if (segmentIndex[0] > 1) {
+                    continue;
+                }
+            }
+            if (isPointElement(element)) {
+                out.add(new RawPoint(out.size() + 1,
+                        element.getAttribute("lat"), element.getAttribute("lon")));
+                continue;
+            }
+            collectPoints(element, out, segmentIndex);
+        }
+    }
+
+    /** 统计 trkseg 段数，用于提示“只导入第一段”。 */
+    static int countSegments(String xml) {
+        if (xml == null) {
+            return 0;
+        }
+        int count = 0;
+        int index = xml.indexOf("<trkseg");
+        while (index >= 0) {
+            count++;
+            index = xml.indexOf("<trkseg", index + 1);
+        }
+        return count;
     }
 
     /**

@@ -40,7 +40,10 @@ public class RouteJsonCodecTest {
             RouteDefinition decoded = RouteJsonCodec.decode(RouteJsonCodec.encode(original));
             assertEquals(original.id(), decoded.id());
             assertEquals(original.name(), decoded.name());
-            assertEquals(1, decoded.schemaVersion());
+            assertEquals(RouteDefinition.SCHEMA_VERSION, decoded.schemaVersion());
+            assertEquals(org.localroute.core.EndBehavior.LOOP, decoded.endBehavior());
+            assertEquals(1, decoded.runDefaults().repeatCount());
+            assertEquals(9.0d, decoded.runDefaults().speedKmh(), 1e-9);
             assertEquals("WGS84", decoded.coordinateSystem());
             assertTrue(decoded.closed());
             assertEquals(original.createdAt(), decoded.createdAt());
@@ -80,7 +83,7 @@ public class RouteJsonCodecTest {
 
     @Test
     public void rejectsUnknownSchemaVersion() {
-        String json = replaceJson(encode(sample()), "\"schemaVersion\"", "1", "2");
+        String json = replaceJson(encode(sample()), "\"schemaVersion\"", "2", "99");
         expectFormatError(json);
     }
 
@@ -169,4 +172,42 @@ public class RouteJsonCodecTest {
             fail("应抛出 RouteFormatException 而不是 JSONException：" + e);
         }
     }
-}
+
+    @Test
+    public void decodesVersion1FileWithLegacyOpenSemantics() {
+        // v1 文件没有 endBehavior / runDefaults：closed=false 必须仍是“原路往返”，不能因为新默认改变运行结果。
+        String v1 = "{\"schemaVersion\":1,\"id\":\"route-legacy\",\"name\":\"老路线\","
+                + "\"coordinateSystem\":\"WGS84\",\"closed\":false,"
+                + "\"createdAt\":\"2026-10-26T10:00:00Z\",\"updatedAt\":\"2026-10-26T10:00:00Z\","
+                + "\"points\":[{\"latitude\":30.0,\"longitude\":120.0},"
+                + "{\"latitude\":30.0,\"longitude\":120.001}]}";
+        try {
+            RouteDefinition decoded = RouteJsonCodec.decode(v1);
+            assertFalse(decoded.closed());
+            assertEquals(org.localroute.core.EndBehavior.SHUTTLE, decoded.endBehavior());
+            assertEquals(1, decoded.runDefaults().repeatCount());
+            assertEquals(9.0d, decoded.runDefaults().speedKmh(), 1e-9d);
+        } catch (JSONException | RouteJsonCodec.RouteFormatException e) {
+            fail("v1 兼容解码不应失败：" + e);
+        }
+    }
+
+    @Test
+    public void roundTripKeepsEndBehaviorAndRunDefaults() {
+        Instant now = Instant.parse("2026-10-26T10:00:00Z");
+        List<GeoPoint> points = new ArrayList<>();
+        points.add(new GeoPoint(30.0d, 120.0d));
+        points.add(new GeoPoint(30.0d, 120.001d));
+        RouteDefinition route = new RouteDefinition("route-stop", "单程", points, false,
+                org.localroute.core.EndBehavior.STOP_AT_END,
+                new RunDefaults(3, 12.5d), now, now);
+        try {
+            RouteDefinition decoded = RouteJsonCodec.decode(RouteJsonCodec.encode(route));
+            assertFalse(decoded.closed());
+            assertEquals(org.localroute.core.EndBehavior.STOP_AT_END, decoded.endBehavior());
+            assertEquals(3, decoded.runDefaults().repeatCount());
+            assertEquals(12.5d, decoded.runDefaults().speedKmh(), 1e-9d);
+        } catch (JSONException | RouteJsonCodec.RouteFormatException e) {
+            fail("编解码不应失败：" + e);
+        }
+    }}

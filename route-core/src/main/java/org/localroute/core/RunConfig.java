@@ -67,6 +67,11 @@ public final class RunConfig {
         return new RunConfig(speedKmh, loopCount, newTickIntervalMs);
     }
 
+    /** 运行中改速：只换速度，圈数与调度间隔不变。 */
+    public RunConfig withSpeedKmh(double newSpeedKmh) {
+        return new RunConfig(newSpeedKmh, loopCount, tickIntervalMs);
+    }
+
     public String speedText() {
         return String.format(java.util.Locale.US, "%.1f km/h", speedKmh);
     }

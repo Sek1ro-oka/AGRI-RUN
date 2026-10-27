@@ -11,36 +11,56 @@ public final class RouteEngine {
     private RouteEngine() {
     }
 
-    /** 本次运行的目标总距离 = 单圈长度 × 圈数。 */
+    /** 本次运行实际使用的行程次数：开口单程固定 1 次，其余用用户设置的圈数/次数。 */
+    public static int effectiveRepeatCount(CompiledRoute route, int requested) {
+        return route.endBehavior().isSingleRun() ? 1 : requested;
+    }
+
+    /** 本次运行的目标总距离 = 单圈长度 × 圈数（开口单程就是全程）。 */
     public static double targetDistanceMeters(CompiledRoute route, RunConfig config) {
-        return route.lapLengthMeters() * config.loopCount();
+        return route.lapLengthMeters() * effectiveRepeatCount(route, config.loopCount());
     }
 
     /** 根据有效运行时间计算当前进度。 */
     public static Progress progressAt(CompiledRoute route, RunConfig config, long activeElapsedNanos) {
-        double lap = route.lapLengthMeters();
-        double target = targetDistanceMeters(route, config);
         double elapsedSeconds = Math.max(0L, activeElapsedNanos) / 1_000_000_000d;
-        double rawDistance = config.speedMetersPerSecond() * elapsedSeconds;
+        double distance = config.speedMetersPerSecond() * elapsedSeconds;
+        return progressForDistance(route, effectiveRepeatCount(route, config.loopCount()), distance,
+                config.speedMetersPerSecond());
+    }
 
-        if (rawDistance >= target - 1e-6d) {
-            // 到达终点：位置精确回到起点，圈数等于目标圈数，不多走。
+    /**
+     * 按「已走距离」计算进度（运行中改速用）。
+     *
+     * <p>改速时累计距离必须连续：调用方用 {@code 改速前距离 + 新速度 × 改速后经过时间} 得到新的距离，
+     * 再交给本方法，位置就不会因为速度变化而跳变（审查 R-009）。
+     */
+    public static Progress progressForDistance(CompiledRoute route, int loopCount, double distanceMeters,
+                                               double speedMps) {
+        loopCount = effectiveRepeatCount(route, loopCount);
+        double lap = route.lapLengthMeters();
+        double target = lap * loopCount;
+        double distance = Math.max(0d, distanceMeters);
+
+        if (distance >= target - 1e-6d) {
+            // 到达终点：闭合/往返精确回到起点，开口单程停在最后一个节点；不多走。
+            boolean single = route.endBehavior().isSingleRun();
+            GeoPoint end = single ? route.vertex(route.vertexCount() - 1) : route.vertex(0);
             return new Progress(
-                    route.vertex(0).latitude(),
-                    route.vertex(0).longitude(),
+                    end.latitude(),
+                    end.longitude(),
                     route.bearingAt(lap - 1e-6d),
                     target,
-                    config.loopCount(),
-                    config.loopCount(),
+                    loopCount,
+                    loopCount,
                     lap,
-                    config.speedMetersPerSecond(),
+                    speedMps,
                     true);
         }
 
-        double distance = rawDistance;
         int completedLoops = (int) Math.floor(distance / lap + 1e-9d);
-        if (completedLoops > config.loopCount()) {
-            completedLoops = config.loopCount();
+        if (completedLoops > loopCount) {
+            completedLoops = loopCount;
         }
         GeoPoint point = route.pointAt(distance);
         double bearing = route.bearingAt(distance);
@@ -50,9 +70,9 @@ public final class RouteEngine {
                 bearing,
                 distance,
                 completedLoops,
-                config.loopCount(),
+                loopCount,
                 lap,
-                config.speedMetersPerSecond(),
+                speedMps,
                 false);
     }
 

@@ -34,6 +34,7 @@ import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.SettingsInspector;
 import org.localroute.app.storage.RouteRepository;
 import org.localroute.core.CompiledRoute;
+import org.localroute.core.EndBehavior;
 import org.localroute.core.GeoPoint;
 import org.localroute.core.GpxCodec;
 import org.localroute.core.InvalidRouteException;
@@ -71,6 +72,12 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<String[]> openGpxLauncher;
 
     private RunSnapshot snapshot = RunSnapshot.idle();
+    /** 跨应用悬浮控制条（审查 C）；没授权时它自己什么都不做。 */
+    private org.localroute.app.overlay.OverlayPanel overlayPanel;
+    private boolean overlayEnabled;
+    /** 同步「闭合/终点策略」控件时置真，避免程序性 setChecked 反过来改草稿。 */
+    private boolean syncingControls;
+    private static final String PREFS_UI = "ui";
     // 待启动参数放在 ViewModel 里：权限弹窗期间旋转屏幕时 Activity 会重建，字段会丢失，
     // 用户点「允许」后就毫无反应。ViewModel 能跨配置变更存活。
     private final java.util.concurrent.ExecutorService ioExecutor =
@@ -118,8 +125,31 @@ public class MainActivity extends AppCompatActivity {
         });
 
         binding.toolbar.setOnMenuItemClickListener(this::onMenuItemClick);
-        binding.toolbar.getMenu().findItem(R.id.action_toggle_closed)
-                .setChecked(viewModel.isClosed());
+        overlayPanel = new org.localroute.app.overlay.OverlayPanel(this);
+        overlayEnabled = getSharedPreferences(PREFS_UI, MODE_PRIVATE)
+                .getBoolean(org.localroute.app.overlay.OverlayPanel.PREF_ENABLED, false);
+        android.view.MenuItem overlayItem = binding.toolbar.getMenu().findItem(R.id.action_overlay);
+        if (overlayItem != null) {
+            overlayItem.setChecked(overlayEnabled);
+        }
+        binding.checkboxClosed.setOnCheckedChangeListener((button, checked) -> {
+            if (checked != viewModel.isClosed()) {
+                viewModel.toggleClosed();
+            }
+            refreshDraft(false);
+        });
+        binding.radioEndBehavior.setOnCheckedChangeListener((group, checkedId) -> {
+            if (syncingControls) {
+                return;
+            }
+            EndBehavior wanted = checkedId == R.id.radioShuttle ? EndBehavior.SHUTTLE : EndBehavior.STOP_AT_END;
+            if (viewModel.isClosed()) {
+                // 闭合时这一行是隐藏的，程序性恢复勾选不应改写策略（真机 0.2.0 崩溃点）。
+                return;
+            }
+            viewModel.setEndBehavior(wanted);
+            refreshDraft(false);
+        });
         binding.buttonUndo.setOnClickListener(v -> {
             if (viewModel.undo() != null) {
                 refreshDraft(false);
@@ -147,6 +177,11 @@ public class MainActivity extends AppCompatActivity {
                 toast("当前没有运行中的任务");
             }
         });
+        // 常用配速：没在跑时只是填进输入框，跑起来时直接下发改速命令（R-009）。
+        binding.buttonPresetWalk.setOnClickListener(v -> applySpeedPreset(3d));
+        binding.buttonPresetJog.setOnClickListener(v -> applySpeedPreset(6d));
+        binding.buttonPresetRun.setOnClickListener(v -> applySpeedPreset(9d));
+        binding.buttonPresetRide.setOnClickListener(v -> applySpeedPreset(12d));
 
         if (savedInstanceState == null) {
             binding.inputSpeed.setText(String.format(Locale.US, "%.1f", RunConfig.DEFAULT_SPEED_KMH));
@@ -156,6 +191,9 @@ public class MainActivity extends AppCompatActivity {
         SimulationStateRepo.get().snapshot().observe(this, next -> {
             snapshot = next;
             render();
+            if (overlayPanel != null) {
+                overlayPanel.sync(next, overlayEnabled);
+            }
         });
 
         refreshDraft(true);
@@ -193,6 +231,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         // shutdown 而不是 shutdownNow：已提交的保存/加载让它跑完，避免半截临时文件。
         ioExecutor.shutdown();
+        if (overlayPanel != null) {
+            overlayPanel.hide();
+        }
         mapController.onDestroy();
         super.onDestroy();
     }
@@ -241,10 +282,7 @@ public class MainActivity extends AppCompatActivity {
         }
         binding.textLap.setText(lap > 0 ? RunSnapshot.formatMeters(lap) : "—");
 
-        android.view.MenuItem closedItem = binding.toolbar.getMenu().findItem(R.id.action_toggle_closed);
-        if (closedItem != null) {
-            closedItem.setChecked(viewModel.isClosed());
-        }
+        syncRouteOptions();
 
         boolean active = snapshot.isActive();
         binding.buttonStart.setEnabled(!active);
@@ -256,6 +294,49 @@ public class MainActivity extends AppCompatActivity {
 
         updateRunnerMarker();
         binding.textHint.setText(hintText(state));
+    }
+
+    /**
+     * 把草稿的几何/终点策略同步到「将当前末点连接到第一个点」那一行。
+     *
+     * <p>勾选=闭合绕圈（隐藏终点策略）；不勾=开口，可在「停止 / 原路往返」之间选。
+     * 长度文案跟着策略变，避免用户按“圈”理解单程（审查方案 5.1 / 5.2）。
+     */
+    private void syncRouteOptions() {
+        // 同步控件时不能反过来触发监听器，否则「闭合 + 隐藏的单选」会把策略改回开口。
+        syncingControls = true;
+        try {
+            binding.checkboxClosed.setChecked(viewModel.isClosed());
+            binding.behaviorRow.setVisibility(viewModel.isClosed()
+                    ? android.view.View.GONE : android.view.View.VISIBLE);
+            if (!viewModel.isClosed()) {
+                binding.radioStopAtEnd.setChecked(viewModel.endBehavior() == EndBehavior.STOP_AT_END);
+                binding.radioShuttle.setChecked(viewModel.endBehavior() == EndBehavior.SHUTTLE);
+            }
+        } finally {
+            syncingControls = false;
+        }
+        binding.inputLoops.setEnabled(!viewModel.isSingleRun());
+
+        CompiledRoute draftRoute = viewModel.compileOrNull();
+        if (draftRoute == null) {
+            binding.textRouteLength.setText(R.string.placeholder);
+            return;
+        }
+        switch (viewModel.endBehavior()) {
+            case LOOP:
+                binding.textRouteLength.setText(
+                        getString(R.string.length_loop, draftRoute.lapLengthMeters()));
+                break;
+            case SHUTTLE:
+                binding.textRouteLength.setText(getString(R.string.length_shuttle,
+                        draftRoute.lapLengthMeters(), draftRoute.pathLengthMeters()));
+                break;
+            default:
+                binding.textRouteLength.setText(
+                        getString(R.string.length_single_run, draftRoute.lapLengthMeters()));
+                break;
+        }
     }
 
     private void updateRunnerMarker() {
@@ -348,7 +429,7 @@ public class MainActivity extends AppCompatActivity {
         }
         CompiledRoute route;
         try {
-            route = RouteCompiler.compile(points, viewModel.isClosed());
+            route = RouteCompiler.compile(points, viewModel.endBehavior());
         } catch (InvalidRouteException e) {
             toast(e.getMessage() == null ? "路线无效" : e.getMessage());
             return;
@@ -361,6 +442,19 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         requestPermissionsThenStart(route, config);
+    }
+
+    /**
+     * 配速按钮：运行中就改速（服务端分段累计，位置不跳变），否则只填输入框。
+     */
+    private void applySpeedPreset(double kmh) {
+        binding.inputSpeed.setText(String.format(Locale.US, "%.1f", kmh));
+        if (snapshot.isActive()) {
+            SimulationService.setSpeedKmh(this, kmh);
+            toast(getString(R.string.toast_speed_applied, kmh));
+        } else {
+            toast(getString(R.string.toast_speed_no_effect, kmh));
+        }
     }
 
     private RunConfig readConfigFromInputs() {
@@ -378,6 +472,12 @@ public class MainActivity extends AppCompatActivity {
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("圈数必须是整数（1—1000）");
         }
+        if (viewModel.isSingleRun() && loops != 1) {
+            loops = 1;
+            toast(getString(R.string.toast_loops_fixed_for_single));
+        }
+        viewModel.rememberSpeed(speed);
+        viewModel.rememberRepeatCount(loops);
         return new RunConfig(speed, loops);
     }
 
@@ -600,10 +700,30 @@ public class MainActivity extends AppCompatActivity {
 
     // ---------------------------------------------------------------- 地图/闭合（0.1.1）
 
-    private void toggleClosed() {
-        boolean closed = viewModel.toggleClosed();
-        refreshDraft(false);
-        toast(closed ? getString(R.string.hint_closed_on) : getString(R.string.hint_closed_off));
+
+    /**
+     * 悬浮控制条开关（审查 C）：没有「显示在其他应用上层」权限时先引导授权，
+     * 授权回来后下次运行仍按偏好自动出现。
+     */
+    private void toggleOverlay() {
+        if (!overlayEnabled
+                && !org.localroute.app.overlay.OverlayPanel.canDrawOverlays(this)) {
+            toast(getString(R.string.menu_overlay_no_permission));
+            org.localroute.app.overlay.OverlayPanel.requestPermission(this);
+            return;
+        }
+        overlayEnabled = !overlayEnabled;
+        getSharedPreferences(PREFS_UI, MODE_PRIVATE).edit()
+                .putBoolean(org.localroute.app.overlay.OverlayPanel.PREF_ENABLED, overlayEnabled)
+                .apply();
+        android.view.MenuItem item = binding.toolbar.getMenu().findItem(R.id.action_overlay);
+        if (item != null) {
+            item.setChecked(overlayEnabled);
+        }
+        overlayPanel.sync(snapshot, overlayEnabled);
+        toast(overlayEnabled
+                ? getString(R.string.menu_overlay_on)
+                : getString(R.string.menu_overlay_off));
     }
 
     private void showTileSourceDialog() {
@@ -850,8 +970,8 @@ public class MainActivity extends AppCompatActivity {
             toggleTeleportMode();
             return true;
         }
-        if (id == R.id.action_toggle_closed) {
-            toggleClosed();
+        if (id == R.id.action_overlay) {
+            toggleOverlay();
             return true;
         }
         if (id == R.id.action_map_source) {

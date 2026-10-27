@@ -185,3 +185,46 @@ API 35 / x86_64 的 AVD，把整条链路真的跑了一遍。**模拟器不是�
 
 没能在模拟器上证明的事：厂商 ROM 的模拟位置白名单、锁屏与后台冻结、通知按钮在冷启动下的行为、
 真机移动网络下高德/OSM 的实际可用性、耗电与温升。这些仍以真机复验为准。
+
+## 9. 0.2.0 实测与回归（2026-10-27）
+
+### 9.1 本轮做了什么
+
+按 `docs/05_对标审查与改进方案.md` 的 A—G 逐项落地：默认开口草稿、显式闭合复选框、到终点停止/原路往返/绕圈三种终点策略、配速按钮与运行中改速、切地图源后重放草稿、多段 GPX 只取首段、schema v2 兼容 v1 文件。测试从 144 增至 **173**（route-core 102 / simulation-core 24 / app 47，13 个套件；lint 0 error、app 29 warning）。
+
+### 9.2 自动化用例
+
+| 套件 | 用例数 |
+| --- | --- |
+| GeoMathTest | 9 |
+| RouteCompilerTest | 21 |
+| RouteEngineTest | 17 |
+| EndBehaviorTest | 7 |
+| DistancePhaseTest | 8 |
+| LoopStateMachineTest | 7 |
+| TickGapPolicyTest | 10 |
+| ChinaShiftTest | 7 |
+| GpxCodecTest | 16 |
+| MockLocationSessionTest | 16 |
+| LocationVerifierTest | 8 |
+| RouteJsonCodecTest | 12 |
+| RouteRepositoryTest | 10 |
+| RouteEditorViewModelTest | 20 |
+| RunRequestTest | 4 |
+
+### 9.3 模拟器实测（API 35 x86_64）
+
+| 检查 | 结果 |
+| --- | --- |
+| 新草稿默认开口 | 3 点后提示「3 个节点 · 单程 66.4 米（到终点停止）」 |
+| 勾选闭合 | 提示变「3 个节点 · 闭合 · 单圈 181.4 米」 |
+| 开口 + 原路往返 | 提示「3 个节点 · 原路往返 · 单程 66.4 米 · 往返 132.7 米」 |
+| 到终点停止实跑 | 66.4 m / 00:26 走完，状态「已完成」，圈数 1/1，位置停在末点 |
+| 运行中改速 | 9 → 12 km/h 后速度栏变 12.0，距离继续累加、位置连续 |
+| 系统侧读数 | `dumpsys location` 出现 `Location[gps 53.388254,-35.890951 ... vel=2.5 bear=54.8 mock]` |
+
+本轮由实测暴露并修复了三个真缺陷：闭合态下程序性恢复单选导致闪退、往返模式「单程」被算成 1.5 倍、多段 GPX 段间被连成直线。
+
+### 9.4 仍未实测
+
+真机（真我 GT Neo5）复验、锁屏/切应用/强杀重开、通知控制、悬浮窗授权流程、官方高德/百度 SDK。这些项目和之前一样保留在 `KNOWN_ISSUES_已知问题.md` 与本表第 5 节，没有因为「模拟器跑通了」而被标成已验证。

@@ -65,6 +65,9 @@ public class SimulationService extends Service {
     public static final String ACTION_PAUSE = "org.localroute.app.action.PAUSE";
     public static final String ACTION_RESUME = "org.localroute.app.action.RESUME";
     public static final String ACTION_STOP = "org.localroute.app.action.STOP";
+    /** 运行中改速（主界面、悬浮窗、通知都走这一条命令）。 */
+    public static final String ACTION_SET_SPEED = "org.localroute.app.action.SET_SPEED";
+    public static final String EXTRA_SPEED_KMH = "org.localroute.app.extra.SPEED_KMH";
 
     private static final String CHANNEL_ID = "simulation";
     private static final int NOTIFICATION_ID = 1001;
@@ -73,7 +76,14 @@ public class SimulationService extends Service {
     private static final org.localroute.core.TickGapPolicy TICK_GAP_POLICY =
             org.localroute.core.TickGapPolicy.defaults();
     private static final double FIX_ALTITUDE_METERS = 10d;
-    private static final double FIX_ACCURACY_METERS = 3d;
+    /**
+     * 提交位置的精度取值：移动中按 GPS 常见量级给 3 米，静止（单点/暂停）给 5 米。
+     *
+     * <p>之前两种场景都用固定 3 米。任务书没规定精度，但「静止却声称 3 米」会让部分
+     * 风控/距离统计把抖动算成位移（审查 R-013），所以按是否有速度区分。
+     */
+    private static final double FIX_ACCURACY_MOVING_METERS = 3d;
+    private static final double FIX_ACCURACY_STATIC_METERS = 5d;
 
     private final LoopStateMachine stateMachine = new LoopStateMachine();
     private final List<String> publishedProviders = new ArrayList<>();
@@ -96,6 +106,12 @@ public class SimulationService extends Service {
     private long lastElapsedMs;
     private long lastNotificationAt;
     private long lastTickNanos;
+    /**
+     * 分段累计距离：改速时冻结已走距离再换速度，保证位置连续（审查 R-009）。
+     * 具体算法在 {@link org.localroute.core.DistancePhase} 里，可单测。
+     */
+    private org.localroute.core.DistancePhase phase =
+            new org.localroute.core.DistancePhase(RunConfig.DEFAULT_SPEED_KMH);
     private volatile boolean stopped;
 
     private final Runnable tickRunnable = new Runnable() {
@@ -142,6 +158,9 @@ public class SimulationService extends Service {
             post(this::handleResume);
         } else if (ACTION_STOP.equals(action)) {
             post(this::handleStop);
+        } else if (ACTION_SET_SPEED.equals(action)) {
+            final double kmh = intent.getDoubleExtra(EXTRA_SPEED_KMH, Double.NaN);
+            post(() -> handleSetSpeed(kmh));
         } else {
             DiagnosticLog.warn("未知的服务动作：" + action);
             stopAndPublishStoppedIfActive("收到未知的运行命令：" + action);
@@ -232,6 +251,37 @@ public class SimulationService extends Service {
         sendCommand(context, ACTION_STOP);
     }
 
+    /**
+     * 运行中改速（km/h）。主界面、悬浮窗、通知快捷操作都调这里，保证只有一条改速路径。
+     *
+     * <p>重复点同一个速度不会打断当前分段（服务端比较后直接忽略），所以可以放心连点。
+     */
+    public static void setSpeedKmh(Context context, double speedKmh) {
+        Intent intent = new Intent(context, SimulationService.class)
+                .setAction(ACTION_SET_SPEED)
+                .putExtra(EXTRA_SPEED_KMH, speedKmh);
+        try {
+            context.startService(intent);
+        } catch (RuntimeException e) {
+            DiagnosticLog.error("发送改速命令失败", e);
+        }
+    }
+
+    /**
+     * 传送到指定坐标（悬浮窗/主界面共用）。
+     *
+     * <p>走的是「单点位置」链路：先在系统里创建一个 0 速度的位置，然后进入 RUNNING 反复提交。
+     * 如果当前有路线任务在跑，先停掉它（同一时刻只允许一个运行任务）。
+     */
+    public static void teleport(Context context, org.localroute.core.GeoPoint point) {
+        RunSnapshot current = SimulationStateRepo.get().current();
+        if (current != null && current.isActive()) {
+            DiagnosticLog.warn("传送前先停止现有任务");
+            stop(context);
+        }
+        start(context, RunRequest.createSinglePoint(point));
+    }
+
     private static void sendCommand(Context context, String action) {
         Intent intent = new Intent(context, SimulationService.class).setAction(action);
         try {
@@ -263,6 +313,7 @@ public class SimulationService extends Service {
         clock = new org.localroute.core.ActiveElapsedClock();
         lastProgress = null;
         lastElapsedMs = 0L;
+        phase = new org.localroute.core.DistancePhase(pending.config().speedKmh(), 0L);
         stopped = false;
 
         ensureReadyState();
@@ -393,8 +444,13 @@ public class SimulationService extends Service {
             return;
         }
 
-        RouteEngine.Progress progress = RouteEngine.progressAt(route, config, elapsed);
-        double speed = paused ? 0d : progress.speedMps();
+        // 距离只由「分段累计」决定：暂停时有效时间不增长，所以位置自然停住；
+        // 改速时只换段，不重算历史（R-009）。
+        double speedMps = phase.speedMetersPerSecond();
+        double distance = phase.distanceAt(elapsed);
+        RouteEngine.Progress progress = RouteEngine.progressForDistance(
+                route, config.loopCount(), distance, speedMps);
+        double speed = paused ? 0d : speedMps;
 
         try {
             session.publish(fixFor(progress, speed, now));
@@ -467,6 +523,50 @@ public class SimulationService extends Service {
                 .build());
         updateNotification(RunState.PAUSED, lastProgress, false, reason);
         scheduleNextTick();
+    }
+
+    /**
+     * 运行中改速：把当前距离冻结进 offset，再以新速度开一个新分段。
+     *
+     * <p>速度非法、任务不存在、单点模式（速度恒 0）或已在目标速度上，都只是记录日志后返回，
+     * 不改变运行状态——改速永远不应该让一次运行失败。
+     */
+    private void handleSetSpeed(double speedKmh) {
+        if (request == null) {
+            DiagnosticLog.warn("忽略改速请求：没有正在运行的任务");
+            return;
+        }
+        if (singlePoint != null) {
+            DiagnosticLog.warn("忽略改速请求：单点模式速度固定为 0");
+            return;
+        }
+        RunState state = stateMachine.state();
+        if (state != RunState.RUNNING && state != RunState.PAUSED) {
+            DiagnosticLog.warn("忽略改速请求：当前状态 " + state);
+            return;
+        }
+        if (!Double.isFinite(speedKmh) || speedKmh < RunConfig.MIN_SPEED_KMH
+                || speedKmh > RunConfig.MAX_SPEED_KMH) {
+            DiagnosticLog.warn("忽略改速请求：速度非法 " + speedKmh);
+            return;
+        }
+        if (Math.abs(speedKmh - phase.speedKmh()) < 1e-9d) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtimeNanos();
+        long elapsed = clock.elapsedNanos(now);
+        double previous = phase.speedKmh();
+        double travelled = phase.changeSpeed(speedKmh, elapsed);
+        config = config.withSpeedKmh(speedKmh);
+        DiagnosticLog.info(String.format(Locale.US, "改速 %.1f → %.1f km/h（已走 %.1f 米）",
+                previous, speedKmh, travelled));
+        // 立刻刷新一次快照与通知，让界面上的速度不用等下一个 tick。
+        // 新分段刚起步（本段用时为 0），位置仍停在冻结点，不跳变。
+        RouteEngine.Progress progress = RouteEngine.progressForDistance(
+                route, config.loopCount(), phase.distanceAt(elapsed), phase.speedMetersPerSecond());
+        lastProgress = progress;
+        publishSnapshot(state, progress);
+        updateNotification(state, progress, false);
     }
 
     private void handleResume() {
@@ -581,14 +681,15 @@ public class SimulationService extends Service {
     }
 
     private MockFix fixFor(RouteEngine.Progress progress, double speedMps, long elapsedRealtimeNanos) {
+        double accuracy = speedMps > 0.05d ? FIX_ACCURACY_MOVING_METERS : FIX_ACCURACY_STATIC_METERS;
         return new MockFix(progress.latitude(), progress.longitude(),
-                FIX_ALTITUDE_METERS, FIX_ACCURACY_METERS, speedMps, progress.bearingDegrees(),
+                FIX_ALTITUDE_METERS, accuracy, speedMps, progress.bearingDegrees(),
                 System.currentTimeMillis(), elapsedRealtimeNanos);
     }
 
     private MockFix fixForPoint(org.localroute.core.GeoPoint point, long elapsedRealtimeNanos) {
         return new MockFix(point.latitude(), point.longitude(),
-                FIX_ALTITUDE_METERS, FIX_ACCURACY_METERS, 0d, 0d,
+                FIX_ALTITUDE_METERS, FIX_ACCURACY_STATIC_METERS, 0d, 0d,
                 System.currentTimeMillis(), elapsedRealtimeNanos);
     }
 

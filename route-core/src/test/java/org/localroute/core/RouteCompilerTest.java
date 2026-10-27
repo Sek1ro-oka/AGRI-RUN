@@ -217,4 +217,48 @@ public class RouteCompilerTest {
         assertEquals(2, route.vertexCount());
         assertEquals(2d * GeoMath.distanceMeters(a, b), route.lapLengthMeters(), 1e-6d);
     }
-}
+
+    @Test
+    public void compileStopAtEnd_square_lapIsTheOneWayPathWithoutClosingEdge() throws Exception {
+        List<GeoPoint> square = square();
+        CompiledRoute stopAtEnd = RouteCompiler.compile(square, EndBehavior.STOP_AT_END);
+        CompiledRoute loop = RouteCompiler.compile(square, EndBehavior.LOOP);
+
+        assertEquals(EndBehavior.STOP_AT_END, stopAtEnd.endBehavior());
+        assertFalse("到终点停止不应回跳起点", stopAtEnd.wraps());
+        assertEquals("单程顶点数应等于用户点数", 4, stopAtEnd.vertexCount());
+        assertEquals("pathPointCount 是用户路径点数", 4, stopAtEnd.pathPointCount());
+        assertTrue("单程一定比闭合一圈短", stopAtEnd.lapLengthMeters() < loop.lapLengthMeters());
+        assertTrue(stopAtEnd.pointAt(0d).isNear(square.get(0), 0.01d));
+        assertTrue("最后一米应停在终点",
+                stopAtEnd.pointAt(stopAtEnd.lapLengthMeters() - 1e-6d)
+                        .isNear(square.get(3), 1e-3d));
+    }
+
+    @Test
+    public void compileStopAtEnd_doesNotWrapWhenAskedBeyondTheEnd() throws Exception {
+        CompiledRoute route = RouteCompiler.compile(square(), EndBehavior.STOP_AT_END);
+        GeoPoint beyond = route.pointAt(route.lapLengthMeters() + 50d);
+        assertTrue("超出单程应夹在终点，而不是绕回起点", beyond.isNear(square().get(3), 1e-3d));
+    }
+
+    @Test
+    public void compileShuttle_keepsOutAndBackPath() throws Exception {
+        CompiledRoute route = RouteCompiler.compile(square(), EndBehavior.SHUTTLE);
+        assertTrue(route.wraps());
+        assertEquals(6, route.vertexCount());
+        assertTrue(route.pointAt(route.lapLengthMeters() - 1e-6d).isNear(square().get(0), 1e-3d));
+    }
+    @Test
+    public void pathLengthMeters_isAlwaysTheUsersOneWayPath() throws Exception {
+        List<GeoPoint> square = square();
+        CompiledRoute loop = RouteCompiler.compile(square, EndBehavior.LOOP);
+        CompiledRoute shuttle = RouteCompiler.compile(square, EndBehavior.SHUTTLE);
+        CompiledRoute stop = RouteCompiler.compile(square, EndBehavior.STOP_AT_END);
+
+        double oneWay = stop.lapLengthMeters();
+        assertEquals("到终点停止：单程就是全程", oneWay, stop.pathLengthMeters(), 1e-9d);
+        assertEquals("原路往返：单程是往返的一半", oneWay, shuttle.pathLengthMeters(), 0.01d);
+        assertEquals("往返一圈 = 两倍单程", shuttle.lapLengthMeters(), shuttle.pathLengthMeters() * 2d, 0.01d);
+        assertTrue("闭合：单圈还要多一段闭合边", loop.lapLengthMeters() >= loop.pathLengthMeters());
+    }}

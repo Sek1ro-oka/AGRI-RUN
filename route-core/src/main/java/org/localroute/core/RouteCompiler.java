@@ -41,12 +41,25 @@ public final class RouteCompiler {
     }
 
     /**
-     * 编译路线。
+     * 编译路线（兼容 0.1.x：不闭合按“原路往返”计圈）。
      *
      * @param closed {@code true} 表示最后一点连回起点；{@code false} 表示沿原路返回计圈
-     * @throws InvalidRouteException 路线无法运行时抛出（错误码固定为 {@link RunErrorCode#ROUTE_INVALID}）
      */
     public static CompiledRoute compile(List<GeoPoint> rawPoints, boolean closed) throws InvalidRouteException {
+        return compile(rawPoints, EndBehavior.legacyForClosed(closed));
+    }
+
+    /**
+     * 按终点策略编译路线。
+     *
+     * @param endBehavior {@link EndBehavior#LOOP} 闭合绕圈；{@link EndBehavior#SHUTTLE} 原路往返；
+     *                    {@link EndBehavior#STOP_AT_END} 开到最后一个节点就停，不回跳起点
+     * @throws InvalidRouteException 路线无法运行时抛出（错误码固定为 {@link RunErrorCode#ROUTE_INVALID}）
+     */
+    public static CompiledRoute compile(List<GeoPoint> rawPoints, EndBehavior endBehavior) throws InvalidRouteException {
+        if (endBehavior == null) {
+            throw invalid("终点策略为空");
+        }
         if (rawPoints == null) {
             throw invalid("路线为空");
         }
@@ -64,6 +77,7 @@ public final class RouteCompiler {
             }
         }
 
+        boolean closed = endBehavior == EndBehavior.LOOP;
         if (closed) {
             // 终点重复起点：去掉重复终点（闭合边由编译期补上）。
             while (points.size() > 1
@@ -76,7 +90,12 @@ public final class RouteCompiler {
             throw invalid("至少需要 2 个不重合的节点，当前 " + points.size() + " 个");
         }
 
-        List<GeoPoint> ring = closed ? new ArrayList<>(points) : buildOutAndBackRing(points);
+        List<GeoPoint> ring;
+        if (endBehavior.repeatsPath()) {
+            ring = buildOutAndBackRing(points);
+        } else {
+            ring = new ArrayList<>(points);
+        }
         int n = ring.size();
         GeoPoint[] vertices = ring.toArray(new GeoPoint[0]);
         double[] prefix = new double[n];
@@ -85,15 +104,19 @@ public final class RouteCompiler {
             accumulated += GeoMath.distanceMeters(vertices[i - 1], vertices[i]);
             prefix[i] = accumulated;
         }
-        double closingEdge = GeoMath.distanceMeters(vertices[n - 1], vertices[0]);
+        // 到终点停止的路线没有闭合边：全程就是用户路径长度。
+        double closingEdge = endBehavior.wraps() ? GeoMath.distanceMeters(vertices[n - 1], vertices[0]) : 0d;
         double lapLength = accumulated + closingEdge;
 
+        String what = endBehavior.wraps() ? "单圈长度" : "全程长度";
         if (!Double.isFinite(lapLength) || lapLength < MIN_LAP_METERS) {
             throw invalid(String.format(java.util.Locale.US,
-                    "单圈长度不足 %.1f 米（当前 %.3f 米），请把节点放远一些", MIN_LAP_METERS, lapLength));
+                    "%s不足 %.1f 米（当前 %.3f 米），请把节点放远一些", what, MIN_LAP_METERS, lapLength));
         }
 
-        return new CompiledRoute(vertices, prefix, lapLength, closed, points.size());
+        // 往返：闭合环是「去程 + 原路返回」，用户路径长度正好是环长的一半（环本身对称）。
+        double oneWayLength = endBehavior.repeatsPath() ? lapLength / 2d : accumulated;
+        return new CompiledRoute(vertices, prefix, lapLength, oneWayLength, endBehavior, points.size());
     }
 
     /**

@@ -50,6 +50,7 @@ public final class RouteMapController {
 
     private static final String SOURCE_LINE = "route-line";
     private static final String SOURCE_VERTICES = "route-vertices";
+    private static final String SOURCE_START = "route-start";
     private static final String SOURCE_RUNNER = "run-position";
     private static final String LAYER_BACKGROUND = "background";
     private static final String LAYER_RASTER = "osm-raster";
@@ -84,6 +85,14 @@ public final class RouteMapController {
                     "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
                     "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
                     "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}"),
+            // 腾讯地图（审查 D）：同样是国内可用、GCJ-02 的非官方瓦片接口，作为高德的备选。
+            // 行列号按标准 XYZ 使用；若某天出现错位，切回高德即可，不影响存储的 WGS-84 数据。
+            new TileSource("tencent", "腾讯地图（GCJ-02，非官方接口）", CoordSystem.GCJ02, 18,
+                    "© 腾讯地图",
+                    "https://rt0.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=1",
+                    "https://rt1.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=1",
+                    "https://rt2.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=1",
+                    "https://rt3.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=1"),
             new TileSource("osm", "OpenStreetMap 官方", CoordSystem.WGS84, 19,
                     "© OpenStreetMap contributors",
                     "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
@@ -104,7 +113,23 @@ public final class RouteMapController {
     private final MapView mapView;
     @Nullable
     private MapLibreMap map;
-    private final List<GeoPoint> currentPoints = new ArrayList<>();
+
+    /**
+     * 编辑态显示状态缓存（point 列表、是否闭合、最新 runner）。
+     *
+     * <p>这三个值必须由本类自己保存：样式重建（切瓦片源）时 MapLibre 会把所有
+     * source/layer 丢掉，只有从缓存重放才能保证「切源不丢路线」。
+     */
+    private List<GeoPoint> cachedPoints = new ArrayList<>();
+    private boolean cachedClosed;
+    @Nullable
+    private GeoPoint cachedRunner;
+
+    /**
+     * 样式代次：每次 applyStyle 自增。异步回调（样式加载、瓦片探测）回来时若代次已变，
+     * 说明用户又切了一次源，旧结果必须丢弃，否则旧源的失败会覆盖新源的状态。
+     */
+    private int styleGeneration;
 
     @Nullable
     private Style style;
@@ -235,13 +260,14 @@ public final class RouteMapController {
         }
         style = null;
         tileWarning = null;
+        final int generation = ++styleGeneration;
         final TileSource source = currentTileSource();
         notifyStatus("正在加载 " + source.label() + " 瓦片…");
         DiagnosticLog.info("加载地图样式：" + source.label() + " / " + source.urlTemplate());
 
         cancelStyleTimeout();
         styleTimeout = () -> {
-            if (style == null) {
+            if (style == null && generation == styleGeneration) {
                 String message = String.format(Locale.US,
                         "加载 %s 超过 %d 秒仍未完成（可能是网络无法访问该瓦片服务）",
                         source.label(), STYLE_TIMEOUT_MS / 1000L);
@@ -252,15 +278,20 @@ public final class RouteMapController {
         mapView.postDelayed(styleTimeout, STYLE_TIMEOUT_MS);
 
         map.setStyle(new Style.Builder().fromJson(buildStyleJson(source)), loaded -> {
+            if (generation != styleGeneration) {
+                // 用户已经切到别的源：这次回调是过期的，直接丢弃。
+                DiagnosticLog.info("忽略过期的样式回调：" + source.label());
+                return;
+            }
             cancelStyleTimeout();
             style = loaded;
             addSources(loaded);
-            renderRoute(currentPoints);
+            restoreOverlays();
             DiagnosticLog.info("地图样式已加载：" + source.label());
             notifyStatus(null);
             // 样式加载成功不代表瓦片能下载：样式是一段本地 JSON，瓦片才是网络请求。
             // 这里单独探一次瓦片，失败就把原因留在界面上，而不是让用户看着空白地图猜。
-            probeTiles(source);
+            probeTiles(source, generation);
         });
     }
 
@@ -270,7 +301,7 @@ public final class RouteMapController {
      * <p>用独立的短连接而不是 MapLibre 内部回调：MapLibre 没有暴露“所有瓦片都失败”的事件，
      * 而这里只需要回答一个用户问题——“底图为什么是空的”。
      */
-    private void probeTiles(@NonNull TileSource source) {
+    private void probeTiles(@NonNull TileSource source, int generation) {
         final String url = source.tileUrls().get(0)
                 .replace("{z}", "0").replace("{x}", "0").replace("{y}", "0");
         Thread thread = new Thread(() -> {
@@ -298,9 +329,13 @@ public final class RouteMapController {
             final boolean reachable = ok;
             final String failure = reason;
             mapView.post(() -> {
+                if (generation != styleGeneration) {
+                    // 探测期间用户又切源了：这个结果属于旧源，不能覆盖新源的状态。
+                    return;
+                }
                 if (!reachable) {
                     tileWarning = String.format(Locale.US,
-                            "%s 的瓦片下载失败（%s），可在菜单「地图瓦片源」换一个",
+                            "%s 的瓦片下载失败（%s），可在菜单「地图瓦片源」换一个或点「重新加载」",
                             source.label(), failure);
                     DiagnosticLog.warn("瓦片探测失败：" + tileWarning);
                     notifyStatus(tileWarning);
@@ -395,16 +430,22 @@ public final class RouteMapController {
         return Point.fromLngLat(display.getLongitude(), display.getLatitude());
     }
 
-    /** 切换瓦片源并立即重试；返回是否真的切换了。 */
+    /**
+     * 切换瓦片源并立即重试。
+     *
+     * <p>同一个源也允许重试（返回 true）：用户在看到“瓦片下载失败”后第一反应就是再点一次，
+     * 早期版本因为「索引没变直接 return false」被当成没反应（R-008）。
+     */
     public boolean selectTileSource(int index) {
-        int clamped = clampIndex(index);
-        if (clamped == clampIndex(tileSourceIndex)) {
-            return false;
-        }
-        tileSourceIndex = clamped;
-        saveTileSourceIndex(clamped);
+        tileSourceIndex = clampIndex(index);
+        saveTileSourceIndex(tileSourceIndex);
         applyStyle();
         return true;
+    }
+
+    /** 用当前源重新加载样式（菜单「重新加载地图」用）。 */
+    public void reloadStyle() {
+        applyStyle();
     }
 
     private static int clampIndex(int index) {
@@ -433,6 +474,7 @@ public final class RouteMapController {
     private void addSources(@NonNull Style loaded) {
         loaded.addSource(new GeoJsonSource(SOURCE_LINE));
         loaded.addSource(new GeoJsonSource(SOURCE_VERTICES));
+        loaded.addSource(new GeoJsonSource(SOURCE_START));
         loaded.addSource(new GeoJsonSource(SOURCE_RUNNER));
         loaded.addLayer(new LineLayer(LAYER_LINE, SOURCE_LINE)
                 .withProperties(
@@ -446,7 +488,9 @@ public final class RouteMapController {
                         PropertyFactory.circleRadius(5f),
                         PropertyFactory.circleStrokeWidth(2f),
                         PropertyFactory.circleStrokeColor(0xFFFFFFFF)));
-        loaded.addLayer(new CircleLayer(LAYER_START, SOURCE_VERTICES)
+        // 起点用独立单点源：早期版本让它复用整条顶点源且没有过滤条件，
+        // 结果所有节点都被画成橙色起点（R-007）。
+        loaded.addLayer(new CircleLayer(LAYER_START, SOURCE_START)
                 .withProperties(
                         PropertyFactory.circleColor(0xFFE65100),
                         PropertyFactory.circleRadius(8f)));
@@ -459,25 +503,46 @@ public final class RouteMapController {
     }
 
     /**
+     * 样式重建后从缓存重放所有图层（路线、节点、起点、runner）。
+     *
+     * <p>MapLibre 换样式会清空 source/layer，这条路径必须能独立把显示恢复出来，
+     * 不能依赖调用方再调一次 renderRoute。
+     */
+    private void restoreOverlays() {
+        drawRoute();
+        drawRunner();
+    }
+
+    /**
      * 更新路线折线（{@code closed} 为真时首尾相连，为假时保持开口）与节点。
+     *
+     * <p>兼容旧签名：默认按闭合画（GPX/示例导入前的老调用方）。
      */
     public void renderRoute(@NonNull List<GeoPoint> points) {
         renderRoute(points, true);
     }
 
     public void renderRoute(@NonNull List<GeoPoint> points, boolean closed) {
-        currentPoints.clear();
-        currentPoints.addAll(points);
+        // 先复制再缓存：调用方（编辑器 ViewModel）传的是可变列表，稍后增删节点时
+        // 如果直接持有同一引用，缓存会跟着变，切源重放就会拿到错误的历史状态。
+        cachedPoints = new ArrayList<>(points);
+        cachedClosed = closed;
+        drawRoute();
+    }
+
+    /** 按缓存重画路线图层（样式重建后也走这里）。 */
+    private void drawRoute() {
         if (style == null) {
             return;
         }
+        List<GeoPoint> points = cachedPoints;
         List<Point> ring = new ArrayList<>(points.size() + 1);
         List<Feature> lineFeatures = new ArrayList<>();
         if (points.size() >= 2) {
             for (GeoPoint point : points) {
                 ring.add(toDisplayPoint(point));
             }
-            if (closed) {
+            if (cachedClosed) {
                 ring.add(toDisplayPoint(points.get(0)));
             }
             lineFeatures.add(Feature.fromGeometry(LineString.fromLngLats(ring)));
@@ -491,23 +556,35 @@ public final class RouteMapController {
         setGeoJson(SOURCE_LINE, FeatureCollection.fromFeatures(lineFeatures));
 
         List<Feature> vertexFeatures = new ArrayList<>();
-        for (GeoPoint point : points) {
-            vertexFeatures.add(Feature.fromGeometry(toDisplayPoint(point)));
+        for (int i = 1; i < points.size(); i++) {
+            // 起点单独用 SOURCE_START 画，节点层从第 2 个点开始，避免两层叠色。
+            vertexFeatures.add(Feature.fromGeometry(toDisplayPoint(points.get(i))));
         }
         setGeoJson(SOURCE_VERTICES, FeatureCollection.fromFeatures(vertexFeatures));
+
+        List<Feature> startFeatures = new ArrayList<>();
+        if (!points.isEmpty()) {
+            startFeatures.add(Feature.fromGeometry(toDisplayPoint(points.get(0))));
+        }
+        setGeoJson(SOURCE_START, FeatureCollection.fromFeatures(startFeatures));
     }
 
     /** 更新当前模拟位置；{@code position == null} 时清除。 */
     public void renderRunner(@Nullable GeoPoint position) {
+        cachedRunner = position;
+        drawRunner();
+    }
+
+    private void drawRunner() {
         if (style == null) {
             return;
         }
-        if (position == null) {
+        if (cachedRunner == null) {
             setGeoJson(SOURCE_RUNNER, FeatureCollection.fromFeatures(new Feature[0]));
             return;
         }
         setGeoJson(SOURCE_RUNNER, FeatureCollection.fromFeatures(new Feature[]{
-                Feature.fromGeometry(toDisplayPoint(position))}));
+                Feature.fromGeometry(toDisplayPoint(cachedRunner))}));
     }
 
     private void setGeoJson(String sourceId, FeatureCollection collection) {

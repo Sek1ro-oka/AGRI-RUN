@@ -26,21 +26,38 @@ public final class CompiledRoute {
     private final GeoPoint[] vertices;
     private final double[] prefixDistances;
     private final double lapLengthMeters;
-    private final boolean closed;
+    private final EndBehavior endBehavior;
+    private final double oneWayLengthMeters;
     private final int pathPointCount;
 
     CompiledRoute(GeoPoint[] vertices, double[] prefixDistances, double lapLengthMeters,
-                  boolean closed, int pathPointCount) {
+                  double oneWayLengthMeters, EndBehavior endBehavior, int pathPointCount) {
         this.vertices = vertices;
         this.prefixDistances = prefixDistances;
         this.lapLengthMeters = lapLengthMeters;
-        this.closed = closed;
+        this.oneWayLengthMeters = oneWayLengthMeters;
+        this.endBehavior = endBehavior;
         this.pathPointCount = pathPointCount;
     }
 
-    /** 是否闭合：{@code false} 表示按“原路返回”计圈。 */
+    /** 是否闭合（只有绕圈策略算闭合）。 */
     public boolean closed() {
-        return closed;
+        return endBehavior == EndBehavior.LOOP;
+    }
+
+    /** 终点策略。 */
+    public EndBehavior endBehavior() {
+        return endBehavior;
+    }
+
+    /** 运行路径是否首尾相接；{@code false} 时 {@link #pointAt(double)} 会夹在终点，不回跳起点。 */
+    public boolean wraps() {
+        return endBehavior.wraps();
+    }
+
+    /** 用户路径长度（不含闭合边、不含往返的第二程）。 */
+    public double pathLengthMeters() {
+        return oneWayLengthMeters;
     }
 
     /** 用户实际输入（去重后）的点数，与 {@link #vertexCount()} 不同：不闭合时顶点会多一倍。 */
@@ -126,6 +143,10 @@ public final class CompiledRoute {
     }
 
     private double normalizeAlongLap(double alongLapMeters) {
+        if (!wraps()) {
+            // "到终点停止"：超过全程就夹在终点，绝不回跳起点。
+            return Math.max(0d, Math.min(alongLapMeters, lapLengthMeters));
+        }
         double value = alongLapMeters % lapLengthMeters;
         if (value < 0d) {
             value += lapLengthMeters;

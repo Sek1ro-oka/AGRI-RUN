@@ -3,6 +3,7 @@ package org.localroute.app.model;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.localroute.core.EndBehavior;
 import org.localroute.core.GeoPoint;
 import org.localroute.core.RouteCompiler;
 
@@ -14,19 +15,23 @@ import java.util.List;
 /**
  * 路线文件的 JSON 编解码。
  *
- * <p>文件格式（schemaVersion=1）：
+ * <p>文件格式（schemaVersion=2，v1 仍可读）：
  * <pre>
  * {
- *   "schemaVersion": 1,
+ *   "schemaVersion": 2,
  *   "id": "20261026T120000-abc123",
  *   "name": "示例方形路线",
  *   "coordinateSystem": "WGS84",
  *   "closed": true,
  *   "createdAt": "2026-10-26T12:00:00Z",
  *   "updatedAt": "2026-10-26T12:00:00Z",
- *   "points": [ { "latitude": 0.0, "longitude": 0.0 }, ... ]
+ *   "points": [ { "latitude": 0.0, "longitude": 0.0 }, ... ],
+ *   "runDefaults": { "endBehavior": "STOP_AT_END", "repeatCount": 1, "speedKmh": 9.0 }
  * }
  * </pre>
+ *
+ * <p>v1 文件没有 {@code runDefaults}：{@code closed=true} 仍按绕圈，{@code closed=false} 保留旧的
+ * “原路往返”运行默认值；只有新建的 v2 草稿才默认“到终点停止”（审查方案 5.3 第 5 条）。
  * 经纬度字段名固定为 {@code latitude}/{@code longitude}，顺序为先纬度后经度；
  * GeoJSON 导出（P1）才使用 {@code [lon, lat]} 的顺序。
  */
@@ -44,6 +49,11 @@ public final class RouteJsonCodec {
         root.put("closed", route.closed());
         root.put("createdAt", route.createdAt().toString());
         root.put("updatedAt", route.updatedAt().toString());
+        JSONObject runDefaults = new JSONObject();
+        runDefaults.put("endBehavior", route.endBehavior().name());
+        runDefaults.put("repeatCount", route.runDefaults().repeatCount());
+        runDefaults.put("speedKmh", route.runDefaults().speedKmh());
+        root.put("runDefaults", runDefaults);
         JSONArray points = new JSONArray();
         for (GeoPoint point : route.points()) {
             JSONObject item = new JSONObject();
@@ -58,7 +68,7 @@ public final class RouteJsonCodec {
     public static RouteDefinition decode(String json) throws JSONException, RouteFormatException {
         JSONObject root = new JSONObject(json);
         int schemaVersion = root.optInt("schemaVersion", -1);
-        if (schemaVersion != RouteDefinition.SCHEMA_VERSION) {
+        if (schemaVersion != 1 && schemaVersion != RouteDefinition.SCHEMA_VERSION) {
             throw new RouteFormatException("不支持的 schemaVersion：" + schemaVersion);
         }
         String coordinateSystem = root.optString("coordinateSystem", "");
@@ -94,7 +104,34 @@ public final class RouteJsonCodec {
         Instant createdAt = parseInstant(root.optString("createdAt", ""));
         Instant updatedAt = parseInstant(root.optString("updatedAt", ""));
         boolean closed = root.optBoolean("closed", true);
-        return new RouteDefinition(id, name, points, closed,
+        EndBehavior endBehavior;
+        RunDefaults runDefaults;
+        if (schemaVersion == 1) {
+            // v1 没有终点策略：保持旧行为，绝不把旧路线悄悄改成单程。
+            endBehavior = EndBehavior.legacyForClosed(closed);
+            runDefaults = RunDefaults.defaults();
+        } else {
+            JSONObject defaults = root.optJSONObject("runDefaults");
+            EndBehavior fallback = EndBehavior.forDraft(closed);
+            endBehavior = defaults == null
+                    ? fallback
+                    : EndBehavior.parse(defaults.optString("endBehavior", ""), fallback);
+            if (closed && endBehavior != EndBehavior.LOOP) {
+                endBehavior = EndBehavior.LOOP;
+            }
+            if (!closed && endBehavior == EndBehavior.LOOP) {
+                endBehavior = EndBehavior.STOP_AT_END;
+            }
+            int repeatCount = defaults == null ? 1 : defaults.optInt("repeatCount", 1);
+            double speedKmh = defaults == null ? RunDefaults.DEFAULT_SPEED_KMH
+                    : defaults.optDouble("speedKmh", RunDefaults.DEFAULT_SPEED_KMH);
+            try {
+                runDefaults = new RunDefaults(repeatCount, speedKmh);
+            } catch (IllegalArgumentException e) {
+                throw new RouteFormatException("runDefaults 非法：" + e.getMessage(), e);
+            }
+        }
+        return new RouteDefinition(id, name, points, closed, endBehavior, runDefaults,
                 createdAt == null ? Instant.now() : createdAt,
                 updatedAt == null ? (createdAt == null ? Instant.now() : createdAt) : updatedAt);
     }
