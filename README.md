@@ -5,6 +5,7 @@
 
 - 包名：`org.localroute.app`　版本：0.2.2（versionCode 9）
 - 代码镜像：<https://github.com/Sek1ro-oka/AGRI-RUN>（**不含** APK、签名密钥、`local.properties` 与高德 Key）
+- 下载：<https://github.com/Sek1ro-oka/AGRI-RUN/releases/tag/v0.2.2>（`RouteWorkshop-0.2.2-release.apk`、`LocationProbe-0.1.0-debug.apk`、`SHA256SUMS-release.txt`）
 - 最低系统：Android 10（API 29），编译 SDK 35
 - 无账号、无网络请求（地图瓦片除外）、无服务器、数据只存在手机本地
 - 附带一个独立包名的小工具 **定位探针**（`org.localroute.probe`），用来独立验证“系统确实收到了坐标”

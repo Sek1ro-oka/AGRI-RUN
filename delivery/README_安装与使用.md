@@ -3,6 +3,15 @@
 > 离线工具：在地图上点出一条路线（闭合或原路返回），用系统「模拟位置」把匀速跑圈的坐标喂给系统；
 > 也可以直接发送一个固定坐标、或把当前位置传送到地图上任意一点。不联网同步、不登录、不上传，任何数据都只在本机。
 
+## 零、从 GitHub 下载（可选）
+
+不想自己构建时，直接用 Release 里的资产（文件名是 ASCII，避免 GitHub 截掉中文）：
+
+- <https://github.com/Sek1ro-oka/AGRI-RUN/releases/tag/v0.2.2>
+- `RouteWorkshop-0.2.2-release.apk`（69.07 MB，主应用）
+- `LocationProbe-0.1.0-debug.apk`（10.59 MB，定位探针）
+- `SHA256SUMS-release.txt`（下载后核对 `Get-FileHash <文件> -Algorithm SHA256`）
+
 ## 一、两个 APK
 
 | 文件 | 包名 | 作用 |
