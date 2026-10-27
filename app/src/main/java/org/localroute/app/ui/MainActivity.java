@@ -1094,6 +1094,10 @@ public class MainActivity extends AppCompatActivity {
             toggleOverlay();
             return true;
         }
+        if (id == R.id.action_teleport_slots) {
+            showTeleportSlotsDialog();
+            return true;
+        }
         if (id == R.id.action_map_source) {
             showTileSourceDialog();
             return true;
@@ -1131,6 +1135,56 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         return false;
+    }
+
+    /** 悬浮条 A/B/C 三个快捷传送槽位：这里只负责写入/清除，真正发送由悬浮条触发。 */
+    private void showTeleportSlotsDialog() {
+        final String[] labels = {"A", "B", "C"};
+        String[] items = new String[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            org.localroute.core.GeoPoint point =
+                    org.localroute.app.overlay.OverlayPanel.readSlot(this, i);
+            items[i] = point == null
+                    ? getString(R.string.slot_value_empty, labels[i])
+                    : getString(R.string.slot_value_set, labels[i], point.format());
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.dialog_teleport_slots_title)
+                .setItems(items, (dialog, which) -> pickSlotAction(which))
+                .setNegativeButton(R.string.slot_action_cancel, null)
+                .show();
+    }
+
+    private void pickSlotAction(int index) {
+        final String label = String.valueOf((char) ('A' + index));
+        String setLabel = getString(R.string.slot_action_set_to_center, label);
+        String clearLabel = getString(R.string.slot_action_clear, label);
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.dialog_teleport_slots_title))
+                .setItems(new String[]{setLabel, clearLabel}, (dialog, which) -> {
+                    if (which == 0) {
+                        // 优先用草稿的最后一个节点（用户刚点过的地方最可靠），否则退回地图中心。
+                        org.localroute.core.GeoPoint picked = viewModel.points().isEmpty()
+                                ? null
+                                : viewModel.points().get(viewModel.points().size() - 1);
+                        if (picked == null) {
+                            picked = mapController.cameraCenter();
+                        }
+                        if (picked == null
+                                || (Math.abs(picked.latitude()) < 1e-6
+                                && Math.abs(picked.longitude()) < 1e-6)) {
+                            toast(getString(R.string.toast_slot_no_position));
+                            return;
+                        }
+                        org.localroute.app.overlay.OverlayPanel.writeSlot(this, index, picked);
+                        toast(getString(R.string.toast_slot_saved, label, picked.format()));
+                    } else {
+                        org.localroute.app.overlay.OverlayPanel.clearSlot(this, index);
+                        toast(getString(R.string.toast_slot_cleared, label));
+                    }
+                })
+                .setNegativeButton(R.string.slot_action_cancel, null)
+                .show();
     }
 
     private void saveRoute() {

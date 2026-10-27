@@ -33,6 +33,46 @@ public final class OverlayPanel {
     /** 用户在设置页勾选「显示悬浮控制条」后写这个键。 */
     public static final String PREF_ENABLED = "overlay_enabled";
 
+    /** 与 MainActivity 共用的偏好文件名（Prefs 里存三个快捷传送槽位）。 */
+    private static final String PREFS = "ui";
+    private static final String[] SLOT_KEYS = {"slot_a", "slot_b", "slot_c"};
+    private static final int[] SLOT_LABELS = {R.string.overlay_slot_a, R.string.overlay_slot_b,
+            R.string.overlay_slot_c};
+
+    private static android.content.SharedPreferences prefs(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    /** 读某个槽位；未设置或写法损坏都返回 null，调用方据此提示。 */
+    public static org.localroute.core.GeoPoint readSlot(Context context, int index) {
+        String raw = prefs(context).getString(SLOT_KEYS[index], "");
+        if (raw == null || raw.isEmpty()) {
+            return null;
+        }
+        int comma = raw.indexOf(',');
+        if (comma <= 0) {
+            return null;
+        }
+        try {
+            return new org.localroute.core.GeoPoint(
+                    Double.parseDouble(raw.substring(0, comma).trim()),
+                    Double.parseDouble(raw.substring(comma + 1).trim()));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    public static void writeSlot(Context context, int index, org.localroute.core.GeoPoint point) {
+        prefs(context).edit()
+                .putString(SLOT_KEYS[index], String.format(java.util.Locale.US, "%.6f,%.6f",
+                        point.latitude(), point.longitude()))
+                .apply();
+    }
+
+    public static void clearSlot(Context context, int index) {
+        prefs(context).edit().remove(SLOT_KEYS[index]).apply();
+    }
+
     private final Context context;
     private final WindowManager windowManager;
     private LinearLayout root;
@@ -76,7 +116,10 @@ public final class OverlayPanel {
 
     /** 按快照决定显示、刷新或收起。运行态变化时调用即可。 */
     public void sync(RunSnapshot snapshot, boolean enabled) {
-        boolean shouldShow = enabled && canDrawOverlays(context) && snapshot.isActive();
+        boolean allowed = canDrawOverlays(context);
+        android.util.Log.d("OverlayPanel", "sync enabled=" + enabled + " allowed=" + allowed
+                + " active=" + snapshot.isActive() + " state=" + snapshot.state() + " showing=" + running);
+        boolean shouldShow = enabled && allowed && snapshot.isActive();
         if (!shouldShow) {
             hide();
             return;
@@ -90,6 +133,7 @@ public final class OverlayPanel {
                 windowManager.addView(root, params);
                 running = true;
             } catch (RuntimeException e) {
+                android.util.Log.w("OverlayPanel", "addView 失败: " + e, e);
                 // 权限被撤销或窗口被系统拒绝：保持安静，不要因为悬浮窗失败影响主流程。
                 root = null;
                 running = false;
@@ -140,6 +184,26 @@ public final class OverlayPanel {
         });
         TextView stop = makeButton(buttons, R.string.overlay_stop);
         stop.setOnClickListener(v -> SimulationService.stop(context));
+
+        // 快捷传送：A / B / C 三个槽位（跨应用点一下就把当前位置挪过去，速度 0、复用同一个定位会话）。
+        LinearLayout slots = new LinearLayout(context);
+        slots.setOrientation(LinearLayout.HORIZONTAL);
+        root.addView(slots, matchWrap());
+        for (int i = 0; i < SLOT_KEYS.length; i++) {
+            final int index = i;
+            TextView slot = makeButton(slots, SLOT_LABELS[i]);
+            slot.setOnClickListener(v -> {
+                org.localroute.core.GeoPoint point = readSlot(context, index);
+                if (point == null) {
+                    android.widget.Toast.makeText(context,
+                            context.getString(R.string.overlay_slot_empty,
+                                    String.valueOf((char) ('A' + index))),
+                            android.widget.Toast.LENGTH_LONG).show();
+                    return;
+                }
+                SimulationService.teleportTo(context, point);
+            });
+        }
 
         params = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,

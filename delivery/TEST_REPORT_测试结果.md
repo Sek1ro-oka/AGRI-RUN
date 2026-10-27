@@ -1,7 +1,7 @@
 # 测试结果报告 — 路线工坊 0.2.0
 
 - 测试日期：2026-10-27（Asia/Hong_Kong）
-- 被测版本：`org.localroute.app` versionName 0.2.0 / versionCode 6（release，本地自签名）
+- 被测版本：`org.localroute.app` versionName 0.2.0 / versionCode 7（release，本地自签名）
 - 测试主机：Windows 11，CPU/内存见 `docs/environment.md`
 - 构建工具链：JDK 21.0.3（`D:\Java\jdk-21`）、Gradle 8.11.1、AGP 8.9.2、Android SDK 35、build-tools 35.0.0
 - **测试机**：真机（真我 GT Neo5）仍未接入自动化；本轮按用户要求装了 **API 35 x86_64 模拟器**，
@@ -62,7 +62,7 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 
 - 调试包 `app-debug.apk` 因为额外打了 `x86_64`（模拟器用），体积涨到 48.12 MB；release 不受影响。
 - `apksigner verify --print-certs`：签名有效，证书 `CN=Route Workshop Local`，SHA-256 `14f0286f4624de37fc1a013f9a15514ac04981bb1f222b77b3ce7dbb38f02a9c`（与 0.1.0—0.1.2 同一把 key，可覆盖安装）。
-- `aapt2 dump badging`：`package org.localroute.app`、`versionCode 6`、`versionName 0.2.0`、`minSdk 29`、`targetSdk 35`、应用名「路线工坊」、入口 `org.localroute.app.ui.MainActivity`；
+- `aapt2 dump badging`：`package org.localroute.app`、`versionCode 7`、`versionName 0.2.0`、`minSdk 29`、`targetSdk 35`、应用名「路线工坊」、入口 `org.localroute.app.ui.MainActivity`；
   权限清单里包含 `android.permission.ACCESS_MOCK_LOCATION`（这就是修好“模拟位置应用列表里没有本应用”的关键）。
 - 探针包名 `org.localroute.probe`，权限只有 FINE/COARSE 定位。
 
@@ -234,4 +234,4 @@ API 35 / x86_64 的 AVD，把整条链路真的跑了一遍。**模拟器不是�
 - 配速改为三种具名预设（行走 5.0 / 跑步 9.0 / 骑行 15.0 km/h，单击套用、长按改值、可恢复默认），保留手动输入；模拟器首屏已验证按钮文案。
 - 新增 `MapProviders` 适配层：Key 从 `local.properties` 的 `amapKey=` 注入 `BuildConfig.AMAP_KEY`，不进仓库；无 Key 时明确提示「当前使用非官方栅格瓦片」，有 Key 也只标「待接入」——`MapProvidersTest` 断言不会谎称官方 SDK 已生效。
 - 用例总数 173 → **185**（新增 `SpeedPresetsTest` 8、`MapProvidersTest` 4）；lint 仍 0 error、app 29 warning。
-- 版本：`versionName 0.2.0`、`versionCode 6`，签名证书 SHA-256 仍为 `14f0286f…02a9c`（同一把本地 key，可覆盖安装 build 5）。
+- 版本：`versionName 0.2.0`、`versionCode 7`，签名证书 SHA-256 仍为 `14f0286f…02a9c`（同一把本地 key，可覆盖安装 build 5）。

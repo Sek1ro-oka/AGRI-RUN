@@ -69,6 +69,11 @@ public class SimulationService extends Service {
     public static final String ACTION_SET_SPEED = "org.localroute.app.action.SET_SPEED";
     public static final String EXTRA_SPEED_KMH = "org.localroute.app.extra.SPEED_KMH";
 
+    /** 运行中改传送目标（悬浮条 A/B/C 用）：不新建任务、不重建会话，只换坐标。 */
+    public static final String ACTION_TELEPORT = "org.localroute.app.action.TELEPORT";
+    public static final String EXTRA_TELEPORT_LAT = "org.localroute.app.extra.TELEPORT_LAT";
+    public static final String EXTRA_TELEPORT_LON = "org.localroute.app.extra.TELEPORT_LON";
+
     private static final String CHANNEL_ID = "simulation";
     private static final int NOTIFICATION_ID = 1001;
     private static final long WAKELOCK_TIMEOUT_MS = 90L * 60L * 1000L;
@@ -103,6 +108,9 @@ public class SimulationService extends Service {
     private RouteEngine.Progress lastProgress;
     /** 单点模式要固定发送的坐标；路线模式为 null。 */
     private org.localroute.core.GeoPoint singlePoint;
+
+    /** 每次传送目标变化 +1；在途 tick 用它判断自己算的是不是旧点位。 */
+    private int teleportGeneration;
     private long lastElapsedMs;
     private long lastNotificationAt;
     private long lastTickNanos;
@@ -161,6 +169,10 @@ public class SimulationService extends Service {
         } else if (ACTION_SET_SPEED.equals(action)) {
             final double kmh = intent.getDoubleExtra(EXTRA_SPEED_KMH, Double.NaN);
             post(() -> handleSetSpeed(kmh));
+        } else if (ACTION_TELEPORT.equals(action)) {
+            final double lat = intent.getDoubleExtra(EXTRA_TELEPORT_LAT, Double.NaN);
+            final double lon = intent.getDoubleExtra(EXTRA_TELEPORT_LON, Double.NaN);
+            post(() -> handleTeleport(lat, lon));
         } else {
             DiagnosticLog.warn("未知的服务动作：" + action);
             stopAndPublishStoppedIfActive("收到未知的运行命令：" + action);
@@ -280,6 +292,55 @@ public class SimulationService extends Service {
             stop(context);
         }
         start(context, RunRequest.createSinglePoint(point));
+    }
+
+    /**
+     * 悬浮条快捷传送入口：正在跑单点传送时只改坐标（单个会话、速度 0），没在跑就新起一个单点任务。
+     */
+    public static void teleportTo(Context context, org.localroute.core.GeoPoint point) {
+        Intent intent = new Intent(context, SimulationService.class)
+                .setAction(ACTION_TELEPORT)
+                .putExtra(EXTRA_TELEPORT_LAT, point.latitude())
+                .putExtra(EXTRA_TELEPORT_LON, point.longitude());
+        try {
+            context.startService(intent);
+        } catch (RuntimeException e) {
+            DiagnosticLog.error("发送传送命令失败", e);
+        }
+    }
+
+    private void handleTeleport(double latitude, double longitude) {
+        org.localroute.core.GeoPoint point;
+        try {
+            point = new org.localroute.core.GeoPoint(latitude, longitude);
+        } catch (RuntimeException e) {
+            DiagnosticLog.warn("传送坐标非法：" + latitude + "," + longitude);
+            return;
+        }
+        if (request == null || singlePoint == null) {
+            // 没有运行中的单点任务：按单点模式新起一个（沿用既有的权限/模拟应用检查）。
+            if (request == null) {
+                start(this, RunRequest.createSinglePoint(point));
+            } else {
+                DiagnosticLog.warn("当前是路线任务，忽略传送命令；请先停止再传送");
+            }
+            return;
+        }
+        singlePoint = point;
+        teleportGeneration++;
+        DiagnosticLog.info("传送目标改为 " + point.format() + "（会话不变）");
+        try {
+            session.publish(fixForPoint(point, SystemClock.elapsedRealtimeNanos()));
+        } catch (MockProviderException e) {
+            failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(),
+                    e.getMessage());
+            return;
+        }
+        RunState current = stateMachine.state();
+        publishSnapshot(current == RunState.PAUSED ? RunState.PAUSED : RunState.RUNNING, null);
+        updateNotification(current == RunState.PAUSED ? RunState.PAUSED : RunState.RUNNING, null,
+                false);
+        scheduleNextTick();
     }
 
     private static void sendCommand(Context context, String action) {
@@ -428,10 +489,18 @@ public class SimulationService extends Service {
 
         if (singlePoint != null) {
             // 单点模式：位置与速度都不变，只是按节奏重复提交，保持系统里的模拟位置“活着”。
+            final int generation = teleportGeneration;
+            final org.localroute.core.GeoPoint target = singlePoint;
             try {
-                session.publish(fixForPoint(singlePoint, now));
+                session.publish(fixForPoint(target, now));
             } catch (MockProviderException e) {
                 failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(), e.getMessage());
+                return;
+            }
+            if (generation != teleportGeneration) {
+                // 算这一帧的时候目标已经被改掉了：丢掉它，绝不用旧点位覆盖新传送。
+                lastTickNanos = now;
+                scheduleNextTick();
                 return;
             }
             DiagnosticLog.fix(String.format(Locale.US, "单点 %s 用时=%dms", singlePoint.format(),
