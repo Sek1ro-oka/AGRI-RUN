@@ -1,7 +1,7 @@
-# 测试结果报告 — 路线工坊 0.1.3
+# 测试结果报告 — 路线工坊 0.2.0
 
 - 测试日期：2026-10-27（Asia/Hong_Kong）
-- 被测版本：`org.localroute.app` versionName 0.1.3 / versionCode 4（release，本地自签名）
+- 被测版本：`org.localroute.app` versionName 0.2.0 / versionCode 6（release，本地自签名）
 - 测试主机：Windows 11，CPU/内存见 `docs/environment.md`
 - 构建工具链：JDK 21.0.3（`D:\Java\jdk-21`）、Gradle 8.11.1、AGP 8.9.2、Android SDK 35、build-tools 35.0.0
 - **测试机**：真机（真我 GT Neo5）仍未接入自动化；本轮按用户要求装了 **API 35 x86_64 模拟器**，
@@ -33,7 +33,7 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 | app | `RouteJsonCodecTest` | 9 | 0 | 编解码往返、字段与顺序、单点草稿可保存但编译报 `ROUTE_INVALID`、`closed:false` 往返保留并编译成往返路线、未知 `schemaVersion` 拒绝、空 id 拒绝、坐标越界拒绝、超 5000 点拒绝 |
 | app | `RouteRepositoryTest` | 10 | 0 | 保存/加载往返、列表按更新时间倒序、id 生成格式、非法 id 拒绝、删除幂等、损坏文件移入 `corrupt/` 保留原文件名且不被覆盖、文件名为 A 而内容 id 为 B 时被隔离不进列表、原子写不残留 `.tmp` |
 | app | `RouteEditorViewModelTest` | 19 | 0 | 加点/撤销/清空/闭合、点数上限、单圈长度随点变化、草稿（<2 点）不可运行、手动经纬度输入解析（先纬后经、非法值拒绝）、速度与圈数校验、保存后重新加载名字与点；**闭合开关**：切换后 dirty、圈长变长、文案含「原路返回」、`toDefinition().closed()` 同步、载入不闭合路线保持不闭合；单点请求暂存与清理；传送模式默认关、可开关、开关不影响草稿点 |
-| route-core | `GpxCodecTest`（0.1.3 新增） | 15 | 0 | 编码含声明/`trk`/`trkseg`/`trkpt` 与 6 位小数、名称转义、空点集拒绝、解码往返保序、忽略 `wpt`/`rte`、缺 `lat`/`lon` 抛异常、非数字与越界拒绝、XML 声明缺失仍可解析、空白文件拒绝、Doctype 被禁用（XXE） |
+| route-core | `GpxCodecTest`（0.2.0 新增） | 15 | 0 | 编码含声明/`trk`/`trkseg`/`trkpt` 与 6 位小数、名称转义、空点集拒绝、解码往返保序、忽略 `wpt`/`rte`、缺 `lat`/`lon` 抛异常、非数字与越界拒绝、XML 声明缺失仍可解析、空白文件拒绝、Doctype 被禁用（XXE） |
 | app | `RunRequestTest`（新增） | 4 | 0 | 路线请求携带路线与配置、单点请求无路线且速度默认、单点拒绝 null、每个请求有独立 id |
 | route-core | `ChinaShiftTest`（0.1.2 新增） | 7 | 0 | 境外判定（伦敦为真、北京/上海为假）、境外原样返回、北京偏移 100–1500 米且经纬均增大、WGS→GCJ→WGS 往返误差 < 0.5 m、境外逆向不变、极端点换算后仍合法 |
 | simulation-core | `LocationVerifierTest`（0.1.2 新增） | 8 | 0 | 一致判 `ACCEPTED`、超容差判 `MISMATCH`、未收到判 `NOT_RECEIVED`、无模拟标记判 `NOT_MARKED_MOCK`、无期望值判 `NO_EXPECTED`、距离计算与缺侧返回 -1、文案包含「目标 App」 |
@@ -56,13 +56,13 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
-| `路线工坊-0.1.3-release.apk` | 32.93 MB | release，本地自签名；只含 `arm64-v8a`/`armeabi-v7a` 原生库 |
+| `路线工坊-0.2.0-release.apk` | 32.93 MB | release，本地自签名；只含 `arm64-v8a`/`armeabi-v7a` 原生库 |
 | `定位探针-0.1.0-debug.apk` | 10.59 MB | 独立包名 `org.localroute.probe`，debug 签名，用于验证系统位置（本版未改动） |
 | `source.zip` | 约 0.2 MB | `git archive HEAD` 生成；源码快照对应的提交见 `git log -1`（归档内容即该提交的树） |
 
 - 调试包 `app-debug.apk` 因为额外打了 `x86_64`（模拟器用），体积涨到 48.12 MB；release 不受影响。
 - `apksigner verify --print-certs`：签名有效，证书 `CN=Route Workshop Local`，SHA-256 `14f0286f4624de37fc1a013f9a15514ac04981bb1f222b77b3ce7dbb38f02a9c`（与 0.1.0—0.1.2 同一把 key，可覆盖安装）。
-- `aapt2 dump badging`：`package org.localroute.app`、`versionCode 4`、`versionName 0.1.3`、`minSdk 29`、`targetSdk 35`、应用名「路线工坊」、入口 `org.localroute.app.ui.MainActivity`；
+- `aapt2 dump badging`：`package org.localroute.app`、`versionCode 6`、`versionName 0.2.0`、`minSdk 29`、`targetSdk 35`、应用名「路线工坊」、入口 `org.localroute.app.ui.MainActivity`；
   权限清单里包含 `android.permission.ACCESS_MOCK_LOCATION`（这就是修好“模拟位置应用列表里没有本应用”的关键）。
 - 探针包名 `org.localroute.probe`，权限只有 FINE/COARSE 定位。
 
@@ -118,7 +118,7 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 模拟器上已经做完的（T29—T35）不必重复；下面这些必须在真机上按顺序做：
 
 1. 手机打开「开发者选项 → 选择模拟位置信息应用」，选中「路线工坊」（0.1.1 起才会出现在列表里）。
-2. 安装 `路线工坊-0.1.3-release.apk`，授予定位权限与通知权限，确认系统定位开关开启。
+2. 安装 `路线工坊-0.2.0-release.apk`，授予定位权限与通知权限，确认系统定位开关开启。
 3. 按 `README_安装与使用.md` 画一条路线（或手动输入 `samples/` 里的合成坐标），速度 9 km/h、1 圈，点「开始」。
 4. 同时安装 `定位探针-0.1.0-debug.apk`，在探针里点「开始监听」，应看到每秒约 2 条 `模拟位置` 标记的坐标，且沿路线移动。
 5. 依次执行 T16（锁屏 10 分钟）、T17（通知按钮）、T18（旋转）、T20（杀进程后重开）、T22（连停 20 次）、
@@ -158,7 +158,7 @@ gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest ^
 | 完成容差、单圈 1 米边界无测试 | 补 `completionThreshold_boundaryEitherSide`、`lapLengthNearOneMeter_isAcceptedOrRejected` | 用例数 88 → 95 |
 
 仍未处理（已写入 `KNOWN_ISSUES_已知问题.md`）：`SimulationService` 无自动化测试、残留 provider 在真机上是否跨进程存活待验证、`fused` provider 能否注册因 ROM 而异、通知 action 冷启动前台服务在 Android 14 上的限制、第三方应用（尤其走 GMS Fused）是否接受这套模拟位置。
-## 8. 模拟器实测（0.1.3，2026-10-27）
+## 8. 模拟器实测（0.2.0，2026-10-27）
 
 为什么做：用户指出「还没办法真正实现虚拟定位」和「地图太老」。这两条光靠读代码无法回答，于是本机装了一个
 API 35 / x86_64 的 AVD，把整条链路真的跑了一遍。**模拟器不是真机**，结论只覆盖 AOSP 行为。
