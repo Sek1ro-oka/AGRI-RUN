@@ -1,6 +1,6 @@
 # 本地 Issue 清单
 
-本项目为单人本地开发、**无远端仓库**，因此没有 GitHub Issue。按 agent 规则用本文件代替：
+本项目为单人开发；2026-10-27 起代码镜像到 <https://github.com/Sek1ro-oka/AGRI-RUN>（公开仓库，私钥、`local.properties` 与高德 Key 均不入库）。Issue 仍以本文件记录，按 agent 规则用本文件代替 GitHub Issues：
 每条 Issue 记录编号、初始状态、解决方式与验证证据。状态只写“已关闭/未关闭”，不写没有证据的“已验证”。
 
 ## 已关闭

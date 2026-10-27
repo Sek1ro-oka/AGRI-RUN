@@ -83,10 +83,10 @@
     "policy": "app/src/main/java/org/localroute/app/map/MapBackendPolicy.java"
   },
   "source": {
-    "repository": "本地 git 仓库（无远端，从未推送）",
+    "repository": "https://github.com/Sek1ro-oka/AGRI-RUN（main 分支，2026-10-27 推送）",
     "branch": "master",
     "archivedAt": "2026-10-27",
-    "note": "source.zip 由 git archive HEAD 生成；为避免自引用导致哈希漂移，本文件不写死提交号"
+    "note": "source.zip 由 git archive HEAD 生成；为避免自引用导致哈希漂移，本文件不写死提交号；远端仓库不含 APK/ZIP、keystore 与 local.properties（见 .gitignore）"
   },
   "artifacts": [
     { "file": "路线工坊-0.2.2-release.apk", "module": ":app", "versionName": "0.2.2", "versionCode": 9, "sizeMB": 69.07, "signing": "本地自签名（keystore 与口令不入库）" },

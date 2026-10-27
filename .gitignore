@@ -21,6 +21,8 @@ out/
 .cxx/
 
 # ---- 签名私钥与密码（禁止入库）----
+keystore/
+*.p12
 *.jks
 *.keystore
 *.jceks
