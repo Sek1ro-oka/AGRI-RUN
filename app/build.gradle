@@ -43,6 +43,8 @@ android {
         // 高德 Key 走 local.properties 的 amapKey=...（不进仓库、不写死在源码里）。
         // 没有配置时留空字符串，界面据此提示「未配置 Key，仍用栅格瓦片」。
         buildConfigField 'String', 'AMAP_KEY', "\"${amapKey}\""
+        // 高德 SDK 要求 manifest 里挂 com.amap.api.v2.apikey；用占位符注入，源码不出现明文。
+        manifestPlaceholders = [amapKey: amapKey]
     }
 
     signingConfigs {
