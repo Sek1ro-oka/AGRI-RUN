@@ -8,6 +8,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
+import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -20,13 +21,18 @@ import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.service.SimulationService;
 
 /**
- * 跨应用悬浮控制条：在别的 App 里也能看到状态、暂停/继续、停止。
+ * 跨应用悬浮控制条。
  *
- * <p>审查 C 的诉求是「运行中切到导航/计步类 App 后，还能一键停或暂停」。这里只做
- * 最少的三件事：状态一行字 + 暂停/继续 + 停止；传送仍然在应用内点地图完成，避免
- * 悬浮窗里再堆一套选点交互。
+ * <p>行为约定（0.3.2 起）：
+ * <ul>
+ *   <li>只要用户在设置里打开、系统又给了「显示在其他应用上层」权限，悬浮条就<b>一直挂着</b>，
+ *       不要求正在运行——否则冷态在别的 App 里根本调不出来，跨应用传送只做了一半（N-01）。</li>
+ *   <li>点 A/B/C：冷态直接起一个单点任务（前台服务启动路径），运行中也照送；路线运行中点
+ *       A/B/C 由服务就地切换成单点任务，不再是静默忽略（N-02）。</li>
+ *   <li>拖动夹在屏幕内并记住位置，重启后回到原处（N-03）。</li>
+ * </ul>
  *
- * <p>没有「在其他应用上层显示」权限时什么也不做，由设置页引导去授权。
+ * <p>没有悬浮窗权限时什么也不做，由设置页引导授权。
  */
 public final class OverlayPanel {
 
@@ -40,6 +46,8 @@ public final class OverlayPanel {
             R.string.overlay_slot_c};
 
     private static final String KEY_COLLAPSED = "overlay_collapsed";
+    private static final String KEY_X = "overlay_x";
+    private static final String KEY_Y = "overlay_y";
 
     private static android.content.SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -80,6 +88,7 @@ public final class OverlayPanel {
     private LinearLayout root;
     private TextView statusView;
     private TextView actionView;
+    private TextView stopView;
     private LinearLayout content;
     private TextView toggleView;
     private boolean collapsed;
@@ -119,12 +128,14 @@ public final class OverlayPanel {
         return running;
     }
 
-    /** 按快照决定显示、刷新或收起。运行态变化时调用即可。 */
+    /**
+     * 按快照决定显示、刷新或收起。
+     *
+     * <p>与运行状态无关：只在「用户关闭」或「没有悬浮权限」时收起（N-01）。
+     */
     public void sync(RunSnapshot snapshot, boolean enabled) {
         boolean allowed = canDrawOverlays(context);
-        android.util.Log.d("OverlayPanel", "sync enabled=" + enabled + " allowed=" + allowed
-                + " active=" + snapshot.isActive() + " state=" + snapshot.state() + " showing=" + running);
-        boolean shouldShow = enabled && allowed && snapshot.isActive();
+        boolean shouldShow = enabled && allowed;
         if (!shouldShow) {
             hide();
             return;
@@ -132,7 +143,7 @@ public final class OverlayPanel {
         if (root == null) {
             inflate();
         }
-        update(snapshot);
+        update(snapshot == null ? RunSnapshot.idle() : snapshot);
         if (!running) {
             try {
                 windowManager.addView(root, params);
@@ -196,25 +207,25 @@ public final class OverlayPanel {
                 SimulationService.resume(context);
             }
         });
-        TextView stop = makeButton(buttons, R.string.overlay_stop);
-        stop.setOnClickListener(v -> SimulationService.stop(context));
+        stopView = makeButton(buttons, R.string.overlay_stop);
+        stopView.setOnClickListener(v -> SimulationService.stop(context));
 
-        // 快捷传送：A / B / C 三个槽位（跨应用点一下就把当前位置挪过去，速度 0、复用同一个定位会话）。
+        // 快捷传送：A / B / C 三个槽位。冷态也有效——点一下就在系统里建一个单点位置。
         LinearLayout slots = new LinearLayout(context);
         slots.setOrientation(LinearLayout.HORIZONTAL);
         content.addView(slots, matchWrap());
         for (int i = 0; i < SLOT_KEYS.length; i++) {
             final int index = i;
+            final String label = String.valueOf((char) ('A' + index));
             TextView slot = makeButton(slots, SLOT_LABELS[i]);
             slot.setOnClickListener(v -> {
                 org.localroute.core.GeoPoint point = readSlot(context, index);
                 if (point == null) {
-                    android.widget.Toast.makeText(context,
-                            context.getString(R.string.overlay_slot_empty,
-                                    String.valueOf((char) ('A' + index))),
-                            android.widget.Toast.LENGTH_LONG).show();
+                    toast(context.getString(R.string.overlay_slot_empty, label));
                     return;
                 }
+                // 先给反馈再发命令：命令失败时至少有「已发送」这一条，而不是点了没反应。
+                toast(context.getString(R.string.overlay_teleport_sent, label));
                 SimulationService.teleportTo(context, point);
             });
         }
@@ -226,8 +237,7 @@ public final class OverlayPanel {
                         ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                         : WindowManager.LayoutParams.TYPE_PHONE,
                 // 不抢焦点：这样底下的 App 仍然能正常输入。
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         toggleView = new TextView(context);
         toggleView.setTextColor(Color.WHITE);
@@ -243,8 +253,9 @@ public final class OverlayPanel {
         header.addView(toggleView, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         params.gravity = Gravity.TOP | Gravity.START;
-        params.x = dp(12);
-        params.y = dp(96);
+        params.x = prefs(context).getInt(KEY_X, dp(12));
+        params.y = prefs(context).getInt(KEY_Y, dp(96));
+        clampToScreen();
         // 拖动只挂在状态行上：根部挂触摸监听会把按钮的点击一起吃掉。
         setCollapsed(prefs(context).getBoolean(KEY_COLLAPSED, false), false);
     }
@@ -269,6 +280,7 @@ public final class OverlayPanel {
             }
         }
     }
+
     private TextView makeButton(LinearLayout parent, int textRes) {
         TextView button = new TextView(context);
         button.setText(textRes);
@@ -288,29 +300,49 @@ public final class OverlayPanel {
     }
 
     private void update(RunSnapshot snapshot) {
+        update(OverlayViewState.from(snapshot));
+    }
+
+    private void update(OverlayViewState state) {
         if (statusView == null || actionView == null) {
             return;
         }
-        String state = stateText(snapshot);
+        if (state.isIdle()) {
+            // 冷态：不再是一行看不到的空白，而是明确告诉用户「传送到这里还能用」。
+            statusView.setText(context.getString(R.string.overlay_idle_status));
+            actionView.setEnabled(false);
+            actionView.setAlpha(0.4f);
+            stopView.setEnabled(false);
+            stopView.setAlpha(0.4f);
+            return;
+        }
+        actionView.setEnabled(state.actionEnabled());
+        actionView.setAlpha(state.actionEnabled() ? 1f : 0.4f);
+        stopView.setEnabled(state.stopEnabled());
+        stopView.setAlpha(state.stopEnabled() ? 1f : 0.4f);
         statusView.setText(context.getString(R.string.overlay_status,
-                state,
-                String.format(java.util.Locale.US, "%.1f", snapshot.speedKmh()),
-                String.format(java.util.Locale.US, "%.0f", snapshot.distanceMeters())));
-        actionView.setText(snapshot.state() == org.localroute.core.RunState.PAUSED
+                modeText(state.mode()),
+                String.format(java.util.Locale.US, "%.1f", state.speedKmh()),
+                String.format(java.util.Locale.US, "%.0f", state.distanceMeters())));
+        actionView.setText(state.actionIsResume()
                 ? R.string.overlay_resume
                 : R.string.overlay_pause);
     }
 
-    private String stateText(RunSnapshot snapshot) {
-        switch (snapshot.state()) {
-            case RUNNING:
+    private String modeText(OverlayViewState.Mode mode) {
+        switch (mode) {
+            case RUNNING_SINGLE_POINT:
+                return context.getString(R.string.overlay_state_single_point);
+            case RUNNING_ROUTE:
                 return context.getString(R.string.overlay_state_running);
             case PAUSED:
                 return context.getString(R.string.overlay_state_paused);
             case STARTING:
                 return context.getString(R.string.overlay_state_starting);
+            case TERMINAL:
+                return context.getString(R.string.overlay_state_terminal);
             default:
-                return snapshot.state().name();
+                return context.getString(R.string.overlay_idle_status);
         }
     }
 
@@ -324,7 +356,23 @@ public final class OverlayPanel {
         return Math.round(context.getResources().getDisplayMetrics().density * value);
     }
 
-    /** 拖动移动位置；松手后停在原处，不做吸边（够用且少一层状态）。 */
+    private void toast(String text) {
+        android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    /** 把 x/y 夹在屏幕内：悬浮条永远至少有一半可见，拖不丢。 */
+    private void clampToScreen() {
+        if (params == null) {
+            return;
+        }
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        int maxX = Math.max(0, metrics.widthPixels - dp(80));
+        int maxY = Math.max(0, metrics.heightPixels - dp(60));
+        params.x = Math.max(0, Math.min(params.x, maxX));
+        params.y = Math.max(0, Math.min(params.y, maxY));
+    }
+
+    /** 拖动移动位置：夹在屏幕内，松手后记住坐标（N-03）。 */
     private final class DragListener implements View.OnTouchListener {
         private int startX;
         private int startY;
@@ -346,6 +394,7 @@ public final class OverlayPanel {
                 case MotionEvent.ACTION_MOVE:
                     params.x = startX + Math.round(event.getRawX() - touchX);
                     params.y = startY + Math.round(event.getRawY() - touchY);
+                    clampToScreen();
                     if (running) {
                         try {
                             windowManager.updateViewLayout(root, params);
@@ -353,6 +402,10 @@ public final class OverlayPanel {
                             // 视图已被移除。
                         }
                     }
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    prefs(context).edit().putInt(KEY_X, params.x).putInt(KEY_Y, params.y).apply();
                     return true;
                 default:
                     return false;

@@ -80,3 +80,31 @@
 | I-042 | test | 「系统真的收到了吗」只有单元测试 | 已关闭（模拟器） | API 35 模拟器实测：探针收到 11 帧且均标模拟；真机仍待复验 |
 | I-043 | limitation | 高德瓦片接口非官方、可能失效 | 未关闭（外部依赖） | 菜单可切回 OSM/备用源；文档与界面都注明来源与风险 |
 | I-044 | limitation | 模拟器结论不能代替真机 | 未关闭（范围声明） | `delivery/TEST_REPORT_测试结果.md` 分开列「已实测（模拟器）」与「未实测（真机）」 |
+
+## 0.3.2 关闭项（2026-10-28）
+
+| 编号 | 标题 | 处理 | 证据 |
+| --- | --- | --- | --- |
+| I-101 | 悬浮条只在任务活动时显示，冷态无法跨应用传送（N-01） | `OverlayPanel.sync()` 改为 `enabled && allowed`；未运行时禁用暂停/停止并显示 `overlay_idle_status`；点 A/B/C 走 `teleportTo`（冷态也启动任务） | `:app:compileDebugJavaWithJavac` 通过；全量 216 用例通过 |
+| I-102 | 路线运行中点 A/B/C 只写日志、界面无反馈（N-02） | `SimulationService.handleTeleport()` 路线分支改调 `switchRouteTaskToSinglePoint()`，就地切单点并发布 RUNNING 快照；`OverlayPanel` 先 toast `overlay_teleport_sent` | 同上；代码路径 `SimulationService.java` 新增方法 |
+| I-103 | 悬浮条拖动可出屏、位置不持久化（N-03） | `clampToScreen()` + `overlay_x`/`overlay_y` 持久化；去掉 `FLAG_LAYOUT_NO_LIMITS` | 同上 |
+| I-104 | 保存期间继续编辑会丢 dirty（N-04） | `RouteEditorViewModel.editRevision()` + `markSavedIfUnchanged(long)`；`MainActivity.doSave()` 按代次决定是否清除 dirty | 同上 |
+| I-105 | 「地图瓦片源」仍提示“本版本仍使用栅格瓦片…SDK 待接入”（N-11） | `MapProviders.note()` 改为如实描述 SDK/回退；`MapProvidersTest` 断言同步更新 | `MapProvidersTest.noteExplainsSdkPathAndRasterFallback` 通过 |
+| I-106 | 诊断页看不出实际发送间隔与偏差 | 新增 `PublishCadence`（中位间隔/最长间隔/相对标称偏差）与每 20 帧一条日志 | `PublishCadenceTest` 6 例通过 |
+| I-107 | 探针日志两个来源混在一行（N-12） | `ProbeActivity.append()` 改 `synchronized` 并折掉行内换行 | 同上 |
+| I-108 | 探针无法验证高德 SDK 接收结果（docs/13 第二步） | 新增 `AmapReader`（`amap-sdk` / `amap-sdk-dev` 双通道，getter 实读选项，输出 errorCode/errorInfo/locationType/gpsAccuracyStatus/精度/年龄/provider/mock/脱敏坐标） | `:location-probe:assembleDebug` BUILD SUCCESSFUL，APK 12.1 MB |
+
+## 0.3.3 关闭项（2026-10-28，真机验收意见 R32-01…R32-07）
+
+真机验收结论：目标 App「农林快跑」已能记录模拟运动距离，核心需求达成。本批修的是可用性缺陷。
+
+| 编号 | 标题 | 处理 | 证据 |
+| --- | --- | --- | --- |
+| I-109 | 路线运行中传送把自己打断：`providerReady()` 无条件推进状态机，RUNNING→RUNNING 非法边抛异常（R32-01） | 新增 `TaskModeSwitch`：RUNNING 保持不推进、PAUSED 不自动恢复且不重置有效用时、只有 STARTING 才 `providerReady()`；不给状态机加自转移 | `TaskModeSwitchTest` 5 例通过 |
+| I-110 | 探针高德对照通道被 `setLocationPurpose(Sport)` 覆盖，mockEnable 实测 false，对照无效（R32-02） | `AmapReader` 拆 `baseOption/buildPrimaryOption/buildDevOption`，对照最后设 `setMockEnable(true)`；新增 `AmapOptionCheck` 断言 false/true 并把 ✓/✗ 写进报告 | `AmapOptionCheckTest` 5 例通过 |
+| I-111 | 传送/暂停/开始各路径重复 `postDelayed`，多个发布循环并行（R32-03） | 新增 `TickScheduler`：同一 Runnable 只保留一个待执行 tick，`cleanupEverything()` 先 cancel | `TickSchedulerTest` 6 例通过（含连续排程 20 次只投递 1 次） |
+| I-112 | 悬浮条订阅挂在 Activity 生命周期上，切后台后状态冻住（R32-04） | 新增 `OverlayHost` / `OverlaySession` / `SnapshotSource` / `OverlayViewState`；订阅随悬浮开关成对 attach/detach，`onDestroy` 不再隐藏窗口 | `OverlaySessionTest` 6 例、`OverlayViewStateTest` 7 例通过 |
+| I-113 | 探针把 SDK 错误回调算进位移与均速；无速度样本时显示 0.00 m/s（R32-05） | `ChannelStats` 分开回调/有效/错误，新增 `hasSpeedSamples`、`ageSinceLastFrameMillis`；报告加统计会话与最后回调年龄；布局加「传送测试」复选框 | `ChannelStatsTest` 新增 3 例通过 |
+| I-114 | 保存 A 期间切到 B，B 被误标已保存（R32-06） | 新增 `DraftSaveToken`（routeId + draftGeneration + editRevision）；`load/newDraft/markDeleted` 递增代次；`markSavedIfCurrent` 三者全等才清 dirty | `DraftSaveTokenTest` 8 例通过 |
+| I-115 | `docs/12` 自相矛盾地声称已实现 `GOGOGO_REFERENCE`；首帧日志给出结论式建议（R32-07） | 修正 `docs/12` 改动表与 §7/§8；`logFirstFixProfile()` 改为只报观测值并说明「一次只改一个变量」 | 文档核对 + 代码 review |
+| I-116 | 交付文档版本漂移（README/手册/ISSUES/TEST_REPORT/VERSION/SHA256SUMS 停在 0.3.2） | 全部升到 0.3.3 / 0.1.4，新增 `docs/15`；0.3.2 成功包移入 `delivery/baseline-0.3.2/` 作对照 | 见 `delivery/SHA256SUMS.txt`（逐项复核 0 不匹配） |

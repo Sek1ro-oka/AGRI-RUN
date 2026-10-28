@@ -1,168 +1,183 @@
 {
-    "application":  {
-                        "name":  "路线工坊",
-                        "packageName":  "org.localroute.app",
-                        "versionName":  "0.3.0",
-                        "versionCode":  11,
-                        "minSdk":  29,
-                        "targetSdk":  35,
-                        "compileSdk":  35,
-                        "language":  "java",
-                        "buildType":  "release（本地自签名，私钥不入库）",
-                        "buildDate":  "2026-10-27",
-                        "changesSinceLast":  [
-                                                 "0.2.0：默认开口路线、三种终点策略、配速与运行中改速、切源重放草稿、GPX 首段导入、schema v2",
-                                                 "0.2.1：可选高德官方 3D SDK 10.0.600 地图引擎（需 AMAP_KEY 与 arm ABI）",
-                                                 "0.2.2：修 SDK 模式下 MapLibre 视图遮挡导致的空白地图与无法点选；getMap() 为空时在 onResume 重试；新增菜单「定位到当前位置」"
-                                             ]
-                    },
-    "probe":  {
-                  "name":  "定位探针",
-                  "packageName":  "org.localroute.probe",
-                  "versionName":  "0.1.0",
-                  "versionCode":  1,
-                  "note":  "debug 构建，仅用于独立验证系统收到了哪些位置，不参与模拟位置注入"
-              },
-    "toolchain":  {
-                      "jdk":  "21.0.3 (D:\\Java\\jdk-21)",
-                      "gradle":  "8.11.1",
-                      "gradleDistributionUrl":  "https://mirrors.cloud.tencent.com/gradle/gradle-8.11.1-bin.zip",
-                      "agp":  "8.9.2",
-                      "androidBuildTools":  "35.0.0",
-                      "androidPlatform":  "android-35",
-                      "emulator":  "AVD API 35（google_apis / x86_64），用于 0.1.3—0.2.2 实测；debug 包额外包含 x86_64 ABI",
-                      "note":  "工程位于纯 ASCII 路径 E:\\agri-run\\route-workshop"
-                  },
-    "dependencies":  [
-                         {
-                             "module":  "org.maplibre.gl:android-sdk",
-                             "version":  "13.7.1",
-                             "license":  "BSD-2-Clause",
-                             "scope":  "implementation"
-                         },
-                         {
-                             "module":  "com.amap.api:3dmap",
-                             "version":  "10.0.600",
-                             "license":  "高德开放平台条款（需 Key）",
-                             "scope":  "implementation（可选引擎，arm-only）"
-                         },
-                         {
-                             "module":  "androidx.appcompat:appcompat",
-                             "version":  "1.7.0",
-                             "license":  "Apache-2.0",
-                             "scope":  "implementation"
-                         },
-                         {
-                             "module":  "com.google.android.material:material",
-                             "version":  "1.12.0",
-                             "license":  "Apache-2.0",
-                             "scope":  "implementation"
-                         },
-                         {
-                             "module":  "androidx.lifecycle:lifecycle-viewmodel",
-                             "version":  "2.8.7",
-                             "license":  "Apache-2.0",
-                             "scope":  "implementation"
-                         },
-                         {
-                             "module":  "androidx.lifecycle:lifecycle-livedata",
-                             "version":  "2.8.7",
-                             "license":  "Apache-2.0",
-                             "scope":  "implementation"
-                         },
-                         {
-                             "module":  "junit:junit",
-                             "version":  "4.13.2",
-                             "license":  "EPL-1.0",
-                             "scope":  "testImplementation"
-                         },
-                         {
-                             "module":  "org.json:json",
-                             "version":  "20240303",
-                             "license":  "JSON License",
-                             "scope":  "testImplementation"
-                         },
-                         {
-                             "module":  "androidx.test:core",
-                             "version":  "1.6.1",
-                             "license":  "Apache-2.0",
-                             "scope":  "testImplementation"
-                         },
-                         {
-                             "module":  "androidx.test.ext:junit",
-                             "version":  "1.2.1",
-                             "license":  "Apache-2.0",
-                             "scope":  "testImplementation"
-                         },
-                         {
-                             "module":  "androidx.test:runner",
-                             "version":  "1.6.2",
-                             "license":  "Apache-2.0",
-                             "scope":  "androidTestImplementation"
-                         },
-                         {
-                             "module":  "androidx.test:rules",
-                             "version":  "1.6.1",
-                             "license":  "Apache-2.0",
-                             "scope":  "androidTestImplementation"
-                         },
-                         {
-                             "module":  "androidx.test.espresso:espresso-core",
-                             "version":  "3.6.1",
-                             "license":  "Apache-2.0",
-                             "scope":  "androidTestImplementation"
-                         }
-                     ],
-    "externalData":  [
-                         {
-                             "name":  "AMap (autonavi) raster tiles",
-                             "url":  "https://webrd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn\u0026size=1\u0026scale=1\u0026style=7\u0026x={x}\u0026y={y}\u0026z={z}",
-                             "coordinateSystem":  "GCJ-02（显示层用 ChinaShift 与 WGS-84 互转）",
-                             "license":  "无公开授权、非官方接口，仅个人本地调试",
-                             "attribution":  "© 高德地图",
-                             "default":  true
-                         },
-                         {
-                             "name":  "OpenStreetMap raster tiles (selectable)",
-                             "url":  "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                             "license":  "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
-                             "attribution":  "© OpenStreetMap contributors",
-                             "note":  "本机与模拟器网络下不可达（DNS 黑洞 + TLS 失败），应用会显示原因提示"
-                         },
-                         {
-                             "name":  "OpenStreetMap DE raster tiles (selectable)",
-                             "url":  "https://tile.openstreetmap.de/{z}/{x}/{y}.png",
-                             "license":  "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
-                             "attribution":  "© OpenStreetMap contributors"
-                         },
-                         {
-                             "name":  "OpenStreetMap France raster tiles (selectable)",
-                             "url":  "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
-                             "license":  "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
-                             "attribution":  "© OpenStreetMap contributors"
-                         }
-                     ],
-    "mapEngines":  {
-                       "defaultFallback":  "MapLibre 13.7.1 + 高德栅格瓦片（GCJ-02，显示层换算）",
-                       "optional":  "高德官方 3D SDK 10.0.600（com.amap.api:3dmap，需 AMAP_KEY + arm ABI）",
-                       "policy":  "app/src/main/java/org/localroute/app/map/MapBackendPolicy.java"
-                   },
-    "source":  {
-                   "repository":  "https://github.com/Sek1ro-oka/AGRI-RUN（main 分支，2026-10-27 推送）",
-                   "branch":  "master",
-                   "archivedAt":  "2026-10-27",
-                   "note":  "source.zip 由 git archive HEAD 生成；为避免自引用导致哈希漂移，本文件不写死提交号；远端仓库不含 APK/ZIP、keystore 与 local.properties（见 .gitignore）"
-               },
-    "artifacts":  [
-                      {
-                          "name":  "路线工坊-0.3.0-release.apk",
-                          "sizeBytes":  73151524,
-                          "note":  "release，本地自签名"
-                      },
-                      {
-                          "name":  "定位探针-0.1.0-debug.apk",
-                          "sizeBytes":  21565766,
-                          "note":  "探针 debug 包，含 4 条通道"
-                      }
-                  ]
+    "application": {
+        "name": "路线工坊",
+        "packageName": "org.localroute.app",
+        "versionName": "0.3.3",
+        "versionCode": 14,
+        "minSdk": 29,
+        "targetSdk": 35,
+        "compileSdk": 35,
+        "language": "java",
+        "buildType": "release（本地自签名，私钥不入库）",
+        "buildDate": "2026-10-28",
+        "changesSinceLast": [
+            "0.2.0：默认开口路线、三种终点策略、配速与运行中改速、切源重放草稿、GPX 首段导入、schema v2",
+            "0.2.1：可选高德官方 3D SDK 10.0.600 地图引擎（需 AMAP_KEY 与 arm ABI）",
+            "0.2.2：修 SDK 模式下 MapLibre 视图遮挡导致的空白地图与无法点选；getMap() 为空时在 onResume 重试；新增菜单「定位到当前位置」",
+            "0.3.0：自检按新鲜度判定、独立探针四通道（含 GMS FLP）、provider 分属性配置",
+            "0.3.1：针对目标 App 不累计里程补全发布字段（垂直/速度/航向精度、卫星数与载噪比、elapsedRealtimeUncertainty），framework 与 GMS FLP 共用 LocationFiller；新增菜单「兼容性：发送间隔」500/1000/2000 ms；诊断页首次发布打印精度画像与小步长告警；探针显示卫星数/速度精度并支持切后台续听",
+            "0.3.3：按真机验收意见修 R32-01…R32-07——传送不再推进状态机（TaskModeSwitch）、同一 Handler 只保留一个待执行 tick（TickScheduler）、悬浮条订阅与 Activity 解耦（OverlayHost/OverlaySession）、保存令牌含草稿代次（DraftSaveToken）、探针高德对照通道先套 Sport 场景再开 mockEnable 并打 ✓/✗（AmapOptionCheck）、探针分开统计有效帧与错误回调并标注传送测试",
+            "0.3.2：悬浮条常显（冷态可传送）、路线运行中 A/B/C 就地切成单点任务并提示、拖动夹屏与位置持久化、保存按编辑代次判定、诊断页记录实际发送间隔、修「仍使用栅格瓦片」旧文案、探针日志去重行并接高德 SDK 通道（amap-sdk / amap-sdk-dev）"
+        ]
+    },
+    "probe": {
+        "name": "定位探针",
+        "packageName": "org.localroute.probe",
+        "versionName": "0.1.4",
+        "versionCode": 4,
+        "note": "debug 构建，仅用于独立验证系统与高德 SDK 收到了哪些位置，不参与模拟位置注入；0.1.4 起高德通道给出 mockEnable ✓/✗ 自检，并把错误回调与有效帧分开统计"
+    },
+    "toolchain": {
+        "jdk": "21.0.3 (D:\\Java\\jdk-21)",
+        "gradle": "8.11.1",
+        "gradleDistributionUrl": "https://mirrors.cloud.tencent.com/gradle/gradle-8.11.1-bin.zip",
+        "agp": "8.9.2",
+        "androidBuildTools": "35.0.0",
+        "androidPlatform": "android-35",
+        "emulator": "AVD API 35（google_apis / x86_64），用于 0.1.3—0.2.2 实测；debug 包额外包含 x86_64 ABI",
+        "note": "工程位于纯 ASCII 路径 E:\\agri-run\\route-workshop"
+    },
+    "dependencies": [
+        {
+            "module": "org.maplibre.gl:android-sdk",
+            "version": "13.7.1",
+            "license": "BSD-2-Clause",
+            "scope": "implementation"
+        },
+        {
+            "module": "com.amap.api:3dmap",
+            "version": "10.0.600",
+            "license": "高德开放平台条款（需 Key）",
+            "scope": "implementation（可选引擎，arm-only）"
+        },
+        {
+            "module": "androidx.appcompat:appcompat",
+            "version": "1.7.0",
+            "license": "Apache-2.0",
+            "scope": "implementation"
+        },
+        {
+            "module": "com.google.android.material:material",
+            "version": "1.12.0",
+            "license": "Apache-2.0",
+            "scope": "implementation"
+        },
+        {
+            "module": "androidx.lifecycle:lifecycle-viewmodel",
+            "version": "2.8.7",
+            "license": "Apache-2.0",
+            "scope": "implementation"
+        },
+        {
+            "module": "androidx.lifecycle:lifecycle-livedata",
+            "version": "2.8.7",
+            "license": "Apache-2.0",
+            "scope": "implementation"
+        },
+        {
+            "module": "junit:junit",
+            "version": "4.13.2",
+            "license": "EPL-1.0",
+            "scope": "testImplementation"
+        },
+        {
+            "module": "org.json:json",
+            "version": "20240303",
+            "license": "JSON License",
+            "scope": "testImplementation"
+        },
+        {
+            "module": "androidx.test:core",
+            "version": "1.6.1",
+            "license": "Apache-2.0",
+            "scope": "testImplementation"
+        },
+        {
+            "module": "androidx.test.ext:junit",
+            "version": "1.2.1",
+            "license": "Apache-2.0",
+            "scope": "testImplementation"
+        },
+        {
+            "module": "androidx.test:runner",
+            "version": "1.6.2",
+            "license": "Apache-2.0",
+            "scope": "androidTestImplementation"
+        },
+        {
+            "module": "androidx.test:rules",
+            "version": "1.6.1",
+            "license": "Apache-2.0",
+            "scope": "androidTestImplementation"
+        },
+        {
+            "module": "androidx.test.espresso:espresso-core",
+            "version": "3.6.1",
+            "license": "Apache-2.0",
+            "scope": "androidTestImplementation"
+        },
+        {
+            "module": "com.amap.api:location",
+            "version": "6.4.5",
+            "license": "高德开放平台条款（需 Key）",
+            "scope": "implementation（仅探针，用于复现目标 App 的高德接收策略）"
+        }
+    ],
+    "externalData": [
+        {
+            "name": "AMap (autonavi) raster tiles",
+            "url": "https://webrd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
+            "coordinateSystem": "GCJ-02（显示层用 ChinaShift 与 WGS-84 互转）",
+            "license": "无公开授权、非官方接口，仅个人本地调试",
+            "attribution": "© 高德地图",
+            "default": true
+        },
+        {
+            "name": "OpenStreetMap raster tiles (selectable)",
+            "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
+            "attribution": "© OpenStreetMap contributors",
+            "note": "本机与模拟器网络下不可达（DNS 黑洞 + TLS 失败），应用会显示原因提示"
+        },
+        {
+            "name": "OpenStreetMap DE raster tiles (selectable)",
+            "url": "https://tile.openstreetmap.de/{z}/{x}/{y}.png",
+            "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
+            "attribution": "© OpenStreetMap contributors"
+        },
+        {
+            "name": "OpenStreetMap France raster tiles (selectable)",
+            "url": "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
+            "license": "ODbL 1.0 (data) / OSMF Tile Usage Policy (service)",
+            "attribution": "© OpenStreetMap contributors"
+        }
+    ],
+    "mapEngines": {
+        "defaultFallback": "MapLibre 13.7.1 + 高德栅格瓦片（GCJ-02，显示层换算）",
+        "optional": "高德官方 3D SDK 10.0.600（com.amap.api:3dmap，需 AMAP_KEY + arm ABI）",
+        "policy": "app/src/main/java/org/localroute/app/map/MapBackendPolicy.java"
+    },
+    "source": {
+        "repository": "https://github.com/Sek1ro-oka/AGRI-RUN（main 分支，2026-10-28 推送 v0.3.3）",
+        "branch": "main",
+        "archivedAt": "2026-10-28",
+        "note": "source.zip 为 v0.3.3 提交（tag v0.3.3）的工作树快照，不含 delivery/ 与构建产物"
+    },
+    "artifacts": [
+        {
+            "name": "路线工坊-0.3.3-release.apk",
+            "sizeBytes": 73185200,
+            "sha256": "2b2879e79c5830101f25873cd2cc24b1ef78971538e38f399eac67bf2edd35c4"
+        },
+        {
+            "name": "定位探针-0.1.4-debug.apk",
+            "sizeBytes": 12736975,
+            "sha256": "0344cbcf5e1acc3e71bac87881845e6786d72e174e25d0a04a423759446e3b7e"
+        },
+        {
+            "name": "source.zip",
+            "sizeBytes": 941549,
+            "sha256": "0e296658a941ab150fc2a331c984460e73034b47a946307b8a80b78dbc4786b2"
+        }
+    ]
 }

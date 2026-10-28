@@ -31,13 +31,16 @@ public class MapProvidersTest {
     }
 
     @Test
-    public void noteNeverClaimsOfficialSdkIsActive() {
+    public void noteExplainsSdkPathAndRasterFallback() {
         String missing = MapProviders.note(null);
         String present = MapProviders.note("abcdef0123456789");
         assertTrue(missing.contains("未配置高德 Key"));
         assertTrue(missing.contains("栅格瓦片"));
-        assertTrue(present.contains("待接入"));
-        assertTrue(present.contains("栅格瓦片"));
+        // 0.3.2 起文案必须如实说明「ABI 支持就走 SDK、否则回退栅格」，
+        // 不能再出现“本版本仍使用栅格瓦片，SDK 待接入”这种与实际相反的断言（N-11）。
+        assertTrue(present.contains("高德官方 SDK 渲染"));
+        assertTrue(present.contains("回退栅格瓦片"));
+        assertFalse(present.contains("待接入"));
         assertFalse(present.contains("abcdef0123456789"));
     }
 }

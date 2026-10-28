@@ -111,15 +111,7 @@ public final class GmsFlpBackend implements LocationOutputBackend {
         inFlight = true;
         final int frameGeneration = generation;
         Location location = new Location("gms-flp");
-        location.setLatitude(fix.latitude());
-        location.setLongitude(fix.longitude());
-        location.setAltitude(fix.altitudeMeters());
-        location.setAccuracy((float) fix.accuracyMeters());
-        location.setSpeed((float) fix.speedMps());
-        location.setBearing((float) fix.bearingDegrees());
-        location.setTime(fix.timeMillis());
-        location.setElapsedRealtimeNanos(fix.elapsedRealtimeNanos() > 0L
-                ? fix.elapsedRealtimeNanos() : SystemClock.elapsedRealtimeNanos());
+        LocationFiller.fill(location, fix);
 
         client.setMockLocation(location).addOnCompleteListener(task -> {
             inFlight = false;

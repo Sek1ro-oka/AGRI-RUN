@@ -37,6 +37,7 @@ import org.localroute.core.RouteEngine;
 import org.localroute.core.RunConfig;
 import org.localroute.core.RunErrorCode;
 import org.localroute.core.RunState;
+import org.localroute.core.TaskModeSwitch;
 import org.localroute.simulation.MockFix;
 import org.localroute.app.simulation.GmsFlpBackend;
 import org.localroute.app.simulation.LocationOutputBackend;
@@ -82,15 +83,11 @@ public class SimulationService extends Service {
     /** 任务书 T11：两次 tick 的实际间隔超过这个值，就认为调度被阻塞，自动暂停而不是硬补一大段路线。 */
     private static final org.localroute.core.TickGapPolicy TICK_GAP_POLICY =
             org.localroute.core.TickGapPolicy.defaults();
-    private static final double FIX_ALTITUDE_METERS = 10d;
+    private static final double FIX_ALTITUDE_METERS = org.localroute.simulation.FixQualityProfile.ALTITUDE_METERS;
     /**
-     * 提交位置的精度取值：移动中按 GPS 常见量级给 3 米，静止（单点/暂停）给 5 米。
-     *
-     * <p>之前两种场景都用固定 3 米。任务书没规定精度，但「静止却声称 3 米」会让部分
-     * 风控/距离统计把抖动算成位移（审查 R-013），所以按是否有速度区分。
+     * 提交位置的精度取值由 {@link org.localroute.simulation.FixQualityProfile} 统一决定（移动 3 米、静止 5 米）；
+     * 这里不再保留同名常量，避免“精度”出现第二处定义。
      */
-    private static final double FIX_ACCURACY_MOVING_METERS = 3d;
-    private static final double FIX_ACCURACY_STATIC_METERS = 5d;
 
     private final LoopStateMachine stateMachine = new LoopStateMachine();
     private final List<String> publishedProviders = new ArrayList<>();
@@ -98,6 +95,11 @@ public class SimulationService extends Service {
 
     private HandlerThread handlerThread;
     private Handler handler;
+    /**
+     * 同一时刻最多一条待执行 tick（R32-03）。开始 / 暂停 / 传送 / 模式切换 / 停止都走它，
+     * 避免 {@code postDelayed} 叠加出多个发布循环。
+     */
+    private org.localroute.simulation.TickScheduler tickScheduler;
     private PowerManager.WakeLock wakeLock;
 
     private RunRequest request;
@@ -125,6 +127,11 @@ public class SimulationService extends Service {
     private org.localroute.core.DistancePhase phase =
             new org.localroute.core.DistancePhase(RunConfig.DEFAULT_SPEED_KMH);
     private volatile boolean stopped;
+    /** 每次运行只记一条“发布字段”日志，避免每帧刷屏。 */
+    private boolean loggedFixProfile;
+    /** 实际发送间隔记录：用来回答「标称 500 ms 到底按多快发的」（docs/13 第三步）。 */
+    private final org.localroute.simulation.PublishCadence cadence =
+            new org.localroute.simulation.PublishCadence();
 
     private final Runnable tickRunnable = new Runnable() {
         @Override
@@ -146,6 +153,18 @@ public class SimulationService extends Service {
         handlerThread = new HandlerThread("route-simulation");
         handlerThread.start();
         handler = new Handler(handlerThread.getLooper());
+        tickScheduler = new org.localroute.simulation.TickScheduler(
+                new org.localroute.simulation.TickScheduler.Queue() {
+                    @Override
+                    public boolean postDelayed(Runnable runnable, long delayMillis) {
+                        return handler.postDelayed(runnable, delayMillis);
+                    }
+
+                    @Override
+                    public void removeCallbacks(Runnable runnable) {
+                        handler.removeCallbacks(runnable);
+                    }
+                }, tickRunnable);
         createNotificationChannel();
         DiagnosticLog.info("SimulationService 已创建");
     }
@@ -284,24 +303,18 @@ public class SimulationService extends Service {
     }
 
     /**
-     * 传送到指定坐标（悬浮窗/主界面共用）。
-     *
-     * <p>走的是「单点位置」链路：先在系统里创建一个 0 速度的位置，然后进入 RUNNING 反复提交。
-     * 如果当前有路线任务在跑，先停掉它（同一时刻只允许一个运行任务）。
-     */
-    public static void teleport(Context context, org.localroute.core.GeoPoint point) {
-        RunSnapshot current = SimulationStateRepo.get().current();
-        if (current != null && current.isActive()) {
-            DiagnosticLog.warn("传送前先停止现有任务");
-            stop(context);
-        }
-        start(context, RunRequest.createSinglePoint(point));
-    }
-
-    /**
-     * 悬浮条快捷传送入口：正在跑单点传送时只改坐标（单个会话、速度 0），没在跑就新起一个单点任务。
+     * 悬浮条快捷传送入口：没在跑就新起一个单点任务（前台服务启动路径，冷态也有效）；
+     * 正在跑就把目标坐标换掉，会话不变。
      */
     public static void teleportTo(Context context, org.localroute.core.GeoPoint point) {
+        RunSnapshot current = SimulationStateRepo.get().current();
+        if (current == null || !current.isActive()) {
+            // 冷态：从后台直接 startService 会被 Android 8+ 拒（后台启动限制），
+            // 必须走 startForegroundService，也就是标准的「开始一次单点任务」路径。
+            DiagnosticLog.info("悬浮条传送：当前没有运行任务，改为启动单点任务 " + point.format());
+            start(context, RunRequest.createSinglePoint(point));
+            return;
+        }
         Intent intent = new Intent(context, SimulationService.class)
                 .setAction(ACTION_TELEPORT)
                 .putExtra(EXTRA_TELEPORT_LAT, point.latitude())
@@ -321,13 +334,15 @@ public class SimulationService extends Service {
             DiagnosticLog.warn("传送坐标非法：" + latitude + "," + longitude);
             return;
         }
-        if (request == null || singlePoint == null) {
-            // 没有运行中的单点任务：按单点模式新起一个（沿用既有的权限/模拟应用检查）。
-            if (request == null) {
-                start(this, RunRequest.createSinglePoint(point));
-            } else {
-                DiagnosticLog.warn("当前是路线任务，忽略传送命令；请先停止再传送");
-            }
+        if (request == null) {
+            // 服务收到了传送命令但还没有任务：按单点模式新起一个（沿用既有的权限/模拟应用检查）。
+            start(this, RunRequest.createSinglePoint(point));
+            return;
+        }
+        if (singlePoint == null) {
+            // 路线运行中点 A/B/C：就地切换成单点任务。不做「忽略」，也不重建 provider 会话，
+            // 这样地图上的位置立刻过去，用户能马上看到效果（N-02）。
+            switchRouteTaskToSinglePoint(point);
             return;
         }
         singlePoint = point;
@@ -344,6 +359,58 @@ public class SimulationService extends Service {
         publishSnapshot(current == RunState.PAUSED ? RunState.PAUSED : RunState.RUNNING, null);
         updateNotification(current == RunState.PAUSED ? RunState.PAUSED : RunState.RUNNING, null,
                 false);
+        scheduleNextTick();
+    }
+
+    /**
+     * 路线任务运行中收到传送命令：停止路线推进，改用同一个定位会话发单点坐标。
+     *
+     * <p>为什么不是「先 stop 再 start」：那样会拆掉 provider 会话、触发通知重建，中间还会有
+     * 一次 STOPPED 快照，别的 App 可能把这段当成「运动结束」。就地改模式只换数据来源。
+     */
+    private void switchRouteTaskToSinglePoint(org.localroute.core.GeoPoint point) {
+        long now = SystemClock.elapsedRealtimeNanos();
+        RunState before = stateMachine.state();
+        TaskModeSwitch.StateAction action = TaskModeSwitch.stateActionFor(before);
+        DiagnosticLog.info("传送命令：路线任务切换为单点 " + point.format()
+                + "（" + TaskModeSwitch.describe(before) + "）");
+        if (action == TaskModeSwitch.StateAction.UNSUPPORTED) {
+            // 正常路径不会走到这里（没有任务时 handleTeleport 的冷态分支已经接管），
+            // 兜底按「运行中」处理，不再让状态机抛异常把整个任务清掉。
+            DiagnosticLog.warn("当前状态 " + before + " 不在就地切换的预期范围，按运行中处理");
+        }
+        request = RunRequest.createSinglePoint(point);
+        routeName = request.routeName();
+        runId = request.runId();
+        route = null;
+        config = request.config();
+        singlePoint = point;
+        phase = new org.localroute.core.DistancePhase(0d, 0L);
+        teleportGeneration++;
+        lastProgress = null;
+        lastElapsedMs = 0L;
+        lastTickNanos = now;
+        cadence.reset();
+        clock.reset();
+        if (TaskModeSwitch.clockActionFor(before) == TaskModeSwitch.ClockAction.RESTART) {
+            clock.start(now);
+        }
+        try {
+            publishFix(fixForPoint(point, now));
+        } catch (MockProviderException e) {
+            failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(),
+                    e.getMessage());
+            return;
+        }
+        // 关键修复（R32-01）：只有 STARTING 才需要 providerReady。RUNNING 下调用它等于
+        // 「RUNNING→RUNNING」，状态机里没有这条边，会抛 IllegalRunStateException 并被
+        // runGuarded 当成失败清理——表现就是传送一帧后自己停住。
+        if (TaskModeSwitch.requiresProviderReady(before)) {
+            stateMachine.providerReady();
+        }
+        RunState published = TaskModeSwitch.publishedState(before);
+        publishSnapshot(published, null);
+        updateNotification(published, null, false);
         scheduleNextTick();
     }
 
@@ -380,6 +447,8 @@ public class SimulationService extends Service {
         lastElapsedMs = 0L;
         phase = new org.localroute.core.DistancePhase(pending.config().speedKmh(), 0L);
         stopped = false;
+        loggedFixProfile = false;
+        cadence.reset();
 
         ensureReadyState();
         stateMachine.startRun();
@@ -511,6 +580,7 @@ public class SimulationService extends Service {
             }
             DiagnosticLog.fix(String.format(Locale.US, "单点 %s 用时=%dms", singlePoint.format(),
                     elapsed / 1_000_000L));
+            recordCadence(now);
             lastElapsedMs = elapsed / 1_000_000L;
             lastTickNanos = now;
             publishSnapshot(paused ? RunState.PAUSED : RunState.RUNNING, null);
@@ -540,6 +610,7 @@ public class SimulationService extends Service {
         lastProgress = progress;
         lastElapsedMs = elapsed / 1_000_000L;
         lastTickNanos = now;
+        recordCadence(now);
         publishSnapshot(paused ? RunState.PAUSED : RunState.RUNNING, progress);
         updateNotification(paused ? RunState.PAUSED : RunState.RUNNING, progress, false);
 
@@ -555,8 +626,10 @@ public class SimulationService extends Service {
             return;
         }
         long interval = config == null ? 500L : config.tickIntervalMs();
-        boolean posted = handler.postDelayed(tickRunnable, interval);
-        if (!posted) {
+        // 唯一的排程入口（R32-03）：已有待执行 tick 时不会重复投递，
+        // 因此连续点 A/B/C 不会叠出多条发布循环。
+        boolean posted = tickScheduler != null && tickScheduler.schedule(interval);
+        if (tickScheduler == null || (!posted && !tickScheduler.pending())) {
             failAndStop(RunErrorCode.SCHEDULER_INTERRUPTED, "调度线程已不可用，模拟位置停止");
         }
     }
@@ -732,11 +805,54 @@ public class SimulationService extends Service {
 
     /** 一条帧同时送所有已启用的输出后端：framework 测试 provider 与 GMS FLP。 */
     private void publishFix(MockFix fix) throws MockProviderException {
+        logFirstFixProfile(fix);
         if (session != null) {
             session.publish(fix);
         }
         if (gmsBackend != null) {
             gmsBackend.publish(fix);
+        }
+    }
+
+    /**
+     * 记录实际发送间隔，每 20 帧往诊断日志写一行。
+     *
+     * <p>「时快时慢」要么是调度被系统拖慢，要么是目标 App 自己滤波；这一行让前一种可以
+     * 被直接排除：标称 500 ms 而中位 800 ms，问题在我们这边。
+     */
+    private void recordCadence(long nowNanos) {
+        cadence.onTick(nowNanos);
+        int samples = cadence.sampleCount();
+        if (samples > 0 && samples % 20 == 0) {
+            DiagnosticLog.info(cadence.summary(config == null
+                    ? RunConfig.DEFAULT_TICK_INTERVAL_MS : config.tickIntervalMs()));
+        }
+    }
+
+    /**
+     * 首帧把“实际声明了哪些字段”写进诊断日志。
+     *
+     * <p>目标 App 不计里程时，第一个要排除的就是“我们发的字段它根本不认”；第二个是每帧位移
+     * 太小被当成抖动。注意：这只是可疑条件，不是判定——目标 App 的门槛以它自己的日志为准。
+     */
+    private void logFirstFixProfile(MockFix fix) {
+        if (loggedFixProfile) {
+            return;
+        }
+        loggedFixProfile = true;
+        DiagnosticLog.info("发布字段（每帧一致）：" + fix.quality().summary());
+        long intervalMs = config == null ? RunConfig.DEFAULT_TICK_INTERVAL_MS : config.tickIntervalMs();
+        double tickSeconds = intervalMs / 1000d;
+        double stepMeters = fix.speedMps() * tickSeconds;
+        if (fix.speedMps() > org.localroute.simulation.FixQualityProfile.MOVING_SPEED_THRESHOLD_MPS
+                && stepMeters < fix.accuracyMeters()) {
+            // R32-07：这里只记录观测事实与实验变量，不再给「提高速度 / 拉长间隔」这种结论式建议——
+            // 是否被目标 App 当抖动丢掉，要靠目标 App 自己的日志判定。
+            DiagnosticLog.warn(String.format(java.util.Locale.US,
+                    "观测：每帧位移 %.1f 米 < 声明精度 %.1f 米（速度 %.1f km/h，发送间隔 %d ms）。"
+                            + "这只是观测值，不是结论；若要验证是否被当作抖动丢弃，请一次只改一个变量"
+                            + "（只改速度，或只改发送间隔），目标 App 版本与路线保持不变",
+                    stepMeters, fix.accuracyMeters(), fix.speedMps() * 3.6d, intervalMs));
         }
     }
 
@@ -757,17 +873,20 @@ public class SimulationService extends Service {
     }
     private void cleanupEverything() {
         stopped = true;
+        if (tickScheduler != null) {
+            tickScheduler.cancel();
+        }
         if (handler != null) {
             handler.removeCallbacks(tickRunnable);
         }
         if (session != null) {
             session.stop();
+            session = null;
+        }
         if (gmsBackend != null) {
             gmsBackend.stop();
             DiagnosticLog.info("GMS FLP 后端已停止：" + gmsBackend.statusText());
             gmsBackend = null;
-        }
-            session = null;
         }
         releaseWakeLock();
         if (clock != null) {
@@ -791,16 +910,19 @@ public class SimulationService extends Service {
     }
 
     private MockFix fixFor(RouteEngine.Progress progress, double speedMps, long elapsedRealtimeNanos) {
-        double accuracy = speedMps > 0.05d ? FIX_ACCURACY_MOVING_METERS : FIX_ACCURACY_STATIC_METERS;
+        org.localroute.simulation.FixQualityProfile quality =
+                org.localroute.simulation.FixQualityProfile.forSpeed(speedMps);
         return new MockFix(progress.latitude(), progress.longitude(),
-                FIX_ALTITUDE_METERS, accuracy, speedMps, progress.bearingDegrees(),
-                System.currentTimeMillis(), elapsedRealtimeNanos);
+                FIX_ALTITUDE_METERS, quality.accuracyMeters(), speedMps, progress.bearingDegrees(),
+                System.currentTimeMillis(), elapsedRealtimeNanos, quality);
     }
 
     private MockFix fixForPoint(org.localroute.core.GeoPoint point, long elapsedRealtimeNanos) {
+        org.localroute.simulation.FixQualityProfile quality =
+                org.localroute.simulation.FixQualityProfile.forSpeed(0d);
         return new MockFix(point.latitude(), point.longitude(),
-                FIX_ALTITUDE_METERS, FIX_ACCURACY_STATIC_METERS, 0d, 0d,
-                System.currentTimeMillis(), elapsedRealtimeNanos);
+                FIX_ALTITUDE_METERS, quality.accuracyMeters(), 0d, 0d,
+                System.currentTimeMillis(), elapsedRealtimeNanos, quality);
     }
 
     private boolean hasLocationPermission() {

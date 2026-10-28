@@ -3,9 +3,9 @@
 一个**完全离线**的 Android 小工具：在地图上点出一条闭合路线，设置速度与圈数，然后用**Android 系统模拟位置**把
 “沿这条路线匀速跑 N 圈”的坐标源源不断地喂给系统，让第三方运动 App 以为你在跑圈。
 
-- 包名：`org.localroute.app`　版本：0.2.2（versionCode 9）
+- 包名：`org.localroute.app`　版本：0.3.3（versionCode 14）
 - 代码镜像：<https://github.com/Sek1ro-oka/AGRI-RUN>（**不含** APK、签名密钥、`local.properties` 与高德 Key）
-- 下载：<https://github.com/Sek1ro-oka/AGRI-RUN/releases/tag/v0.2.2>（`RouteWorkshop-0.2.2-release.apk`、`LocationProbe-0.1.0-debug.apk`、`SHA256SUMS-release.txt`）
+- 交付包：`delivery/路线工坊-0.3.3-release.apk`、`delivery/定位探针-0.1.4-debug.apk`、`delivery/SHA256SUMS.txt`（当前哈希清单）；0.3.2 的成功包保留在 `delivery/baseline-0.3.2/` 作对照
 - 最低系统：Android 10（API 29），编译 SDK 35
 - 无账号、无网络请求（地图瓦片除外）、无服务器、数据只存在手机本地
 - 附带一个独立包名的小工具 **定位探针**（`org.localroute.probe`），用来独立验证“系统确实收到了坐标”
@@ -26,7 +26,7 @@
 | 传送 | 菜单「传送到地图选点」：在地图上点一下，模拟位置立刻搬到那一点并钉住（速度 0），可随时停止（0.1.2） |
 | 国内底图 | 可切换「高德地图（GCJ-02）」：底图与点位之间自动做 WGS-84 ↔ GCJ-02 换算，路线不会漂移（0.1.2） |
 | 位置自检 | 诊断页把「应用提交的坐标」与「系统读回的坐标」并排对比，给出「系统已接受 / 偏差过大 / 未收到 / 无模拟标记」结论（0.1.2） |
-| 运行参数 | 速度 0.5–60 km/h（默认 9）、圈数 1–1000（默认 5）、每 500 ms 提交一次位置 |
+| 运行参数 | 速度 0.5–60 km/h（默认 9）、圈数 1–1000（默认 5）、每 500 ms 提交一次位置（菜单「兼容性：发送间隔」可改 100 / 500 / 1000 / 2000 ms） |
 | 运行控制 | 开始 / 暂停 / 继续 / 停止；重复点击不会产生第二个任务 |
 | 运行展示 | 状态、当前位置、速度、累计距离、已完成圈数、有效运行时间（暂停不计时） |
 | 模拟位置 | `LocationManager.addTestProvider` + `setTestProviderEnabled` + `setTestProviderLocation`，GPS 必测，NETWORK/FUSED 支持则一并提交 |
@@ -37,7 +37,7 @@
 
 ## 快速开始
 
-1. 安装 `delivery/路线工坊-0.2.2-release.apk`（另附 `定位探针` APK）。
+1. 安装 `delivery/路线工坊-0.3.3-release.apk`（另附 `定位探针` APK）。
 2. 手机 **开发者选项 → 选择模拟位置信息应用 → 路线工坊**（0.1.1 起本应用才会出现在这个列表里）。
 3. 打开 App 授予定位权限，打开系统定位；菜单「设置检查」逐项确认全部通过。
 4. 地图上点 3–4 个点围出一圈，填速度与圈数，点「开始」。
@@ -150,3 +150,50 @@ delivery/         交付物：APK、源码包、使用说明、测试报告、�
 - 判定逻辑在 `MapBackendPolicy`（9 个单测）：Key 为空 → 瓦片；含 arm → SDK；只有 x86 → 瓦片。
 - 代价：release APK 从 32.98 MB 增到 **69.07 MB**（两份 arm so）。SDK 路径**未在任何设备上跑过**，只在模拟器验证了回退路径；细节与风险见 `docs/07_地图引擎与高德SDK.md`。
 - 测试：**194 个 JVM 用例**（route-core 102 / simulation-core 24 / app 68），lint 0 error（app 31 warning）。
+
+## 0.3.3 变更（真机验收意见 R32-01…R32-07）
+
+真机验收确认：目标 App「农林快跑」**已经能记录模拟运动距离**，核心需求达成。本版修的是真机上暴露的四个 P1 与三个 P2：
+
+| 缺陷 | 处理 |
+| --- | --- |
+| R32-01 路线运行中点 A/B/C 只跳一下就不动了 | 抽出 `TaskModeSwitch`：RUNNING 保持不动状态机、PAUSED 不自动恢复、只有 STARTING 才调 `providerReady()`；不给状态机加 RUNNING→RUNNING 自转移 |
+| R32-02 探针的高德“对照通道”其实没生效 | `setMockEnable(true)` 挪到 `setLocationPurpose(Sport)` **之后**；报告用 getter 实读并打 ✓/✗ 自检 |
+| R32-03 反复传送后发布节奏变快 | 新增 `TickScheduler`：同一 Handler 上最多一个待执行 tick，连续排程 20 次只投递 1 次 |
+| R32-04 主界面切后台后悬浮条冻住 | 订阅从 Activity 挪到单例 `OverlayHost`，`observeForever` 与 `removeObserver` 成对；旋转屏幕不再丢窗口 |
+| R32-05 探针把错误回调算进距离/速度 | `ChannelStats` 分开「有效帧 / 错误回调」；无速度样本显示「未提供」；报告标注是传送测试还是路线测试 |
+| R32-06 保存 A 期间切到 B，B 被误标已保存 | 保存令牌改为 `routeId + draftGeneration + editRevision` 三者全等 |
+| R32-07 文档与日志口径矛盾 | `docs/12` 修正“已加 GOGOGO_REFERENCE”的错误说法；首帧日志只报观测、不给结论式建议 |
+
+测试：**256 个 JVM 用例、0 失败**（route-core 107 / simulation-core 55 / app 89 / location-probe 5），
+lint **0 error / 34 warning**，release APK 73,185,200 B（versionCode 14），探针 12,736,975 B（0.1.4 / 4）。
+详细记录见 `docs/15_0.3.3_R32修复与交付记录.md`。
+
+## 0.3.2 变更（可用性修复：悬浮条、传送、拖动、探针）
+
+这一版修的是「描述里写着、实际却不工作」的几处：
+
+| 问题 | 处理 |
+| --- | --- |
+| 悬浮条只有运行中才显示，冷态在别的 App 里调不出来 | 悬浮条常显（只要开关打开且系统允许），未运行时显示「未运行 · 点 A/B/C 可传送到槽位」，点槽位即可发起传送 |
+| 路线运行中点 A/B/C 只写日志、界面无反应 | 路线运行中传送改为**就地切成单点任务**（不重启服务、不重建 provider），并 toast「已发送传送命令」 |
+| 拖动悬浮条会飞出屏幕、位置不保存 | 每帧夹到屏幕内，松手写入偏好，下次原位恢复；去掉 `FLAG_LAYOUT_NO_LIMITS` |
+| 保存期间继续编辑，dirty 被无条件清掉 | 保存前记编辑代次，保存后只有代次未变才清 dirty，否则提示再存一次 |
+| 诊断页看不出实际发送间隔 | 每 20 帧打一条「实际间隔：标称 X ms，中位 Y ms（±Z%），最长 W ms，样本 N 帧」 |
+| 「地图瓦片源」弹窗仍说本版本只用栅格瓦片 | 文案改为「ABI 受支持时用高德官方 SDK 渲染，否则回退栅格瓦片」 |
+| 探针把两个来源写在一行 | 日志追加改为同步 + 折掉行内换行 |
+| 探针切到后台就停止接收 | 0.3.1 起后台继续，退出页面才停（0.3.2 保持） |
+
+测试：`route-core 102` + `simulation-core 46`（新增 `PublishCadenceTest` 6 例）+ `app 68` = **216 个 JVM 用例，0 失败**。
+
+## 0.3.1 变更（针对“目标 App 不累计里程”）
+
+真机现象：探针四通道（gps / network / fused(framework) / gms-flp）都收到连续帧、模拟标记全为真、位移速度比 1.00，但第三方运动 App 的里程始终为 0。
+
+- 新增 `FixQualityProfile`（simulation-core）：按速度给出水平/垂直/速度/航向精度与卫星数、平均与最高载噪比；移动仍 3 米、静止 5 米。
+- 新增 `LocationFiller`（app）：framework 与 GMS FLP 两条后端共用一份填充，补齐 `setVerticalAccuracyMeters`、`setSpeedAccuracyMetersPerSecond`、`setBearingAccuracyDegrees`、`setElapsedRealtimeUncertaintyNanos` 与 `extras{satellites, meanCn0, maxCn0}`（network 来源不写卫星字段）。
+- 新增菜单**兼容性：发送间隔**（500 / 1000 / 2000 ms，存 `ui` 偏好）：15 km/h 下 500 ms 一帧只有约 2.1 米，小于声明的 3 米精度，容易被目标 App 的距离滤波当抖动；2000 ms 一帧约 8 米。
+- 诊断页在首次发布时打印一行「发布字段（每帧一致）：…」；当「每帧位移 < 声明精度」时额外写一条 warning。
+- 定位探针：每帧多显示 `卫星=N spdAcc=…`；切到后台继续接收（此前一离开页面就停止订阅），可「探针在后台、目标 App 在前台」取证。
+- 测试：**210 个 JVM 用例**（route-core 102 / simulation-core 40 / app 68），0 失败；lint 0 error、35 warning；release APK 69.78 MB（versionCode 12，可覆盖安装 0.3.0）。
+- 复测步骤与判定表见 `docs/12_目标App里程不累计_排查与修改.md`；仍未解决的是目标 App 是否采信，属对方策略，`isMock` 标记无法清除。

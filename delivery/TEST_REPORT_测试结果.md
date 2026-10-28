@@ -1,7 +1,7 @@
-# 测试结果报告 — 路线工坊 0.2.1
+# 测试结果报告 — 路线工坊 0.3.3
 
 - 测试日期：2026-10-27（Asia/Hong_Kong）
-- 被测版本：`org.localroute.app` versionName 0.2.1 / versionCode 8（release，本地自签名）
+- 被测版本（历史）：`org.localroute.app` versionName 0.2.1 / versionCode 8（release，本地自签名）
 - 测试主机：Windows 11，CPU/内存见 `docs/environment.md`
 - 构建工具链：JDK 21.0.3（`D:\Java\jdk-21`）、Gradle 8.11.1、AGP 8.9.2、Android SDK 35、build-tools 35.0.0
 - **测试机**：真机（真我 GT Neo5）仍未接入自动化；本轮按用户要求装了 **API 35 x86_64 模拟器**，
@@ -9,6 +9,30 @@
   **模拟器不等于真机**：厂商 ROM 的模拟位置白名单、后台冻结策略无法用 AOSP 模拟器复现，相关项仍标「未实测」。
 
 > 本报告只写实际执行过的检查。凡是需要真机才能得出的结论，一律标注「未实测」，**不代替用户做真机结论**。
+
+> **0.3.3 快速回归（2026-10-28，本机无设备，`adb devices` 为空）**
+>
+> 命令：`:route-core:test :simulation-core:test :app:testDebugUnitTest :location-probe:testDebugUnitTest
+> :app:assembleRelease :location-probe:assembleDebug :app:lintDebug`
+>
+> - 单元测试：**256 个用例、0 失败**（route-core 107 / simulation-core 55 / app 89 / location-probe 5）
+>   新增：`TaskModeSwitchTest` 5、`TickSchedulerTest` 6、`AmapOptionCheckTest` 5、`OverlayViewStateTest` 7、
+>   `OverlaySessionTest` 6、`DraftSaveTokenTest` 8，`ChannelStatsTest` 新增 3 例
+> - lint：**0 error / 34 warning**（均为此前已有的 GradleDependency / UseTomlInstead / unused resources）
+> - 产物：`路线工坊-0.3.3-release.apk` 73,185,200 B（versionCode 14）、`定位探针-0.1.4-debug.apk` 12,736,975 B（versionCode 4）
+> - **没做**：真机与模拟器回归。R32-04 的"切后台后悬浮条仍刷新"、R32-01 的"运行中反复传送仍持续发布"
+>   这类结论必须真机验证，本报告不代替用户结论。
+
+> **0.3.2 快速回归（2026-10-28，本机无设备）**
+>
+> - 全量 JVM 用例 **216 个、0 失败**：`route-core 102` / `simulation-core 46`（新增 `PublishCadenceTest` 6 例）/ `app 68`。
+> - `:app:lintDebug` **0 error / 35 warning**；`:app:assembleRelease` 与 `:location-probe:assembleDebug` 均 BUILD SUCCESSFUL。
+> - 产物：`delivery/路线工坊-0.3.2-release.apk`（73,168,748 字节，versionCode 13 / 0.3.2）、
+>   `delivery/定位探针-0.1.3-debug.apk`（12,728,171 字节，versionCode 3 / 0.1.3）。
+> - **未做**：真机与模拟器上的功能回归。`adb devices` 为空，悬浮条/传送/探针高德通道都只在编译与单元测试层面验证过，
+>   真机结论以用户的实测为准。
+>
+> 以下正文是 0.2.1 时期的历史记录，版本号以本节为准。
 
 ## 1. 自动化单元测试
 

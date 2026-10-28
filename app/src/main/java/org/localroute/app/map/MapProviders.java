@@ -50,12 +50,15 @@ public final class MapProviders {
     }
 
     /**
-     * 给界面用的一句话说明；两种状态都必须让用户知道「现在用的是瓦片，不是官方 SDK」。
+     * 给界面用的一句话说明。
+     *
+     * <p>0.3.2 起这里如实描述：配了 Key 且设备 ABI 受支持就走高德官方 SDK 渲染；
+     * 否则回退栅格瓦片。旧文案一律说「仍使用栅格瓦片」，与实际行为相反（N-11）。
      */
     public static String note(String amapKey) {
         if (hasKey(amapKey)) {
             return "高德 Key 已配置（" + maskKey(amapKey)
-                    + "）：本版本仍使用栅格瓦片，官方 SDK 适配层待接入";
+                    + "）：设备 ABI 受支持时用高德官方 SDK 渲染，不支持时自动回退栅格瓦片";
         }
         return "未配置高德 Key：当前使用非官方栅格瓦片；申请到 Key 后填入 local.properties 的 amapKey=…";
     }

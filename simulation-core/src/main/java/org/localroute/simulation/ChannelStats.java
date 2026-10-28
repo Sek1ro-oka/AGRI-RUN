@@ -29,6 +29,7 @@ public final class ChannelStats {
     private double lastLongitude;
     private long firstLatencyMillis = -1L;
     private int inFlight;
+    private int errorCallbacks;
 
     public ChannelStats(String channel) {
         this.channel = channel;
@@ -83,6 +84,36 @@ public final class ChannelStats {
     }
 
     private int failedTasks;
+
+    /** 记录一次「有回调但不可用」的帧（例如高德 SDK 明确报错）：只计回调，不进距离与速度（R32-05）。 */
+    public void addErrorCallback() {
+        errorCallbacks++;
+    }
+
+    /** 该通道收到的回调总数：有效帧 + 错误帧。 */
+    public int callbacks() {
+        return totalFrames + errorCallbacks;
+    }
+
+    public int errorCallbacks() {
+        return errorCallbacks;
+    }
+
+    /** 是否有任何一帧带速度字段。没有的话「均速 0.00」是假数据，必须显示「未提供」。 */
+    public boolean hasSpeedSamples() {
+        return speedSamples > 0;
+    }
+
+    /** 最后一帧的到达时刻（elapsedRealtimeNanos）；没有帧返回 -1。 */
+    public long lastArrivalNanos() {
+        return arrivalsNanos.isEmpty() ? -1L : arrivalsNanos.get(arrivalsNanos.size() - 1);
+    }
+
+    /** 距离最后一帧过了多久（毫秒）；没有帧返回 -1。 */
+    public long ageSinceLastFrameMillis(long nowNanos) {
+        long last = lastArrivalNanos();
+        return last < 0L ? -1L : Math.max(0L, (nowNanos - last) / 1_000_000L);
+    }
 
     public int totalFrames() {
         return totalFrames;
@@ -172,17 +203,20 @@ public final class ChannelStats {
 
     /** 一行摘要，给探针界面直接显示。 */
     public String summary() {
-        if (totalFrames == 0) {
-            return String.format(Locale.US, "%s：0 个位置（没有收到回调）", channel);
+        if (callbacks() == 0) {
+            return String.format(Locale.US, "%s：0 次回调（没有收到任何回调）", channel);
         }
         double ratio = speedToDisplacementRatio();
+        String speed = hasSpeedSamples()
+                ? String.format(Locale.US, "%.2f m/s", averageSpeedMps())
+                : "未提供（目标未给速度字段）";
         return String.format(Locale.US,
-                "%s：%d 个位置，首帧延迟 %s，间隔 中位 %s / P95 %s / 最长 %s，位移 %.1f 米，"
-                        + "均速 %.2f m/s，模拟标记 %d/%d，位移速度比 %s",
-                channel, totalFrames,
+                "%s：回调 %d 次（有效 %d / 错误 %d），首帧延迟 %s，间隔 中位 %s / P95 %s / 最长 %s，"
+                        + "位移 %.1f 米（位置跳变累计，不是运动距离），均速 %s，模拟标记 %d/%d，位移速度比 %s",
+                channel, callbacks(), totalFrames, errorCallbacks,
                 firstLatencyMillis < 0 ? "未知" : firstLatencyMillis + " ms",
                 ms(medianIntervalMillis()), ms(p95IntervalMillis()), ms(maxIntervalMillis()),
-                travelledMeters, averageSpeedMps(), mockFrames, totalFrames,
+                travelledMeters, speed, mockFrames, totalFrames,
                 ratio < 0 ? "无" : String.format(Locale.US, "%.2f", ratio));
     }
 

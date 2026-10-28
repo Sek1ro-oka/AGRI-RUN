@@ -29,6 +29,10 @@
         android:title="@string/menu_map_source"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_tick_interval"
+        android:title="@string/menu_tick_interval"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_save"
         android:title="@string/menu_save"
         app:showAsAction="never" />

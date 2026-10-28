@@ -5,7 +5,6 @@ import android.content.Context;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
-import android.os.Build;
 import android.util.Log;
 
 import org.localroute.core.RunErrorCode;
@@ -103,16 +102,7 @@ public final class AndroidMockProviderApi implements MockProviderApi {
     public void setTestProviderLocation(String provider, MockFix fix) throws MockProviderException {
         requireManager();
         Location location = new Location(provider);
-        location.setLatitude(fix.latitude());
-        location.setLongitude(fix.longitude());
-        location.setAltitude(fix.altitudeMeters());
-        location.setAccuracy((float) fix.accuracyMeters());
-        location.setSpeed((float) fix.speedMps());
-        location.setBearing((float) fix.bearingDegrees());
-        location.setTime(fix.timeMillis());
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            location.setElapsedRealtimeNanos(fix.elapsedRealtimeNanos());
-        }
+        LocationFiller.fill(location, fix);
         try {
             locationManager.setTestProviderLocation(provider, location);
         } catch (SecurityException e) {

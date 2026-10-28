@@ -2,6 +2,16 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+// 高德 Key：优先 -PamapKey=...，其次 local.properties 的 amapKey=...（与主应用同一来源，
+// 但不共享任何运行时代码）。没有 Key 时 AmapReader.isConfigured() 返回 false，
+// 探针界面会提示「未配置 Key，高德通道不可用」，其余四通道照常工作。
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def amapKey = (project.findProperty('amapKey') ?: localProperties.getProperty('amapKey') ?: '').trim()
+
 android {
     namespace 'org.localroute.probe'
     compileSdk 35
@@ -10,11 +20,15 @@ android {
         applicationId 'org.localroute.probe'
         minSdk 29
         targetSdk 35
-        versionCode 1
-        versionName '0.1.0'
+        versionCode 4
+        versionName '0.1.4'
         // 独立包名、独立进程：用于从系统 LocationManager 独立读取位置，
         // 不读取主 App 的任何内存状态（任务书第 12 步）。
         resourceConfigurations += ['zh', 'en']
+        // AmapReader 要从 BuildConfig 读 Key，判断「高德通道是否可用」。
+        buildConfigField 'String', 'AMAP_KEY', "\"${amapKey}\""
+        // 高德 SDK 要求 manifest 挂 com.amap.api.v2.apikey；用占位符注入，源码不出现明文。
+        manifestPlaceholders = [amapKey: amapKey]
     }
 
     buildTypes {
@@ -30,7 +44,7 @@ android {
 
     buildFeatures {
         viewBinding true
-        buildConfig false
+        buildConfig true
     }
 
     lint {
@@ -44,4 +58,10 @@ dependencies {
     implementation libs.google.material
     implementation project(':simulation-core')
     implementation 'com.google.android.gms:play-services-location:21.3.0'
+    // 高德定位 SDK：探针要复现目标 App 的接收策略（mockEnable=false 与 =true 两条通道），
+    // 所以必须真的用高德客户端读，而不是猜。只用定位库（不带地图渲染的原生库，包体小很多）。
+    implementation 'com.amap.api:location:6.4.5'
+
+    // 只有纯逻辑（AmapOptionCheck）在 JVM 里测；高德 SDK 与 Android 类不参与。
+    testImplementation libs.junit
 }

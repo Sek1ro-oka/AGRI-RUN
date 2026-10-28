@@ -13,6 +13,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Probe">
 
+        <!-- 高德 SDK 从 manifest 读 Key；占位符来自 local.properties，源码不出现明文。 -->
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="${amapKey}" />
+
         <activity
             android:name=".ProbeActivity"
             android:exported="true">

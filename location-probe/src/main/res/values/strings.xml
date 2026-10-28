@@ -15,4 +15,5 @@
     <string name="probe_stopped_summary">已停止：共 %1$d 个位置，累计位移 %2$s 米，监听 %3$d 秒</string>
     <string name="probe_status_counters">已收 %1$d 个位置 · 累计位移 %2$s 米 · %3$s</string>
     <string name="probe_report">复制报告</string>
+    <string name="probe_session_transfer">本次是「传送测试」（只点 A/B/C），不是跑步路线</string>
 </resources>

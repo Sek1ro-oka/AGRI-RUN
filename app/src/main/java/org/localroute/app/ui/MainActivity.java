@@ -83,11 +83,13 @@ public class MainActivity extends AppCompatActivity {
     private RunSnapshot snapshot = RunSnapshot.idle();
     private SpeedPresets speedPresets;
     /** 跨应用悬浮控制条（审查 C）；没授权时它自己什么都不做。 */
-    private org.localroute.app.overlay.OverlayPanel overlayPanel;
+    private org.localroute.app.overlay.OverlayHost overlayHost;
     private boolean overlayEnabled;
     /** 同步「闭合/终点策略」控件时置真，避免程序性 setChecked 反过来改草稿。 */
     private boolean syncingControls;
     private static final String PREFS_UI = "ui";
+    /** 兼容性选项：每帧发送间隔（毫秒），默认 {@link RunConfig#DEFAULT_TICK_INTERVAL_MS}。 */
+    private static final String PREF_TICK_INTERVAL_MS = "tick_interval_ms";
     // 待启动参数放在 ViewModel 里：权限弹窗期间旋转屏幕时 Activity 会重建，字段会丢失，
     // 用户点「允许」后就毫无反应。ViewModel 能跨配置变更存活。
     private final java.util.concurrent.ExecutorService ioExecutor =
@@ -153,13 +155,14 @@ public class MainActivity extends AppCompatActivity {
         });
 
         binding.toolbar.setOnMenuItemClickListener(this::onMenuItemClick);
-        overlayPanel = new org.localroute.app.overlay.OverlayPanel(this);
-        overlayEnabled = getSharedPreferences(PREFS_UI, MODE_PRIVATE)
-                .getBoolean(org.localroute.app.overlay.OverlayPanel.PREF_ENABLED, false);
+        overlayHost = org.localroute.app.overlay.OverlayHost.get(this);
+        overlayEnabled = overlayHost.isEnabled();
         android.view.MenuItem overlayItem = binding.toolbar.getMenu().findItem(R.id.action_overlay);
         if (overlayItem != null) {
             overlayItem.setChecked(overlayEnabled);
         }
+        // 悬浮条不依赖本 Activity 的生命周期：启动时按偏好恢复，之后由 OverlayHost 自己订阅快照（R32-04）。
+        overlayHost.restore();
         binding.checkboxClosed.setOnCheckedChangeListener((button, checked) -> {
             if (checked != viewModel.isClosed()) {
                 viewModel.toggleClosed();
@@ -230,10 +233,8 @@ public class MainActivity extends AppCompatActivity {
 
         SimulationStateRepo.get().snapshot().observe(this, next -> {
             snapshot = next;
+            // 只更新本界面；悬浮条由 OverlayHost 自己订阅（Activity 停掉也照样刷新）。
             render();
-            if (overlayPanel != null) {
-                overlayPanel.sync(next, overlayEnabled);
-            }
         });
 
         refreshDraft(true);
@@ -271,9 +272,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         // shutdown 而不是 shutdownNow：已提交的保存/加载让它跑完，避免半截临时文件。
         ioExecutor.shutdown();
-        if (overlayPanel != null) {
-            overlayPanel.hide();
-        }
+        // 悬浮条的生命周期由 OverlayHost 管：这里不 hide，否则切个配置/旋转屏幕窗口就没了。
         mapController.onDestroy();
         super.onDestroy();
     }
@@ -615,7 +614,13 @@ public class MainActivity extends AppCompatActivity {
         }
         viewModel.rememberSpeed(speed);
         viewModel.rememberRepeatCount(loops);
-        return new RunConfig(speed, loops);
+        return new RunConfig(speed, loops).withTickIntervalMs(tickIntervalMs());
+    }
+
+    /** 兼容性选项：每帧发送间隔（毫秒）。目标 App 不累计里程时，这里是最先该动的旋钮。 */
+    private int tickIntervalMs() {
+        return getSharedPreferences(PREFS_UI, MODE_PRIVATE)
+                .getInt(PREF_TICK_INTERVAL_MS, RunConfig.DEFAULT_TICK_INTERVAL_MS);
     }
 
     private void requestPermissionsThenStart(CompiledRoute route, RunConfig config) {
@@ -850,14 +855,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         overlayEnabled = !overlayEnabled;
-        getSharedPreferences(PREFS_UI, MODE_PRIVATE).edit()
-                .putBoolean(org.localroute.app.overlay.OverlayPanel.PREF_ENABLED, overlayEnabled)
-                .apply();
         android.view.MenuItem item = binding.toolbar.getMenu().findItem(R.id.action_overlay);
         if (item != null) {
             item.setChecked(overlayEnabled);
         }
-        overlayPanel.sync(snapshot, overlayEnabled);
+        // 开关只交给 OverlayHost：它负责写偏好、建立/注销订阅、显示/收起窗口。
+        overlayHost.setEnabled(overlayEnabled);
         toast(overlayEnabled
                 ? getString(R.string.menu_overlay_on)
                 : getString(R.string.menu_overlay_off));
@@ -952,6 +955,32 @@ public class MainActivity extends AppCompatActivity {
                         toast(MapProviders.note(BuildConfig.AMAP_KEY));
                     }
                 })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    /**
+     * 兼容性选项：每帧发送间隔。
+     *
+     * <p>为什么放在菜单里：目标 App「地图动但里程不动」时，最常见的两个原因是
+     * ①每帧位移小于我们声明的精度，被它的距离滤波当抖动丢掉；②它的采样/记录节奏比我们慢。
+     * 把间隔从 500 ms 调到 1000/2000 ms，单帧位移翻倍，是不改代码就能做的对照实验。
+     */
+    private void showTickIntervalDialog() {
+        int current = tickIntervalMs();
+        int[] options = {500, 1000, 2000};
+        String[] labels = new String[options.length];
+        for (int i = 0; i < options.length; i++) {
+            labels[i] = (options[i] == current ? "✓ " : "") + options[i] + " 毫秒";
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.tick_interval_title)
+                .setItems(labels, (d, which) -> {
+                    getSharedPreferences(PREFS_UI, MODE_PRIVATE).edit()
+                            .putInt(PREF_TICK_INTERVAL_MS, options[which]).apply();
+                    toast(getString(R.string.toast_tick_interval, options[which]));
+                })
+                .setMessage(R.string.tick_interval_hint)
                 .setNegativeButton("取消", null)
                 .show();
     }
@@ -1195,6 +1224,10 @@ public class MainActivity extends AppCompatActivity {
             showTileSourceDialog();
             return true;
         }
+        if (id == R.id.action_tick_interval) {
+            showTickIntervalDialog();
+            return true;
+        }
         if (id == R.id.action_save) {
             saveRoute();
             return true;
@@ -1297,14 +1330,17 @@ public class MainActivity extends AppCompatActivity {
 
     private void doSave() {
         RouteDefinition route = viewModel.toDefinition();
+        // 保存的是「此刻」的快照；令牌含 routeId + 草稿代次 + 编辑代次，三者都对上才算存的是当前草稿（R32-06）。
+        final org.localroute.app.ui.DraftSaveToken token = viewModel.saveToken();
         // 编码 + fsync 是磁盘操作，放到后台线程，避免点保存时卡住界面（5000 点路线时更明显）。
         ioExecutor.execute(() -> {
             try {
                 repository.save(route);
                 runOnUiThread(() -> {
-                    viewModel.markSaved();
-                    toast("已保存：" + route.displayName());
-                    DiagnosticLog.info("路线已保存：" + route.id());
+                    boolean clean = viewModel.markSavedIfCurrent(token);
+                    toast(clean ? "已保存：" + route.displayName()
+                            : "已保存：" + route.displayName() + "（保存期间草稿有变化，请再保存一次）");
+                    DiagnosticLog.info("路线已保存：" + route.id() + (clean ? "" : "（草稿已变化，未清 dirty）"));
                 });
             } catch (IOException | RuntimeException e) {
                 DiagnosticLog.error("保存路线失败", e);

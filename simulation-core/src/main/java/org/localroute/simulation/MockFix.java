@@ -16,17 +16,36 @@ public final class MockFix {
     private final double bearingDegrees;
     private final long timeMillis;
     private final long elapsedRealtimeNanos;
+    /** 精度画像（可为 null：调用方没显式给时按速度推算）。 */
+    private final FixQualityProfile quality;
 
     public MockFix(double latitude, double longitude, double altitudeMeters, double accuracyMeters,
             double speedMps, double bearingDegrees, long timeMillis, long elapsedRealtimeNanos) {
+        this(latitude, longitude, altitudeMeters, accuracyMeters, speedMps, bearingDegrees,
+                timeMillis, elapsedRealtimeNanos, null);
+    }
+
+    /**
+     * 带精度画像的完整构造：水平精度与卫星数等字段统一由 {@link FixQualityProfile} 决定，
+     * 避免“精度参数和画像参数说两套话”。
+     */
+    public MockFix(double latitude, double longitude, double altitudeMeters, double accuracyMeters,
+            double speedMps, double bearingDegrees, long timeMillis, long elapsedRealtimeNanos,
+            FixQualityProfile quality) {
         this.latitude = latitude;
         this.longitude = longitude;
         this.altitudeMeters = altitudeMeters;
-        this.accuracyMeters = accuracyMeters;
+        this.quality = quality;
+        this.accuracyMeters = quality == null ? accuracyMeters : quality.accuracyMeters();
         this.speedMps = speedMps;
         this.bearingDegrees = bearingDegrees;
         this.timeMillis = timeMillis;
         this.elapsedRealtimeNanos = elapsedRealtimeNanos;
+    }
+
+    /** 这一帧该带的精度画像；调用方没给就按速度推算（老调用点不用改）。 */
+    public FixQualityProfile quality() {
+        return quality == null ? FixQualityProfile.forSpeed(speedMps) : quality;
     }
 
     public double latitude() {

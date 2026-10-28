@@ -43,6 +43,10 @@
     <string name="menu_single_point">发送单点位置</string>
     <string name="menu_toggle_closed">闭合路线</string>
     <string name="menu_map_source">地图瓦片源</string>
+    <string name="menu_tick_interval">兼容性：发送间隔</string>
+    <string name="tick_interval_title">发送间隔</string>
+    <string name="tick_interval_hint">默认 500 毫秒。若目标 App 地图在动但里程不累计，先试 1000 或 2000 毫秒：间隔越长，每帧位移越大，越不容易被对方的距离滤波当成定位抖动丢掉。改完下一次开始运行时生效。</string>
+    <string name="toast_tick_interval">发送间隔已设为 %1$d 毫秒</string>
     <string name="map_status_loading">地图加载中…</string>
     <string name="dialog_single_point_title">发送单点位置</string>
     <string name="dialog_single_point_message">前台服务会持续把系统模拟位置固定在这个坐标（速度 0），直到你点「停止」。</string>
@@ -114,6 +118,10 @@
     <string name="overlay_state_running">运行中</string>
     <string name="overlay_state_paused">已暂停</string>
     <string name="overlay_state_starting">准备中</string>
+    <string name="overlay_state_single_point">单点位置</string>
+    <string name="overlay_state_terminal">已结束</string>
+    <string name="overlay_idle_status">未运行 · 点 A/B/C 可传送到槽位</string>
+    <string name="overlay_teleport_sent">已发送传送命令：%1$s</string>
     <string name="overlay_slot_a">A</string>
     <string name="overlay_slot_b">B</string>
     <string name="overlay_slot_c">C</string>

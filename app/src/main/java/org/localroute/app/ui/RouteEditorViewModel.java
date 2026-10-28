@@ -26,6 +26,11 @@ public class RouteEditorViewModel extends ViewModel {
     private RouteDefinition draft = RouteDefinition.createNew(RouteRepository.newRouteId(), "", new ArrayList<>());
     private final List<GeoPoint> undoStack = new ArrayList<>();
     private boolean dirty;
+
+    /** 编辑代次：每次改动草稿 +1，用来发现「保存期间又编辑了」（R-009）。 */
+    private long editRevision;
+    /** 草稿被整体替换的次数（加载 / 新建 / 删除）；与 editRevision 一起构成保存令牌。 */
+    private long draftGeneration;
     private boolean persisted;
 
     private static final int MAX_UNDO = 200;
@@ -121,7 +126,7 @@ public class RouteEditorViewModel extends ViewModel {
     /** 切换「将当前末点连接到第一个点」；返回切换后的值。 */
     public boolean toggleClosed() {
         draft = draft.withClosed(!draft.closed());
-        dirty = true;
+        markDirty();
         return draft.closed();
     }
 
@@ -140,7 +145,7 @@ public class RouteEditorViewModel extends ViewModel {
             return;
         }
         draft = draft.withEndBehavior(behavior);
-        dirty = true;
+        markDirty();
     }
 
     /** 开口单程：只走一次，次数不可设。 */
@@ -158,7 +163,7 @@ public class RouteEditorViewModel extends ViewModel {
             RunDefaults updated = draft.runDefaults().withSpeedKmh(speedKmh);
             if (updated.speedKmh() != draft.runDefaults().speedKmh()) {
                 draft = draft.withRunDefaults(updated);
-                dirty = true;
+                markDirty();
             }
         } catch (IllegalArgumentException ignored) {
             // 非法中间输入不落盘，等用户改到合法值再记。
@@ -171,7 +176,7 @@ public class RouteEditorViewModel extends ViewModel {
             RunDefaults updated = draft.runDefaults().withRepeatCount(repeatCount);
             if (updated.repeatCount() != draft.runDefaults().repeatCount()) {
                 draft = draft.withRunDefaults(updated);
-                dirty = true;
+                markDirty();
             }
         } catch (IllegalArgumentException ignored) {
             // 同上。
@@ -256,6 +261,9 @@ public class RouteEditorViewModel extends ViewModel {
         undoStack.clear();
         dirty = false;
         persisted = true;
+        // 草稿整体换了：递增代次，让「保存上一条路线」的旧回调失效（R32-06）。
+        draftGeneration++;
+        editRevision++;
     }
 
     /** 丢弃当前草稿，换一条新路线。 */
@@ -264,6 +272,8 @@ public class RouteEditorViewModel extends ViewModel {
         undoStack.clear();
         dirty = false;
         persisted = false;
+        draftGeneration++;
+        editRevision++;
     }
 
     public void rename(String name) {
@@ -272,19 +282,71 @@ public class RouteEditorViewModel extends ViewModel {
             return;
         }
         draft = draft.withName(cleaned);
-        dirty = true;
+        markDirty();
     }
 
-    /** 保存成功后调用：草稿变成“已落盘”状态。 */
+    /**
+     * 保存成功后调用：草稿变成“已落盘”状态。
+     *
+     * <p>注意：只在「保存期间草稿没有被继续编辑」时才对；后台保存的真实调用方应使用
+     * {@link #markSavedIfUnchanged(long)}，否则保存过程中新加的点会被误标成已保存（R-009）。
+     */
     public void markSaved() {
         dirty = false;
         persisted = true;
     }
 
+    /**
+     * 仅当草稿自 {@code revision} 之后没有被修改过，才标记为已保存。
+     *
+     * @return 是否真的标记了（false 表示保存期间又有编辑，草稿仍然是 dirty）
+     */
+    public boolean markSavedIfUnchanged(long revision) {
+        if (revision != editRevision) {
+            return false;
+        }
+        markSaved();
+        return true;
+    }
+
+    /** 当前编辑代次：每次草稿内容变化 +1，用于判断异步保存期间是否又有编辑。 */
+    public long editRevision() {
+        return editRevision;
+    }
+
+    /** 草稿整体替换（加载 / 新建 / 删除）的代次。 */
+    public long draftGeneration() {
+        return draftGeneration;
+    }
+
+    /** 取一份「保存此刻草稿」的令牌，保存回调时用它核对身份（R32-06）。 */
+    public DraftSaveToken saveToken() {
+        return new DraftSaveToken(draft.id(), draftGeneration, editRevision);
+    }
+
+    /**
+     * 仅当令牌与当前草稿完全一致（同一条路线、同一代次、没有新编辑）时才标记已保存。
+     *
+     * @return 是否真的标记了；false 表示保存期间草稿被换掉或又被编辑
+     */
+    public boolean markSavedIfCurrent(DraftSaveToken token) {
+        if (token == null || !token.matches(draft.id(), draftGeneration, editRevision)) {
+            return false;
+        }
+        markSaved();
+        return true;
+    }
+
+    private void markDirty() {
+        dirty = true;
+        editRevision++;
+    }
+
     /** 删除文件后调用：保留 ID 与名称，但标记为未落盘。 */
     public void markDeleted() {
         persisted = false;
-        dirty = true;
+        draftGeneration++;
+        markDirty();
     }
 
     public RouteDefinition toDefinition() {
@@ -333,7 +395,7 @@ public class RouteEditorViewModel extends ViewModel {
 
     private void applyPoints(List<GeoPoint> points) {
         draft = draft.withPoints(points);
-        dirty = true;
+        markDirty();
     }
 
     private void pushUndo(GeoPoint point) {

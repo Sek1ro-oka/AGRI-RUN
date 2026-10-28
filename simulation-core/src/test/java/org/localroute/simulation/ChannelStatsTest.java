@@ -1,6 +1,7 @@
 package org.localroute.simulation;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -13,7 +14,38 @@ public class ChannelStatsTest {
     public void emptyChannelReportsZeroFrames() {
         ChannelStats stats = new ChannelStats("gps");
         assertEquals(0, stats.totalFrames());
-        assertTrue(stats.summary(), stats.summary().contains("0 个位置"));
+        assertEquals(0, stats.callbacks());
+        assertEquals(0, stats.errorCallbacks());
+        assertTrue(stats.summary(), stats.summary().contains("0 次回调"));
+    }
+
+    @Test
+    public void errorCallbacksAreCountedSeparatelyFromValidFixes() {
+        ChannelStats stats = new ChannelStats("amap-sdk");
+        stats.addErrorCallback();
+        stats.addErrorCallback();
+        assertEquals(2, stats.errorCallbacks());
+        assertEquals(0, stats.totalFrames());
+        assertEquals(2, stats.callbacks());
+        assertEquals("错误回调不进位置统计", 0d, stats.travelledMeters(), 1e-9);
+        assertTrue(stats.summary(), stats.summary().contains("有效 0 / 错误 2"));
+    }
+
+    @Test
+    public void speedWithoutSamplesIsReportedAsUnknownNotZero() {
+        ChannelStats stats = new ChannelStats("fused");
+        stats.addFrame(0, 39.9, 116.4, false, 0, true, 0);
+        assertFalse(stats.hasSpeedSamples());
+        assertTrue(stats.summary(), stats.summary().contains("未提供（目标未给速度字段）"));
+    }
+
+    @Test
+    public void ageSinceLastFrameFollowsArrivalTime() {
+        ChannelStats stats = new ChannelStats("gps");
+        assertEquals(-1L, stats.ageSinceLastFrameMillis(5_000 * MS));
+        stats.addFrame(1_000 * MS, 39.9, 116.4, true, 2.5, true, 1000);
+        assertEquals(1_000L, stats.lastArrivalNanos() / MS);
+        assertEquals(3_500L, stats.ageSinceLastFrameMillis(4_500 * MS));
     }
 
     @Test
