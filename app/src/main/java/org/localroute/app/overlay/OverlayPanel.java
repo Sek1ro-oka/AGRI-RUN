@@ -40,9 +40,10 @@ import org.localroute.core.RunState;
 /**
  * 跨应用悬浮「摇杆控制台」。
  *
- * <p>布局从上到下：拖动把手、顶部一行（左「返回主界面」·中「暂停/继续跑圈」·右缩放滑杆）、
- * 大摇杆、底部三个圆形按钮依次是行走 / 跑步 / 骑行。暂停按钮左右两格等宽，所以始终居中；
- * 右侧滑杆让整个控制台等比放大缩小（0.7—1.4 倍，持久化）。
+ * <p>整体是一块紧凑的小面板：最上面是拖动把手，第二行左「返回主界面」、中「暂停/继续跑圈」、
+ * 右上角「&lt; &gt;」缩放键；底部左侧是移动摇杆（直径是其他圆形按钮的 1.5 倍），右侧竖排行走 /
+ * 跑步 / 骑行三个档位按钮。暂停按钮左右两格等宽，所以始终居中；缩放键沿对角线拖动即可让整个
+ * 控制台等比放大缩小（往左下缩小、往右上放大，0.7—1.4 倍，持久化）。
  *
  * <p>摇杆默认锁定，点一下才解锁；只有没有跑圈任务（空闲或悬浮单点保持）时才允许解锁，
  * 路线跑圈期间由快照强制锁定。解锁后按住摇杆，每 500 毫秒向
@@ -65,6 +66,12 @@ public final class OverlayPanel {
 
     /** 摇杆命令间隔：与服务端 500 ms 的定位节拍一致，方向变化即时生效。 */
     private static final long DRIVE_INTERVAL_MS = 500L;
+
+    /** 面板里其他圆形按钮的基准直径；摇杆取它的 1.5 倍。 */
+    private static final int BUTTON_DP = 36;
+    private static final int JOYSTICK_DP = 54;
+    /** 顶行三个按钮并排放下的宽度，整块面板以它为基准宽度。 */
+    private static final int CONTENT_DP = 108;
 
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -102,7 +109,7 @@ public final class OverlayPanel {
     private OverlayScaleHost scaleHost;
     private LinearLayout root;
     private JoystickView joystick;
-    private ScaleSliderView scaleSlider;
+    private ScaleControlView scaleControl;
     private ImageView pauseButton;
     private WindowManager.LayoutParams params;
 
@@ -135,7 +142,7 @@ public final class OverlayPanel {
             }
         });
         this.gear = normalizeGear(prefs.getInt(KEY_GEAR, 1));
-        this.overlayScale = ScaleSliderView.clamp(prefs.getFloat(KEY_SCALE, 1f));
+        this.overlayScale = ScaleControlView.clamp(prefs.getFloat(KEY_SCALE, 1f));
     }
 
     public boolean isShowing() {
@@ -195,13 +202,113 @@ public final class OverlayPanel {
         root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(dp(4), dp(4), dp(4), dp(4));
+        root.setPadding(dp(6), dp(4), dp(6), dp(6));
         root.setClipChildren(false);
         root.setClipToPadding(false);
 
-        // 拖动把手独占最上面一行，放在暂停按钮正上方，避免和摇杆、缩放滑杆抢触摸。
+        // 拖动把手独占最上面一行，放在暂停按钮正上方，避免和摇杆、缩放键抢触摸。
         root.addView(buildDragRow());
         root.addView(buildTopRow());
+        root.addView(buildControlCluster());
+        updateGearStyles();
+
+        scaleHost = new OverlayScaleHost(context);
+        scaleHost.addView(root, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT));
+        scaleHost.setScale(overlayScale);
+
+        params = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                        ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                        : WindowManager.LayoutParams.TYPE_PHONE,
+                // 不抢焦点：底下的 App 仍能正常输入；同时触屏外区域透传。
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT);
+        params.gravity = Gravity.TOP | Gravity.START;
+        params.x = prefs(context).getInt(KEY_X, dp(10));
+        params.y = prefs(context).getInt(KEY_Y, dp(88));
+        params.setTitle("青禾校园悬浮控制台");
+        clampToScreen();
+    }
+
+    /** 顶部拖动把手：一条细胶囊，位置在暂停按钮上方。 */
+    private LinearLayout buildDragRow() {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+
+        FrameLayout grip = new FrameLayout(context);
+        grip.setContentDescription(context.getString(R.string.overlay_grip));
+        GradientDrawable pill = new GradientDrawable();
+        pill.setShape(GradientDrawable.RECTANGLE);
+        pill.setCornerRadius(dp(7));
+        pill.setColor(ContextCompat.getColor(context, R.color.overlay_button_fill));
+        pill.setStroke(dp(1), ContextCompat.getColor(context, R.color.overlay_ring));
+        grip.setBackground(pill);
+
+        ImageView icon = new ImageView(context);
+        icon.setImageResource(R.drawable.ic_overlay_grip);
+        icon.setImageTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(context, R.color.overlay_icon_muted)));
+        icon.setAlpha(0.8f);
+        grip.addView(icon, new FrameLayout.LayoutParams(dp(12), dp(12), Gravity.CENTER));
+        grip.setOnTouchListener(new DragListener());
+
+        row.addView(grip, new LinearLayout.LayoutParams(dp(56), dp(14)));
+        row.setLayoutParams(new LinearLayout.LayoutParams(dp(CONTENT_DP), dp(20)));
+        return row;
+    }
+
+    /** 顶部功能行：左返回、中暂停、右上角缩放键；左右两格等宽让暂停严格居中。 */
+    private LinearLayout buildTopRow() {
+        LinearLayout top = new LinearLayout(context);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+
+        FrameLayout leftCell = new FrameLayout(context);
+        ImageView home = circleIcon(R.drawable.ic_overlay_home, BUTTON_DP, 9,
+                R.color.overlay_icon, R.string.overlay_home);
+        home.setOnClickListener(v -> openMainScreen());
+        leftCell.addView(home,
+                new FrameLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP), Gravity.CENTER));
+
+        pauseButton = circleIcon(R.drawable.ic_overlay_pause, BUTTON_DP, 9,
+                R.color.overlay_mint, R.string.overlay_pause_run);
+        pauseButton.setOnClickListener(v -> togglePause());
+
+        FrameLayout rightCell = new FrameLayout(context);
+        scaleControl = new ScaleControlView(context);
+        scaleControl.setScale(overlayScale);
+        scaleControl.setListener(new ScaleControlView.Listener() {
+            @Override
+            public void onScaleChanged(float scale) {
+                applyScale(scale, false);
+            }
+
+            @Override
+            public void onScaleCommitted(float scale) {
+                applyScale(scale, true);
+            }
+        });
+        rightCell.addView(scaleControl,
+                new FrameLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP), Gravity.CENTER));
+
+        top.addView(leftCell, new LinearLayout.LayoutParams(0, dp(BUTTON_DP), 1f));
+        top.addView(pauseButton, new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)));
+        top.addView(rightCell, new LinearLayout.LayoutParams(0, dp(BUTTON_DP), 1f));
+
+        top.setLayoutParams(new LinearLayout.LayoutParams(dp(CONTENT_DP), dp(BUTTON_DP)));
+        return top;
+    }
+
+    /** 底部区域：移动摇杆贴左下角，行走 / 跑步 / 骑行三个档位按钮竖排在右侧。 */
+    private LinearLayout buildControlCluster() {
+        LinearLayout bottom = new LinearLayout(context);
+        bottom.setOrientation(LinearLayout.HORIZONTAL);
+        bottom.setGravity(Gravity.BOTTOM);
 
         joystick = new JoystickView(context);
         joystick.setContentDescription(context.getString(R.string.overlay_joystick_locked));
@@ -236,109 +343,15 @@ public final class OverlayPanel {
                 unlockJoystick();
             }
         });
-        LinearLayout.LayoutParams joyParams =
-                new LinearLayout.LayoutParams(dp(224), dp(224));
-        joyParams.topMargin = dp(12);
-        root.addView(joystick, joyParams);
+        bottom.addView(joystick,
+                new LinearLayout.LayoutParams(dp(JOYSTICK_DP), dp(JOYSTICK_DP)));
 
-        root.addView(buildGearRow());
-        updateGearStyles();
+        View spacer = new View(context);
+        bottom.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
 
-        scaleHost = new OverlayScaleHost(context);
-        scaleHost.addView(root, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT));
-        scaleHost.setScale(overlayScale);
-
-        params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                        ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                        : WindowManager.LayoutParams.TYPE_PHONE,
-                // 不抢焦点：底下的 App 仍能正常输入；同时触屏外区域透传。
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.TOP | Gravity.START;
-        params.x = prefs(context).getInt(KEY_X, dp(10));
-        params.y = prefs(context).getInt(KEY_Y, dp(88));
-        params.setTitle("路线工坊悬浮控制台");
-        clampToScreen();
-    }
-
-    /** 顶部拖动把手：一条细胶囊，位置在暂停按钮上方。 */
-    private LinearLayout buildDragRow() {
-        LinearLayout row = new LinearLayout(context);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-
-        FrameLayout grip = new FrameLayout(context);
-        grip.setContentDescription(context.getString(R.string.overlay_grip));
-        GradientDrawable pill = new GradientDrawable();
-        pill.setShape(GradientDrawable.RECTANGLE);
-        pill.setCornerRadius(dp(11));
-        pill.setColor(ContextCompat.getColor(context, R.color.overlay_button_fill));
-        pill.setStroke(dp(1), ContextCompat.getColor(context, R.color.overlay_ring));
-        grip.setBackground(pill);
-
-        ImageView icon = new ImageView(context);
-        icon.setImageResource(R.drawable.ic_overlay_grip);
-        icon.setImageTintList(ColorStateList.valueOf(
-                ContextCompat.getColor(context, R.color.overlay_icon_muted)));
-        icon.setAlpha(0.8f);
-        grip.addView(icon, new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
-        grip.setOnTouchListener(new DragListener());
-
-        row.addView(grip, new LinearLayout.LayoutParams(dp(84), dp(22)));
-        row.setLayoutParams(new LinearLayout.LayoutParams(dp(224), dp(30)));
-        return row;
-    }
-
-    /** 顶部功能行：左返回、中暂停、右缩放；左右两格等宽让暂停严格居中。 */
-    private LinearLayout buildTopRow() {
-        LinearLayout top = new LinearLayout(context);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-
-        FrameLayout leftCell = new FrameLayout(context);
-        ImageView home = circleIcon(R.drawable.ic_overlay_home, 56, 15,
-                R.color.overlay_icon, R.string.overlay_home);
-        home.setOnClickListener(v -> openMainScreen());
-        leftCell.addView(home, new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER));
-
-        pauseButton = circleIcon(R.drawable.ic_overlay_pause, 56, 15,
-                R.color.overlay_mint, R.string.overlay_pause_run);
-        pauseButton.setOnClickListener(v -> togglePause());
-
-        FrameLayout rightCell = new FrameLayout(context);
-        scaleSlider = new ScaleSliderView(context);
-        scaleSlider.setScale(overlayScale);
-        scaleSlider.setListener(new ScaleSliderView.Listener() {
-            @Override
-            public void onScaleChanged(float scale) {
-                applyScale(scale, false);
-            }
-
-            @Override
-            public void onScaleCommitted(float scale) {
-                applyScale(scale, true);
-            }
-        });
-        rightCell.addView(scaleSlider,
-                new FrameLayout.LayoutParams(dp(72), dp(48), Gravity.CENTER));
-
-        top.addView(leftCell, new LinearLayout.LayoutParams(0, dp(56), 1f));
-        top.addView(pauseButton, new LinearLayout.LayoutParams(dp(56), dp(56)));
-        top.addView(rightCell, new LinearLayout.LayoutParams(0, dp(56), 1f));
-
-        top.setLayoutParams(new LinearLayout.LayoutParams(dp(224), dp(56)));
-        return top;
-    }
-
-    private LinearLayout buildGearRow() {
-        LinearLayout bottom = new LinearLayout(context);
-        bottom.setOrientation(LinearLayout.HORIZONTAL);
-        bottom.setGravity(Gravity.CENTER);
+        LinearLayout gears = new LinearLayout(context);
+        gears.setOrientation(LinearLayout.VERTICAL);
+        gears.setGravity(Gravity.END);
 
         int[] icons = {R.drawable.ic_overlay_walk, R.drawable.ic_overlay_run,
                 R.drawable.ic_overlay_bike};
@@ -346,15 +359,22 @@ public final class OverlayPanel {
                 R.string.overlay_gear_ride};
         for (int i = 0; i < gearButtons.length; i++) {
             final int index = i;
-            ImageView button = circleIcon(icons[i], 64, 17, R.color.overlay_icon, labels[i]);
+            ImageView button = circleIcon(icons[i], BUTTON_DP, 9,
+                    R.color.overlay_icon, labels[i]);
             button.setOnClickListener(v -> selectGear(index, true));
             gearButtons[i] = button;
-            bottom.addView(button, squareParams(64, 14, i == 0 ? 0 : 10, 0));
+            LinearLayout.LayoutParams params =
+                    new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP));
+            if (i > 0) {
+                params.topMargin = dp(3);
+            }
+            gears.addView(button, params);
         }
+        bottom.addView(gears,
+                new LinearLayout.LayoutParams(dp(BUTTON_DP), LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        bottom.setLayoutParams(params);
+        bottom.setLayoutParams(new LinearLayout.LayoutParams(dp(CONTENT_DP),
+                LinearLayout.LayoutParams.WRAP_CONTENT));
         return bottom;
     }
 
@@ -510,7 +530,7 @@ public final class OverlayPanel {
     // ---------------------------------------------------------------- 缩放
 
     private void applyScale(float scale, boolean persist) {
-        overlayScale = ScaleSliderView.clamp(scale);
+        overlayScale = ScaleControlView.clamp(scale);
         if (scaleHost != null) {
             scaleHost.setScale(overlayScale);
         }
@@ -601,9 +621,9 @@ public final class OverlayPanel {
         }
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         int width = scaleHost != null && scaleHost.getMeasuredWidth() > 0
-                ? scaleHost.getMeasuredWidth() : dp(232);
+                ? scaleHost.getMeasuredWidth() : dp(168);
         int height = scaleHost != null && scaleHost.getMeasuredHeight() > 0
-                ? scaleHost.getMeasuredHeight() : dp(408);
+                ? scaleHost.getMeasuredHeight() : dp(260);
         int maxX = Math.max(0, metrics.widthPixels - width);
         int maxY = Math.max(0, metrics.heightPixels - height);
         params.x = Math.max(0, Math.min(params.x, maxX));
@@ -667,14 +687,6 @@ public final class OverlayPanel {
             default:
                 return R.string.overlay_gear_run;
         }
-    }
-
-    private LinearLayout.LayoutParams squareParams(int sizeDp, int topDp, int startDp, int endDp) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp));
-        params.topMargin = dp(topDp);
-        params.setMarginStart(dp(startDp));
-        params.setMarginEnd(dp(endDp));
-        return params;
     }
 
     private int dp(int value) {

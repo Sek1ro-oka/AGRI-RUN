@@ -1,9 +1,9 @@
-# 路线工坊（Route Workshop）
+# 青禾校园（Qinghe Campus · 原名路线工坊）
 
 一个**完全离线**的 Android 小工具：在地图上点出一条闭合路线，设置速度与圈数，然后用**Android 系统模拟位置**把
 “沿这条路线匀速跑 N 圈”的坐标源源不断地喂给系统，让第三方运动 App 以为你在跑圈。
 
-- 包名：`org.localroute.app`　版本：0.3.3（versionCode 14）
+- 包名：`org.localroute.app`　版本：0.4.0（versionCode 15）
 - 代码镜像：<https://github.com/Sek1ro-oka/AGRI-RUN>（**不含** APK、签名密钥、`local.properties` 与高德 Key）
 - 交付包：`delivery/路线工坊-0.3.3-release.apk`、`delivery/定位探针-0.1.4-debug.apk`、`delivery/SHA256SUMS.txt`（当前哈希清单）；0.3.2 的成功包保留在 `delivery/baseline-0.3.2/` 作对照
 - 最低系统：Android 10（API 29），编译 SDK 35
@@ -38,7 +38,7 @@
 ## 快速开始
 
 1. 安装 `delivery/路线工坊-0.3.3-release.apk`（另附 `定位探针` APK）。
-2. 手机 **开发者选项 → 选择模拟位置信息应用 → 路线工坊**（0.1.1 起本应用才会出现在这个列表里）。
+2. 手机 **开发者选项 → 选择模拟位置信息应用 → 青禾校园**（0.1.1 起本应用才会出现在这个列表里）。
 3. 打开 App 授予定位权限，打开系统定位；菜单「设置检查」逐项确认全部通过。
 4. 地图上点 3–4 个点围出一圈，填速度与圈数，点「开始」。
 5. 只想让位置停在某一点时，用菜单「发送单点位置」输入经纬度后点「发送」。

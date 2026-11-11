@@ -3,6 +3,7 @@ package org.localroute.app.overlay;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.view.MotionEvent;
 import android.view.View;
@@ -15,14 +16,16 @@ import org.localroute.app.R;
 import java.util.Locale;
 
 /**
- * 悬浮窗等比缩放滑杆。
+ * 悬浮窗等比缩放键：右上角一枚圆形「&lt; &gt;」按钮。
  *
- * <p>视觉是一枚 72×48 dp 的胶囊：上半显示百分比，下半是轨道与滑点。左右拖动时按
- * <b>屏幕原始坐标的位移</b>换算比例（而不是读取被缩放后的局部坐标），这样悬浮窗在拖动过程中
- * 实时缩放也不会让滑点追着手指跑偏。整个控制台的可视大小由 {@link OverlayScaleHost} 按同一比例
- * 缩放窗口，按钮、摇杆与间距一起等比变化。
+ * <p>按住后沿对角线拖动调整整个控制台的大小：往左下拖缩小，往右上拖放大；两者是同一根
+ * 对角线上的投影，斜着拖也能稳定变化。位移用屏幕原始坐标计算，悬浮窗在拖动过程中实时缩放
+ * 不会让手指与按钮错位。平时显示「&lt; &gt;」，拖动期间在按钮中间显示当前百分比。
+ *
+ * <p>整个面板的可视大小由 {@link OverlayScaleHost} 按同一比例缩放窗口，按钮、摇杆与间距
+ * 一起等比变化。
  */
-public final class ScaleSliderView extends View {
+public final class ScaleControlView extends View {
 
     public static final float MIN_SCALE = 0.7f;
     public static final float MAX_SCALE = 1.4f;
@@ -36,24 +39,28 @@ public final class ScaleSliderView extends View {
         void onScaleCommitted(float scale);
     }
 
-    /** 拖满整个范围（0.7）需要滑动多少 dp；数值越大越精细。 */
-    private static final float FULL_RANGE_DRAG_DP = 140f;
+    /** 沿对角线拖满整个范围（0.7）需要滑动的 dp；数值越大越精细。 */
+    private static final float FULL_RANGE_DRAG_DP = 120f;
+
+    /** 小于这个对角位移视为点按，不改变缩放。 */
+    private static final float TOUCH_SLOP_DP = 3f;
 
     private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint glyphPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint knobPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final RectF pill = new RectF();
+    private final Path glyphs = new Path();
+    private final RectF oval = new RectF();
 
     private float scale = 1f;
     private float downRawX;
+    private float downRawY;
     private float downScale;
     private boolean dragging;
     @Nullable
     private Listener listener;
 
-    public ScaleSliderView(Context context) {
+    public ScaleControlView(Context context) {
         super(context);
         fillPaint.setStyle(Paint.Style.FILL);
         fillPaint.setColor(ContextCompat.getColor(context, R.color.overlay_button_fill));
@@ -62,18 +69,16 @@ public final class ScaleSliderView extends View {
         ringPaint.setStrokeWidth(dp(1f));
         ringPaint.setColor(ContextCompat.getColor(context, R.color.overlay_ring));
 
+        glyphPaint.setStyle(Paint.Style.STROKE);
+        glyphPaint.setStrokeWidth(dp(1.6f));
+        glyphPaint.setStrokeCap(Paint.Cap.ROUND);
+        glyphPaint.setStrokeJoin(Paint.Join.ROUND);
+        glyphPaint.setColor(ContextCompat.getColor(context, R.color.overlay_mint));
+
         textPaint.setColor(ContextCompat.getColor(context, R.color.overlay_icon));
         textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTextSize(dp(11f));
+        textPaint.setTextSize(dp(9.5f));
         textPaint.setFakeBoldText(true);
-
-        trackPaint.setStyle(Paint.Style.STROKE);
-        trackPaint.setStrokeWidth(dp(2f));
-        trackPaint.setStrokeCap(Paint.Cap.ROUND);
-        trackPaint.setColor(ContextCompat.getColor(context, R.color.overlay_ring));
-
-        knobPaint.setStyle(Paint.Style.FILL);
-        knobPaint.setColor(ContextCompat.getColor(context, R.color.overlay_mint));
 
         setClickable(true);
         setContentDescription(context.getString(R.string.overlay_scale));
@@ -104,6 +109,12 @@ public final class ScaleSliderView extends View {
     }
 
     @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        buildGlyphs(w, h);
+    }
+
+    @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         float width = getWidth();
@@ -111,42 +122,45 @@ public final class ScaleSliderView extends View {
         if (width <= 0f || height <= 0f) {
             return;
         }
-        pill.set(dp(1f), dp(1f), width - dp(1f), height - dp(1f));
-        float radius = pill.height() / 2f;
-        canvas.drawRoundRect(pill, radius, radius, fillPaint);
-        canvas.drawRoundRect(pill, radius, radius, ringPaint);
+        oval.set(dp(1f), dp(1f), width - dp(1f), height - dp(1f));
+        canvas.drawOval(oval, fillPaint);
+        ringPaint.setColor(ContextCompat.getColor(getContext(),
+                dragging ? R.color.overlay_mint : R.color.overlay_ring));
+        canvas.drawOval(oval, ringPaint);
 
-        String percent = String.format(Locale.US,
-                getContext().getString(R.string.overlay_scale_percent), percentOf(scale));
-        canvas.drawText(percent, width / 2f, dp(19f), textPaint);
-
-        float trackStart = dp(12f);
-        float trackEnd = width - dp(12f);
-        float trackY = height - dp(14f);
-        canvas.drawLine(trackStart, trackY, trackEnd, trackY, trackPaint);
-
-        float fraction = fractionOf(scale);
-        canvas.drawCircle(trackStart + (trackEnd - trackStart) * fraction, trackY,
-                dp(4.5f), knobPaint);
+        if (dragging) {
+            String percent = String.format(Locale.US,
+                    getContext().getString(R.string.overlay_scale_percent), percentOf(scale));
+            Paint.FontMetrics metrics = textPaint.getFontMetrics();
+            float baseline = height / 2f - (metrics.ascent + metrics.descent) / 2f;
+            canvas.drawText(percent, width / 2f, baseline, textPaint);
+        } else {
+            canvas.drawPath(glyphs, glyphPaint);
+        }
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                dragging = true;
                 downRawX = event.getRawX();
+                downRawY = event.getRawY();
                 downScale = scale;
+                dragging = false;
                 if (getParent() != null) {
                     getParent().requestDisallowInterceptTouchEvent(true);
                 }
                 return true;
             case MotionEvent.ACTION_MOVE:
-                if (!dragging) {
-                    return false;
-                }
-                float deltaDp = (event.getRawX() - downRawX)
+                float dxDp = (event.getRawX() - downRawX)
                         / getResources().getDisplayMetrics().density;
+                // 对角线投影：右上（dx 为正、dy 为负）增大，左下（dx 为负、dy 为正）减小。
+                float deltaDp = dxDp - (event.getRawY() - downRawY)
+                        / getResources().getDisplayMetrics().density;
+                if (!dragging && Math.abs(deltaDp) < TOUCH_SLOP_DP) {
+                    return true;
+                }
+                dragging = true;
                 float next = clamp(downScale
                         + deltaDp / FULL_RANGE_DRAG_DP * (MAX_SCALE - MIN_SCALE));
                 if (Math.abs(next - scale) > 0.0001f) {
@@ -158,20 +172,20 @@ public final class ScaleSliderView extends View {
                 }
                 return true;
             case MotionEvent.ACTION_UP:
-                if (!dragging) {
-                    return false;
-                }
+                boolean wasDragging = dragging;
                 dragging = false;
+                invalidate();
                 performClick();
-                if (listener != null) {
+                if (wasDragging && listener != null) {
                     listener.onScaleCommitted(scale);
                 }
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 if (!dragging) {
-                    return false;
+                    return true;
                 }
                 dragging = false;
+                invalidate();
                 if (listener != null) {
                     listener.onScaleCommitted(scale);
                 }
@@ -186,8 +200,19 @@ public final class ScaleSliderView extends View {
         return super.performClick();
     }
 
-    private static float fractionOf(float value) {
-        return (clamp(value) - MIN_SCALE) / (MAX_SCALE - MIN_SCALE);
+    /** 「&lt; &gt;」两枚朝外的小箭头，整体居中。 */
+    private void buildGlyphs(float width, float height) {
+        glyphs.reset();
+        float cx = width / 2f;
+        float cy = height / 2f;
+        float arrow = dp(3.2f);
+        float gap = dp(2.2f);
+        glyphs.moveTo(cx - gap, cy - arrow);
+        glyphs.lineTo(cx - gap - arrow, cy);
+        glyphs.lineTo(cx - gap, cy + arrow);
+        glyphs.moveTo(cx + gap, cy - arrow);
+        glyphs.lineTo(cx + gap + arrow, cy);
+        glyphs.lineTo(cx + gap, cy + arrow);
     }
 
     private float dp(float value) {
