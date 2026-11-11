@@ -77,6 +77,23 @@ public class SimulationService extends Service {
     public static final String EXTRA_TELEPORT_LAT = "org.localroute.app.extra.TELEPORT_LAT";
     public static final String EXTRA_TELEPORT_LON = "org.localroute.app.extra.TELEPORT_LON";
 
+    /**
+     * 悬浮摇杆手动驱动：单点模式下按方向与速度持续推进，而不是每 200 ms 传送一小步。
+     *
+     * <p>速度写 0 表示松开摇杆，位置停在原地。方向用单位化的北/东分量表示，服务端负责
+     * 换算航向并带进每一帧定位，目标 App 才能看出“人在走”而不是“点在地图上抖”。
+     */
+    public static final String ACTION_DRIVE = "org.localroute.app.action.DRIVE";
+    public static final String EXTRA_DRIVE_NORTH = "org.localroute.app.extra.DRIVE_NORTH";
+    public static final String EXTRA_DRIVE_EAST = "org.localroute.app.extra.DRIVE_EAST";
+    public static final String EXTRA_DRIVE_SPEED_KMH = "org.localroute.app.extra.DRIVE_SPEED_KMH";
+
+    private static final double METERS_PER_DEGREE_LAT = 111320d;
+    /** 超过这个时间没有新的摇杆命令就自动松手（悬浮条被收起、进程被杀都不会让角色一直走）。 */
+    private static final long DRIVE_TIMEOUT_MS = 2000L;
+    /** 单帧位移上限：只在调度异常时兜底，正常 500 ms × 最高速远小于这个值。 */
+    private static final double DRIVE_MAX_STEP_METERS = 30d;
+
     private static final String CHANNEL_ID = "simulation";
     private static final int NOTIFICATION_ID = 1001;
     private static final long WAKELOCK_TIMEOUT_MS = 90L * 60L * 1000L;
@@ -114,6 +131,12 @@ public class SimulationService extends Service {
     private RouteEngine.Progress lastProgress;
     /** 单点模式要固定发送的坐标；路线模式为 null。 */
     private org.localroute.core.GeoPoint singlePoint;
+    /** 悬浮摇杆手动驱动：单位方向（北/东）与当前速度；速度为 0 表示松手。 */
+    private double driveNorth;
+    private double driveEast;
+    private double driveSpeedKmh;
+    /** 最后一次收到驱动的单调时钟；界面消失时用它自动松手，避免人物一直走。 */
+    private long lastDriveCommandNanos;
 
     /** 每次传送目标变化 +1；在途 tick 用它判断自己算的是不是旧点位。 */
     private int teleportGeneration;
@@ -196,6 +219,11 @@ public class SimulationService extends Service {
             final double lat = intent.getDoubleExtra(EXTRA_TELEPORT_LAT, Double.NaN);
             final double lon = intent.getDoubleExtra(EXTRA_TELEPORT_LON, Double.NaN);
             post(() -> handleTeleport(lat, lon));
+        } else if (ACTION_DRIVE.equals(action)) {
+            final double north = intent.getDoubleExtra(EXTRA_DRIVE_NORTH, 0d);
+            final double east = intent.getDoubleExtra(EXTRA_DRIVE_EAST, 0d);
+            final double speedKmh = intent.getDoubleExtra(EXTRA_DRIVE_SPEED_KMH, 0d);
+            post(() -> handleDrive(north, east, speedKmh));
         } else {
             DiagnosticLog.warn("未知的服务动作：" + action);
             stopAndPublishStoppedIfActive("收到未知的运行命令：" + action);
@@ -326,6 +354,50 @@ public class SimulationService extends Service {
         }
     }
 
+    /**
+     * 悬浮摇杆手动驱动：没有任务时先以 {@code anchor} 起一个单点任务，再下发方向/速度。
+     *
+     * <p>方向和速度由服务端在 500 ms 的调度节拍里推进位置，目标 App 能看到连续位移、非零速度
+     * 与稳定航向；松开摇杆调用 {@link #releaseDrive(Context)} 让速度归零。
+     */
+    public static void drive(Context context, org.localroute.core.GeoPoint anchor,
+                             double north, double east, double speedKmh) {
+        RunSnapshot current = SimulationStateRepo.get().current();
+        if (current == null || !current.isActive()) {
+            if (anchor == null) {
+                return;
+            }
+            DiagnosticLog.info("悬浮摇杆：当前没有运行任务，从 " + anchor.format() + " 开始手动移动");
+            start(context, RunRequest.createSinglePoint(anchor));
+        }
+        Intent intent = new Intent(context, SimulationService.class)
+                .setAction(ACTION_DRIVE)
+                .putExtra(EXTRA_DRIVE_NORTH, north)
+                .putExtra(EXTRA_DRIVE_EAST, east)
+                .putExtra(EXTRA_DRIVE_SPEED_KMH, speedKmh);
+        try {
+            context.startService(intent);
+        } catch (RuntimeException e) {
+            DiagnosticLog.error("发送摇杆驱动命令失败", e);
+        }
+    }
+
+    /** 松开摇杆：只对正在运行的任务下发“速度归零”，不会新建或结束任务。 */
+    public static void releaseDrive(Context context) {
+        RunSnapshot current = SimulationStateRepo.get().current();
+        if (current == null || !current.isActive()) {
+            return;
+        }
+        Intent intent = new Intent(context, SimulationService.class)
+                .setAction(ACTION_DRIVE)
+                .putExtra(EXTRA_DRIVE_SPEED_KMH, 0d);
+        try {
+            context.startService(intent);
+        } catch (RuntimeException e) {
+            DiagnosticLog.error("发送摇杆停止命令失败", e);
+        }
+    }
+
     private void handleTeleport(double latitude, double longitude) {
         org.localroute.core.GeoPoint point;
         try {
@@ -334,6 +406,7 @@ public class SimulationService extends Service {
             DiagnosticLog.warn("传送坐标非法：" + latitude + "," + longitude);
             return;
         }
+        clearDrive();
         if (request == null) {
             // 服务收到了传送命令但还没有任务：按单点模式新起一个（沿用既有的权限/模拟应用检查）。
             start(this, RunRequest.createSinglePoint(point));
@@ -363,6 +436,56 @@ public class SimulationService extends Service {
     }
 
     /**
+     * 悬浮摇杆方向/速度。速度 <= 0 等于松手：位置不再推进，下一帧按静止质量发布。
+     *
+     * <p>只有单点模式接受手动驱动；路线跑圈有自己的速度与几何，摇杆此时在界面上是锁定的，
+     * 万一有迟到命令也直接忽略，不能把跑圈改成手动。
+     */
+    private void handleDrive(double north, double east, double speedKmh) {
+        if (!Double.isFinite(north) || !Double.isFinite(east) || !Double.isFinite(speedKmh)) {
+            DiagnosticLog.warn("忽略摇杆驱动：参数非法 " + north + "," + east + "," + speedKmh);
+            return;
+        }
+        double magnitude = Math.hypot(north, east);
+        if (speedKmh <= 0.01d || magnitude < 1e-4d) {
+            clearDrive();
+            if (request != null && singlePoint != null) {
+                RunState state = stateMachine.state();
+                if (state == RunState.RUNNING || state == RunState.PAUSED) {
+                    // 立刻刷新快照，让界面与通知里的速度不用等下一帧。
+                    publishSnapshot(state, null);
+                }
+            }
+            return;
+        }
+        if (request == null || singlePoint == null) {
+            DiagnosticLog.warn("忽略摇杆驱动：当前没有单点任务");
+            return;
+        }
+        driveNorth = north / magnitude;
+        driveEast = east / magnitude;
+        driveSpeedKmh = Math.min(RunConfig.MAX_SPEED_KMH, speedKmh);
+        lastDriveCommandNanos = SystemClock.elapsedRealtimeNanos();
+        RunState state = stateMachine.state();
+        if (state == RunState.RUNNING) {
+            publishSnapshot(state, null);
+        }
+    }
+
+    /** 松开摇杆：方向与速度归零，下一帧按静止质量发布，位置停在原地。 */
+    private void clearDrive() {
+        driveNorth = 0d;
+        driveEast = 0d;
+        driveSpeedKmh = 0d;
+        lastDriveCommandNanos = 0L;
+    }
+
+    /** 摇杆方向（北/东分量）换算成罗盘航向：0=正北，90=正东。 */
+    private double driveBearingDegrees() {
+        return (Math.toDegrees(Math.atan2(driveEast, driveNorth)) + 360d) % 360d;
+    }
+
+    /**
      * 路线任务运行中收到传送命令：停止路线推进，改用同一个定位会话发单点坐标。
      *
      * <p>为什么不是「先 stop 再 start」：那样会拆掉 provider 会话、触发通知重建，中间还会有
@@ -370,6 +493,7 @@ public class SimulationService extends Service {
      */
     private void switchRouteTaskToSinglePoint(org.localroute.core.GeoPoint point) {
         long now = SystemClock.elapsedRealtimeNanos();
+        clearDrive();
         RunState before = stateMachine.state();
         TaskModeSwitch.StateAction action = TaskModeSwitch.stateActionFor(before);
         DiagnosticLog.info("传送命令：路线任务切换为单点 " + point.format()
@@ -424,12 +548,19 @@ public class SimulationService extends Service {
     }
 
     private void handleStart() {
-        if (request != null) {
-            // 重复点击“开始”：已有运行任务，直接忽略，不再创建第二个任务。
-            DiagnosticLog.warn("已有运行任务，忽略重复的开始请求");
-            return;
-        }
         RunRequest pending = PendingRunRegistry.take();
+        if (request != null) {
+            if (pending != null && pending.route() != null && singlePoint != null) {
+                // 悬浮摇杆/传送留下的单点任务：用户从跑圈页发起了新的路线任务，
+                // 就地结束单点并接着启动跑圈，避免「已有任务」把入口卡死。
+                DiagnosticLog.info("收到新的跑圈任务：先结束当前单点任务");
+                resetSinglePointForRestart();
+            } else {
+                // 重复点击“开始”：已有运行任务，直接忽略，不再创建第二个任务。
+                DiagnosticLog.warn("已有运行任务，忽略重复的开始请求");
+                return;
+            }
+        }
         if (pending == null) {
             DiagnosticLog.warn("没有待执行的运行请求，服务退出");
             stopAndPublishStoppedIfActive("没有待执行的运行请求");
@@ -505,6 +636,30 @@ public class SimulationService extends Service {
     }
 
     /**
+     * 在同一个前台服务里结束当前单点任务，把状态机放回 READY，供紧随其后的跑圈启动复用。
+     *
+     * <p>不调用 {@code stopSelf()}、不移除前台通知，避免系统在两次任务之间把服务收走。
+     */
+    private void resetSinglePointForRestart() {
+        long now = SystemClock.elapsedRealtimeNanos();
+        lastElapsedMs = clock == null ? lastElapsedMs : clock.elapsedNanos(now) / 1_000_000L;
+        try {
+            stateMachine.stop();
+        } catch (RuntimeException e) {
+            DiagnosticLog.warn("切换跑圈前停止单点任务异常（已忽略）：" + e.getMessage());
+        }
+        // 刻意不发布 STOPPED：调用方已经把这次切换当作「同一个任务换模式」，提前发终态会让
+        // 跑圈页把旧单点的结束误判成自己路线结束，从而清掉归属并弹出结束提示。
+        cleanupEverything();
+        try {
+            stateMachine.backToReady();
+        } catch (RuntimeException e) {
+            DiagnosticLog.warn("切换跑圈前恢复就绪状态异常（已忽略）：" + e.getMessage());
+        }
+        stopped = false;
+    }
+
+    /**
      * 单点模式启动：只提交一次目标坐标，成功后进入 RUNNING，之后每个 tick 重新提交同一坐标。
      *
      * <p>没有路线、没有单圈、没有圈数；速度固定 0，有效用时照常累计。
@@ -563,11 +718,35 @@ public class SimulationService extends Service {
         boolean paused = state == RunState.PAUSED;
 
         if (singlePoint != null) {
-            // 单点模式：位置与速度都不变，只是按节奏重复提交，保持系统里的模拟位置“活着”。
+            // 悬停时位置固定；摇杆驱动时按速度推进，目标 App 才能看到连续位移与非零速度。
+            if (driveSpeedKmh > 0.01d && lastDriveCommandNanos != 0L
+                    && now - lastDriveCommandNanos > DRIVE_TIMEOUT_MS * 1_000_000L) {
+                // 悬浮条收起或界面被系统回收后不会再有驱动命令：自动松手，人物不能一直走。
+                DiagnosticLog.info("摇杆命令超时，自动停止手动移动");
+                clearDrive();
+            }
+            boolean driving = !paused && driveSpeedKmh > 0.01d;
+            if (driving) {
+                long dtNanos = Math.max(0L, now - lastTickNanos);
+                double stepMeters = Math.min(DRIVE_MAX_STEP_METERS,
+                        driveSpeedKmh / 3.6d * dtNanos / 1_000_000_000d);
+                if (stepMeters > 0.005d) {
+                    double bearing = driveBearingDegrees();
+                    double north = Math.cos(Math.toRadians(bearing)) * stepMeters;
+                    double east = Math.sin(Math.toRadians(bearing)) * stepMeters;
+                    double metersPerDegreeLon = Math.max(1d, METERS_PER_DEGREE_LAT
+                            * Math.cos(Math.toRadians(singlePoint.latitude())));
+                    singlePoint = new org.localroute.core.GeoPoint(
+                            singlePoint.latitude() + north / METERS_PER_DEGREE_LAT,
+                            singlePoint.longitude() + east / metersPerDegreeLon);
+                }
+            }
             final int generation = teleportGeneration;
             final org.localroute.core.GeoPoint target = singlePoint;
+            final double fixSpeedMps = driving ? driveSpeedKmh / 3.6d : 0d;
+            final double fixBearing = driving ? driveBearingDegrees() : 0d;
             try {
-                publishFix(fixForPoint(target, now));
+                publishFix(fixForPoint(target, now, fixSpeedMps, fixBearing));
             } catch (MockProviderException e) {
                 failAndStop(e.errorCode() == null ? RunErrorCode.PUBLISH_FAILED : e.errorCode(), e.getMessage());
                 return;
@@ -578,8 +757,8 @@ public class SimulationService extends Service {
                 scheduleNextTick();
                 return;
             }
-            DiagnosticLog.fix(String.format(Locale.US, "单点 %s 用时=%dms", singlePoint.format(),
-                    elapsed / 1_000_000L));
+            DiagnosticLog.fix(String.format(Locale.US, "单点 %s 速度=%.1fkm/h 用时=%dms",
+                    singlePoint.format(), fixSpeedMps * 3.6d, elapsed / 1_000_000L));
             recordCadence(now);
             lastElapsedMs = elapsed / 1_000_000L;
             lastTickNanos = now;
@@ -896,6 +1075,7 @@ public class SimulationService extends Service {
         route = null;
         config = null;
         singlePoint = null;
+        clearDrive();
     }
 
     // ---------------------------------------------------------------- 辅助
@@ -918,10 +1098,16 @@ public class SimulationService extends Service {
     }
 
     private MockFix fixForPoint(org.localroute.core.GeoPoint point, long elapsedRealtimeNanos) {
+        return fixForPoint(point, elapsedRealtimeNanos, 0d, 0d);
+    }
+
+    /** 单点帧：手动移动时带上速度与航向，静止时按 0 速度发布。 */
+    private MockFix fixForPoint(org.localroute.core.GeoPoint point, long elapsedRealtimeNanos,
+                                double speedMps, double bearingDegrees) {
         org.localroute.simulation.FixQualityProfile quality =
-                org.localroute.simulation.FixQualityProfile.forSpeed(0d);
+                org.localroute.simulation.FixQualityProfile.forSpeed(speedMps);
         return new MockFix(point.latitude(), point.longitude(),
-                FIX_ALTITUDE_METERS, quality.accuracyMeters(), 0d, 0d,
+                FIX_ALTITUDE_METERS, quality.accuracyMeters(), speedMps, bearingDegrees,
                 System.currentTimeMillis(), elapsedRealtimeNanos, quality);
     }
 
@@ -984,10 +1170,11 @@ public class SimulationService extends Service {
                 .publishedProviders(publishedProviders);
         if (singlePoint != null) {
             // 单点模式没有路线几何：单圈、距离、圈数都固定 0，界面用 singlePoint 标记走另一套文案。
+            boolean driving = state == RunState.RUNNING && driveSpeedKmh > 0.01d;
             builder.singlePoint(true)
                     .position(singlePoint.latitude(), singlePoint.longitude())
-                    .bearingDegrees(0d)
-                    .speedMps(0d)
+                    .bearingDegrees(driving ? driveBearingDegrees() : 0d)
+                    .speedMps(driving ? driveSpeedKmh / 3.6d : 0d)
                     .lapLengthMeters(0d)
                     .distanceMeters(0d)
                     .completedLoops(0)

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -19,6 +20,9 @@ import org.localroute.app.R;
  * <p>按住拖动时输出归一化方向向量（右 +x，下 +y，长度 0—1），松手自动回中并回调
  * {@link Listener#onRelease()}。摇杆只负责输入，不直接改模拟位置；移动节奏由
  * {@link OverlayPanel} 按固定间隔推进。
+ *
+ * <p>默认处于锁定状态：画一枚锁标识，点击会回调 {@link Listener#onLockedTap()}，
+ * 由面板决定能否解锁。跑圈任务执行期间面板会强制锁定。
  */
 public final class JoystickView extends View {
 
@@ -27,6 +31,9 @@ public final class JoystickView extends View {
         void onMove(float x, float y);
 
         void onRelease();
+
+        /** 锁定状态下点了摇杆：面板据此提示或解锁。 */
+        void onLockedTap();
     }
 
     private final Paint basePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -35,6 +42,7 @@ public final class JoystickView extends View {
     private final Paint knobPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint knobRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint knobDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint lockPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path chevrons = new Path();
 
     private float centerX;
@@ -47,6 +55,7 @@ public final class JoystickView extends View {
 
     private boolean engaged;
     private boolean inputEnabled = true;
+    private boolean locked;
     @Nullable
     private Listener listener;
 
@@ -79,11 +88,38 @@ public final class JoystickView extends View {
         knobDotPaint.setStyle(Paint.Style.FILL);
         knobDotPaint.setColor(ContextCompat.getColor(context, R.color.overlay_mint));
 
+        lockPaint.setStyle(Paint.Style.STROKE);
+        lockPaint.setStrokeWidth(dp(2f));
+        lockPaint.setStrokeCap(Paint.Cap.ROUND);
+        lockPaint.setStrokeJoin(Paint.Join.ROUND);
+        lockPaint.setColor(ContextCompat.getColor(context, R.color.overlay_mint));
+
         setClickable(true);
     }
 
     public void setListener(@Nullable Listener listener) {
         this.listener = listener;
+    }
+
+    /** 锁定：回中、停掉推进，并在盘面画锁标识。解锁后才接受拖动。 */
+    public void setLocked(boolean locked) {
+        if (this.locked == locked) {
+            return;
+        }
+        this.locked = locked;
+        if (locked) {
+            engaged = false;
+            knobX = 0f;
+            knobY = 0f;
+            if (listener != null) {
+                listener.onRelease();
+            }
+        }
+        invalidate();
+    }
+
+    public boolean isLocked() {
+        return locked;
     }
 
     /** 暂停或收起时禁用输入：立刻回中并通知调用方停止推进。 */
@@ -120,6 +156,10 @@ public final class JoystickView extends View {
         canvas.drawCircle(centerX, centerY, baseRadius, basePaint);
         canvas.drawCircle(centerX, centerY, baseRadius - dp(0.5f), baseRingPaint);
         canvas.drawCircle(centerX, centerY, baseRadius * 0.72f, baseRingPaint);
+        if (locked) {
+            drawLockGlyph(canvas);
+            return;
+        }
         canvas.drawPath(chevrons, chevronPaint);
 
         float x = centerX + knobX;
@@ -129,10 +169,42 @@ public final class JoystickView extends View {
         canvas.drawCircle(x, y, dp(3f), knobDotPaint);
     }
 
+    /** 锁标识：上方半圆锁梁 + 下方圆角锁体。 */
+    private void drawLockGlyph(Canvas canvas) {
+        float bodyWidth = baseRadius * 0.62f;
+        float bodyHeight = bodyWidth * 0.72f;
+        float top = centerY - bodyHeight * 0.30f;
+        RectF body = new RectF(centerX - bodyWidth / 2f, top,
+                centerX + bodyWidth / 2f, top + bodyHeight);
+        canvas.drawRoundRect(body, dp(4f), dp(4f), lockPaint);
+
+        float shackleRadius = bodyWidth * 0.30f;
+        RectF shackle = new RectF(centerX - shackleRadius, top - shackleRadius * 1.55f,
+                centerX + shackleRadius, top + shackleRadius * 0.55f);
+        canvas.drawArc(shackle, 180f, 180f, false, lockPaint);
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (!inputEnabled) {
             return false;
+        }
+        if (locked) {
+            // 锁定状态只消费「点一下」，不产生移动；是否放行由面板决定。
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    performClick();
+                    if (listener != null) {
+                        listener.onLockedTap();
+                    }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    return true;
+                default:
+                    return true;
+            }
         }
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
