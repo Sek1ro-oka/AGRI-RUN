@@ -23,6 +23,16 @@
         android:layout_marginTop="8dp"
         android:orientation="vertical" />
 
+    <TextView
+        android:id="@+id/textNoRoutes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingVertical="14dp"
+        android:text="@string/campus_routes_empty"
+        android:textColor="@color/campus_muted"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"

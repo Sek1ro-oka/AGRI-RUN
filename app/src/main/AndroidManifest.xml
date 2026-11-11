@@ -62,7 +62,8 @@
         <activity
             android:name=".ui.SettingsCheckActivity"
             android:exported="false"
-            android:label="@string/settings_title" />
+            android:label="@string/settings_title"
+            android:theme="@style/Theme.RouteWorkshop.Home" />
 
         <activity
             android:name=".ui.DiagnosticsActivity"

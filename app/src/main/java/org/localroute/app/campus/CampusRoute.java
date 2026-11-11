@@ -9,9 +9,9 @@ import java.util.List;
 /**
  * 一条校园跑圈路线：地图上的设计点 + 这条路线自己的米/单位比例。
  *
- * <p>预设 A 操 / B 操按目标长度反推比例（400 米 / 600 米），自定义路线使用
- * 固定比例 0.9 米/单位。路线本身不保存运行状态；每次开始跑圈时再叠加
- * 路径浮动并编译成 {@link org.localroute.core.CompiledRoute}。
+ * <p>目前路线只来自用户在地图上绘制的自定义路线，使用固定比例 0.9 米/单位
+ * 与默认校园基准点；后续可由导入能力补充更多路线。路线本身不保存运行状态；
+ * 每次开始跑圈时再叠加路径浮动并编译成 {@link org.localroute.core.CompiledRoute}。
  */
 public final class CampusRoute {
 
@@ -24,52 +24,23 @@ public final class CampusRoute {
     private final List<CampusPoint> rawWaypoints;
     private final double metersPerUnit;
     private final double lapMeters;
-    private final boolean custom;
 
     private CampusRoute(String id, String name, List<CampusPoint> points,
                         List<CampusPoint> rawWaypoints, double metersPerUnit,
-                        double lapMeters, boolean custom) {
+                        double lapMeters) {
         this.id = id;
         this.name = name;
         this.points = Collections.unmodifiableList(new ArrayList<>(points));
         this.rawWaypoints = Collections.unmodifiableList(new ArrayList<>(rawWaypoints));
         this.metersPerUnit = metersPerUnit;
         this.lapMeters = lapMeters;
-        this.custom = custom;
     }
 
-    public static CampusRoute presetA() {
-        return preset("A", "A操", 180d, 490d, 104d, 62d, 400d);
-    }
-
-    public static CampusRoute presetB() {
-        return preset("B", "B操", 180d, 120d, 126d, 76d, 600d);
-    }
-
-    /**
-     * 预设跑道：保持地图上的椭圆形状，按目标圈长反算比例。
-     * 迭代 3 次，让地理长度与目标值的误差远小于 1 米。
-     */
-    public static CampusRoute preset(String id, String name, double cx, double cy,
-                                     double rx, double ry, double targetMeters) {
-        List<CampusPoint> points = CampusGeo.ellipse(cx, cy, rx, ry, 160);
-        double scale = targetMeters / CampusGeo.perimeterMeters(points, 1d);
-        for (int i = 0; i < 3; i++) {
-            double actual = CampusGeo.perimeterMeters(points, scale);
-            if (Math.abs(actual - targetMeters) < 0.05d) {
-                break;
-            }
-            scale *= targetMeters / actual;
-        }
-        double actual = CampusGeo.perimeterMeters(points, scale);
-        return new CampusRoute(id, name, points, points, scale, actual, false);
-    }
-
-    /** 自定义路线：把航点平滑成闭合环并计算实际长度。 */
+    /** 自定义路线：把航点平滑成闭合环并计算实际长度，沿用默认校园基准点。 */
     public static CampusRoute custom(String id, String name, List<CampusPoint> waypoints) {
         List<CampusPoint> loop = CampusGeo.smoothClosed(waypoints);
         double meters = CampusGeo.perimeterMeters(loop, CUSTOM_METERS_PER_UNIT);
-        return new CampusRoute(id, name, loop, waypoints, CUSTOM_METERS_PER_UNIT, meters, true);
+        return new CampusRoute(id, name, loop, waypoints, CUSTOM_METERS_PER_UNIT, meters);
     }
 
     public String id() {
@@ -78,10 +49,6 @@ public final class CampusRoute {
 
     public String name() {
         return name;
-    }
-
-    public boolean isCustom() {
-        return custom;
     }
 
     public double metersPerUnit() {
@@ -97,13 +64,18 @@ public final class CampusRoute {
         return points;
     }
 
-    /** 用于持久化的原始航点：自定义路线保存用户点选的节点，预设路线保存完整采样点。 */
+    /** 用于持久化的原始航点：自定义路线保存用户点选的节点。 */
     public List<CampusPoint> waypointsForSave() {
         return rawWaypoints;
     }
 
     public CampusPoint startPoint() {
         return points.get(0);
+    }
+
+    /** 当前路线在真实地图上的 WGS-84 坐标（不叠加路径浮动）。 */
+    public List<GeoPoint> geoPoints() {
+        return CampusGeo.toGeoList(points, metersPerUnit);
     }
 
     public GeoPoint startGeo() {

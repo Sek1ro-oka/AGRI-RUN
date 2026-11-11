@@ -82,12 +82,15 @@
     <string name="toast_gpx_read_failed">读取 GPX 文件失败：%1$s</string>
 
     <!-- 设置检查页 -->
-    <string name="settings_title">设置检查</string>
+    <string name="settings_title">设置</string>
     <string name="settings_recheck">重新检查</string>
     <string name="settings_open_dev_options">打开开发者选项</string>
     <string name="settings_open_app_details">打开应用详情</string>
     <string name="settings_probe_mock">检测模拟位置权限</string>
     <string name="settings_probe_hint">「检测模拟位置权限」会创建并立刻移除一个测试 provider，用来判断系统是否允许本应用提交模拟位置；运行中请勿使用。</string>
+    <string name="settings_section_environment">环境检查</string>
+    <string name="settings_intro">按下面顺序准备环境。任一项是「失败」时，模拟位置不会被系统接受。</string>
+    <string name="settings_section_overlay">悬浮控制台</string>
 
     <!-- 诊断页 -->
     <string name="diagnostics_title">诊断信息</string>
@@ -140,11 +143,34 @@
     <string name="menu_overlay_no_permission">需要先授予「显示在其他应用上层」权限</string>
     <string name="menu_overlay_on">悬浮控制条已开启：运行中切到别的应用也能暂停/停止</string>
     <string name="menu_overlay_off">悬浮控制条已关闭</string>
-    <string name="settings_overlay_title">悬浮控制条权限</string>
-    <string name="settings_overlay_hint">允许后，运行中在别的应用上也能暂停或停止</string>
+    <string name="settings_overlay_title">摇杆悬浮窗</string>
+    <string name="settings_overlay_hint">浮在其他应用上方，用摇杆控制人物行走</string>
     <string name="settings_overlay_grant">去授权</string>
     <string name="settings_overlay_ok">已授权</string>
     <string name="settings_overlay_missing">未授权</string>
+    <string name="settings_overlay_status_on">已开启 · 已授权</string>
+    <string name="settings_overlay_status_on_missing">已开启 · 未授权</string>
+    <string name="settings_overlay_status_off">未开启</string>
+    <string name="settings_overlay_enable_toast">悬浮控制台已开启</string>
+    <string name="settings_overlay_disable_toast">悬浮控制台已关闭</string>
+    <string name="settings_overlay_need_permission_toast">需要「显示在其他应用上层」权限，授权后回来再打开开关</string>
+    <string name="settings_overlay_denied_toast">还没获得悬浮窗权限，开关保持关闭</string>
+
+    <!-- 悬浮摇杆控制台 -->
+    <string name="overlay_home">返回主界面</string>
+    <string name="overlay_pause_run">暂停跑圈</string>
+    <string name="overlay_resume_run">继续跑圈</string>
+    <string name="overlay_joystick">虚拟摇杆，拖动控制人物行走</string>
+    <string name="overlay_grip">拖动悬浮窗</string>
+    <string name="overlay_gear_walk">行走</string>
+    <string name="overlay_gear_run">跑步</string>
+    <string name="overlay_gear_ride">骑行</string>
+    <string name="overlay_gear_toast">已切换为%1$s · %2$s km/h</string>
+    <string name="overlay_paused_toast">已暂停跑圈</string>
+    <string name="overlay_resumed_toast">已继续跑圈</string>
+    <string name="overlay_starting_toast">正在启动，请稍候</string>
+    <string name="overlay_idle_toast">当前没有跑圈，拖动摇杆即可开始单点保持</string>
+    <string name="overlay_need_permission">请先授予「显示在其他应用上层」权限</string>
     <string name="option_connect_first">将当前末点连接到第一个点</string>
     <string name="label_end_behavior">到终点</string>
     <string name="end_stop_at_end">停止</string>
@@ -189,9 +215,9 @@
     <string name="campus_vary_title">路径浮动</string>
     <string name="campus_vary_hint">轨迹在路线两侧自然漂移，每次跑圈略有差异</string>
     <string name="campus_route_title">跑圈路线</string>
-    <string name="campus_route_hint">点击切换 A操 / B操 / 自定义</string>
-    <string name="campus_route_a_summary">A操 · 单圈 400 m</string>
-    <string name="campus_route_b_summary">B操 · 单圈 600 m</string>
+    <string name="campus_route_hint">选择或绘制路线</string>
+    <string name="campus_route_none">未选择路线</string>
+    <string name="campus_route_required">还没有路线，请先点「目标」绘制一条</string>
     <string name="campus_route_custom_summary">自定义路线 · 单圈 %1$s</string>
     <string name="campus_route_info">%1$s · 单圈 %2$s</string>
     <string name="campus_route_lap_only">单圈 %1$s</string>
@@ -211,8 +237,21 @@
     <string name="campus_click_start_hint">点「开始」启动跑圈，或先调整目标与传送点</string>
     <string name="campus_map_tag">模拟定位</string>
     <string name="campus_map_mode">系统模拟</string>
+    <string name="campus_map_mode_amap">高德 SDK</string>
+    <string name="campus_map_mode_tiles">高德瓦片</string>
     <string name="campus_goal">目标</string>
     <string name="campus_teleport">传送</string>
+    <string name="campus_map_actions_label">传送/定位</string>
+    <string name="campus_map_actions_desc">传送或定位当前位置</string>
+    <string name="campus_menu_teleport">传送到地图位置</string>
+    <string name="campus_menu_locate">定位当前位置</string>
+    <string name="campus_locate_done">已定位到当前位置</string>
+    <string name="campus_locate_device">已定位到设备当前位置</string>
+    <string name="campus_locate_searching">正在获取设备定位…</string>
+    <string name="campus_locate_permission">先允许定位权限，再点一次「定位当前位置」</string>
+    <string name="campus_locate_off">系统定位开关是关的，请先打开</string>
+    <string name="campus_locate_fallback">没有可用的设备定位，已回到路线起点</string>
+    <string name="campus_locate_missing">还没有当前位置：请打开系统定位、绘制路线或开始跑圈</string>
     <string name="campus_action_start">开始</string>
     <string name="campus_action_pause">暂停</string>
     <string name="campus_action_resume">继续</string>
@@ -240,6 +279,7 @@
     <string name="campus_draw_overwrite_message">重新绘制会覆盖已保存的自定义路线，确定继续？</string>
     <string name="campus_draw_overwrite_confirm">继续绘制</string>
     <string name="campus_routes_title">选择跑圈路线</string>
+    <string name="campus_routes_empty">还没有路线。点下方按钮在地图上绘制一条。</string>
     <string name="campus_routes_draw">＋ 绘制自定义路线</string>
     <string name="campus_routes_close">关闭</string>
     <string name="campus_done_completed">跑圈完成</string>

@@ -12,12 +12,11 @@ import java.util.Random;
  * 校园快跑的设计坐标 ↔ WGS-84 换算与几何工具。
  *
  * <p>地图是 360 × 620 的示意图，不是真实比例尺；每条路线自带
- * {@code metersPerUnit}（每设计单位对应多少米），因此同一张图上的
- * A 操 400 米与 B 操 600 米都能落在各自的跑道上。所有可见路线与提交给
+ * {@code metersPerUnit}（每设计单位对应多少米）。所有可见路线与提交给
  * 系统的模拟位置都由同一组设计点换算，跑者位置再换算回设计坐标绘制。
  *
- * <p>坐标基准取浙江农林大学东湖校区附近的固定点；这是演示用虚拟位置，
- * 不声称是真实操场测绘坐标。
+ * <p>路线以浙江农林大学东湖校区附近的固定点为基准。这是课程演示用的
+ * 虚拟位置，不声称是专业测绘坐标。
  */
 public final class CampusGeo {
 
@@ -36,20 +35,23 @@ public final class CampusGeo {
     private CampusGeo() {
     }
 
-    private static double metersPerDegreeLon() {
-        return METERS_PER_DEGREE_LAT * Math.cos(Math.toRadians(ANCHOR_LAT));
+    private static double metersPerDegreeLon(double latitude) {
+        return METERS_PER_DEGREE_LAT * Math.cos(Math.toRadians(latitude));
     }
 
-    /** 设计坐标 → WGS-84。y 向下为南，x 向右为东。 */
+    /**
+     * 设计坐标 → WGS-84：把设计中心 {@code (CENTER_X, CENTER_Y)} 放到基准点，
+     * y 向下为南，x 向右为东。
+     */
     public static GeoPoint toGeo(CampusPoint point, double metersPerUnit) {
         double latitude = ANCHOR_LAT - (point.y - CENTER_Y) * metersPerUnit / METERS_PER_DEGREE_LAT;
-        double longitude = ANCHOR_LON + (point.x - CENTER_X) * metersPerUnit / metersPerDegreeLon();
+        double longitude = ANCHOR_LON + (point.x - CENTER_X) * metersPerUnit / metersPerDegreeLon(ANCHOR_LAT);
         return new GeoPoint(latitude, longitude);
     }
 
-    /** WGS-84 → 设计坐标。 */
+    /** WGS-84 → 设计坐标，与 {@link #toGeo(CampusPoint, double)} 互逆。 */
     public static CampusPoint toDesign(GeoPoint point, double metersPerUnit) {
-        double x = CENTER_X + (point.longitude() - ANCHOR_LON) * metersPerDegreeLon() / metersPerUnit;
+        double x = CENTER_X + (point.longitude() - ANCHOR_LON) * metersPerDegreeLon(ANCHOR_LAT) / metersPerUnit;
         double y = CENTER_Y - (point.latitude() - ANCHOR_LAT) * METERS_PER_DEGREE_LAT / metersPerUnit;
         return new CampusPoint(x, y);
     }

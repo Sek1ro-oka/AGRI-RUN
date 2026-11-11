@@ -122,6 +122,7 @@ public final class RouteMapController implements RouteMapHost {
      */
     private List<GeoPoint> cachedPoints = new ArrayList<>();
     private boolean cachedClosed;
+    private boolean cachedVertices = true;
     @Nullable
     private GeoPoint cachedRunner;
 
@@ -523,10 +524,16 @@ public final class RouteMapController implements RouteMapHost {
     }
 
     public void renderRoute(@NonNull List<GeoPoint> points, boolean closed) {
+        renderRoute(points, closed, true);
+    }
+
+    @Override
+    public void renderRoute(@NonNull List<GeoPoint> points, boolean closed, boolean showVertices) {
         // 先复制再缓存：调用方（编辑器 ViewModel）传的是可变列表，稍后增删节点时
         // 如果直接持有同一引用，缓存会跟着变，切源重放就会拿到错误的历史状态。
         cachedPoints = new ArrayList<>(points);
         cachedClosed = closed;
+        cachedVertices = showVertices;
         drawRoute();
     }
 
@@ -556,9 +563,11 @@ public final class RouteMapController implements RouteMapHost {
         setGeoJson(SOURCE_LINE, FeatureCollection.fromFeatures(lineFeatures));
 
         List<Feature> vertexFeatures = new ArrayList<>();
-        for (int i = 1; i < points.size(); i++) {
-            // 起点单独用 SOURCE_START 画，节点层从第 2 个点开始，避免两层叠色。
-            vertexFeatures.add(Feature.fromGeometry(toDisplayPoint(points.get(i))));
+        if (cachedVertices) {
+            for (int i = 1; i < points.size(); i++) {
+                // 起点单独用 SOURCE_START 画，节点层从第 2 个点开始，避免两层叠色。
+                vertexFeatures.add(Feature.fromGeometry(toDisplayPoint(points.get(i))));
+            }
         }
         setGeoJson(SOURCE_VERTICES, FeatureCollection.fromFeatures(vertexFeatures));
 
@@ -607,6 +616,10 @@ public final class RouteMapController implements RouteMapHost {
 
     /** 视野包住整条路线。 */
     public void fitRoute(@NonNull List<GeoPoint> points) {
+        fitRoute(points, true);
+    }
+
+    private void fitRoute(@NonNull List<GeoPoint> points, boolean mayDefer) {
         if (map == null || points.isEmpty()) {
             return;
         }
@@ -616,16 +629,58 @@ public final class RouteMapController implements RouteMapHost {
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(points.get(0)), 16f));
             return;
         }
-        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        int width = mapView.getWidth();
+        int height = mapView.getHeight();
+        if ((width <= 0 || height <= 0) && mayDefer) {
+            // 刚切到地图页时视图还没量好尺寸，等一帧再按实际视口取景。
+            mapView.post(() -> fitRoute(points, false));
+            return;
+        }
+        double minLat = Double.MAX_VALUE;
+        double maxLat = -Double.MAX_VALUE;
+        double minLon = Double.MAX_VALUE;
+        double maxLon = -Double.MAX_VALUE;
         for (GeoPoint point : points) {
-            builder.include(toDisplay(point));
+            minLat = Math.min(minLat, point.latitude());
+            maxLat = Math.max(maxLat, point.latitude());
+            minLon = Math.min(minLon, point.longitude());
+            maxLon = Math.max(maxLon, point.longitude());
         }
-        try {
-            map.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 96));
-        } catch (RuntimeException ignored) {
-            // 极端情况（两点几乎重合）仍算不出边界：退化为居中。
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(points.get(0)), 17f));
+        double centerLat = (minLat + maxLat) / 2d;
+        double centerLon = (minLon + maxLon) / 2d;
+        if (width <= 0 || height <= 0) {
+            // 视图仍然没有尺寸，退回 MapLibre 的边界算法。
+            LatLngBounds.Builder builder = new LatLngBounds.Builder();
+            for (GeoPoint point : points) {
+                builder.include(toDisplay(point));
+            }
+            try {
+                map.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 96));
+            } catch (RuntimeException ignored) {
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(points.get(0)), 17f));
+            }
+            return;
         }
+        double spanLatMeters = (maxLat - minLat) * 111320d;
+        double spanLonMeters = (maxLon - minLon) * 111320d
+                * Math.cos(Math.toRadians(centerLat));
+        float density = mapView.getResources().getDisplayMetrics().density;
+        int padding = (int) (40f * density);
+        double availableWidth = Math.max(1d, width - padding * 2d);
+        double availableHeight = Math.max(1d, height - padding * 2d);
+        // MapLibre 的缩放层级以 dp 计（512 像素瓦片），所以要按 dp 视口反算米/像素。
+        double metersPerDp = Math.max(spanLatMeters / availableHeight,
+                spanLonMeters / availableWidth) * density;
+        double zoom = Math.log(78271.51696d * Math.cos(Math.toRadians(centerLat)) / metersPerDp)
+                / Math.log(2d);
+        // 校园跑圈只有几百米：按边界算出的层级会把底图放到没有街道参照的程度，
+        // 因此把取景层级限制在能看清校园道路的范围内。
+        double clampedZoom = Math.max(3d, Math.min(17d, zoom));
+        DiagnosticLog.info("取景：视图 " + width + "×" + height
+                + "，路线跨度 " + Math.round(spanLatMeters) + "×" + Math.round(spanLonMeters)
+                + " 米，zoom " + zoom + " → " + clampedZoom);
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(
+                toDisplay(new GeoPoint(centerLat, centerLon)), (float) clampedZoom));
     }
 
     /** 当前地图中心（WGS-84）；地图还没就绪时返回 null（用于「发送单点位置」预填）。 */

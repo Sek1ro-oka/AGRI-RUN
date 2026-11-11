@@ -28,6 +28,16 @@ public interface RouteMapHost {
 
     void renderRoute(List<GeoPoint> points, boolean closed);
 
+    /**
+     * 绘制路线，可选择是否显示每个采样节点。
+     *
+     * <p>校园跑圈用的是上百个平滑采样点，全部画成节点会连成一串“珠子”盖住线；
+     * 绘制自定义路线时才有必要显示用户逐个点下的航点。默认忽略该参数，兼容旧实现。
+     */
+    default void renderRoute(List<GeoPoint> points, boolean closed, boolean showVertices) {
+        renderRoute(points, closed);
+    }
+
     void fitRoute(List<GeoPoint> points);
 
     /** 把镜头移到某个点并放大（定位到当前位置、外部跳转都用它）。 */

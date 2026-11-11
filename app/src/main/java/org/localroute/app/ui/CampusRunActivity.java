@@ -7,6 +7,9 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -36,14 +39,20 @@ import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
+import org.localroute.app.BuildConfig;
 import org.localroute.app.R;
 import org.localroute.app.campus.CampusFormat;
 import org.localroute.app.campus.CampusGeo;
-import org.localroute.app.campus.CampusMapView;
 import org.localroute.app.campus.CampusPoint;
 import org.localroute.app.campus.CampusRoute;
 import org.localroute.app.databinding.ActivityCampusRunBinding;
 import org.localroute.app.databinding.DialogCampusRoutesBinding;
+import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.app.diagnostics.SystemLocationReader;
+import org.localroute.app.map.AmapRouteMapView;
+import org.localroute.app.map.MapBackendPolicy;
+import org.localroute.app.map.RouteMapController;
+import org.localroute.app.map.RouteMapHost;
 import org.localroute.app.run.RunRequest;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
@@ -56,8 +65,11 @@ import org.localroute.core.InvalidRouteException;
 import org.localroute.core.RouteCompiler;
 import org.localroute.core.RunConfig;
 import org.localroute.core.RunState;
+import org.maplibre.android.MapLibre;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -76,7 +88,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     private static final String KEY_LAPS = "laps";
     private static final String KEY_NATURAL = "natural_speed";
     private static final String KEY_VARY = "vary_path";
-    private static final String KEY_ROUTE = "route_id";
     private static final String KEY_CUSTOM_POINTS = "custom_points";
     private static final String KEY_ACTIVE_RUN_ID = "active_run_id";
     private static final String KEY_ACTIVE_LAP = "active_lap_meters";
@@ -98,8 +109,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     private static final long NATURAL_INTERVAL_MS = 2500L;
 
     private static final String ROUTE_CUSTOM_ID = "custom";
-    private static final String ROUTE_A_ID = "A";
-    private static final String ROUTE_B_ID = "B";
 
     /** 权限弹窗期间 Activity 可能重建，用静态字段保存待执行动作（只含纯数据）。 */
     @Nullable
@@ -117,10 +126,24 @@ public final class CampusRunActivity extends AppCompatActivity {
     private CampusRoute route;
     @Nullable
     private CampusRoute customRoute;
+    /** 传送预览点；真实底图直接保存 WGS-84，不再经过设计坐标。 */
     @Nullable
-    private CampusPoint teleportDesign;
+    private GeoPoint teleportTarget;
+    /** 空闲时点「定位当前位置」读到的设备真实位置（WGS-84），用于画点与坐标显示。 */
+    @Nullable
+    private GeoPoint deviceLocation;
+    /** 用户是在「定位当前位置」时被要求授权，授权结果回来后继续定位。 */
+    private boolean pendingLocate;
     @Nullable
     private CampusRoute pendingRouteSwitch;
+
+    @Nullable
+    private RouteMapHost mapHost;
+    /** 已经画到底图上的路线对象；换路线时用它判断是否需要重画。 */
+    @Nullable
+    private CampusRoute renderedRoute;
+    private boolean mapReady;
+    private boolean pendingFit;
 
     private String sport = SPORT_RUN;
     private int paceSeconds = DEFAULT_PACE_RUN;
@@ -168,6 +191,8 @@ public final class CampusRunActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // MapLibre 要求在使用 MapView 之前完成初始化。
+        MapLibre.getInstance(this);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         loadSettings();
 
@@ -188,6 +213,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissionResult);
 
         wireViews();
+        setupMap();
         renderSport();
         renderSetupValues();
 
@@ -222,17 +248,12 @@ public final class CampusRunActivity extends AppCompatActivity {
         naturalEnabled = prefs.getBoolean(KEY_NATURAL, true);
         varyEnabled = prefs.getBoolean(KEY_VARY, true);
         customRoute = loadCustomRoute();
-        String routeId = prefs.getString(KEY_ROUTE, ROUTE_A_ID);
-        if (ROUTE_B_ID.equals(routeId)) {
-            route = CampusRoute.presetB();
-        } else if (ROUTE_CUSTOM_ID.equals(routeId) && customRoute != null) {
-            route = customRoute;
-        } else {
-            route = CampusRoute.presetA();
-        }
+        // 目前没有内置路线，只有用户绘制并保存的自定义路线。
+        route = customRoute;
         activeRunId = prefs.getString(KEY_ACTIVE_RUN_ID, "");
-        activeLapMeters = prefs.getFloat(KEY_ACTIVE_LAP, (float) route.lapMeters());
-        teleportDesign = null;
+        activeLapMeters = prefs.getFloat(KEY_ACTIVE_LAP,
+                route == null ? 0f : (float) route.lapMeters());
+        teleportTarget = null;
     }
 
     private boolean restoreActiveSession(RunSnapshot current) {
@@ -339,20 +360,12 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.buttonGo.setOnClickListener(v -> onGoClicked());
         binding.buttonRunMain.setOnClickListener(v -> onMainControl());
         binding.buttonEndRun.setOnClickListener(v -> requestStop());
-        binding.buttonTeleport.setOnClickListener(v -> onTeleportPressed());
-
-        binding.campusMap.setMapClickListener(point -> {
-            if (drawMode) {
-                addDraftPoint(point);
-            } else if (teleportArmed) {
-                performTeleport(point);
-            }
-        });
+        binding.buttonTeleport.setOnClickListener(this::showMapActionsMenu);
 
         binding.buttonDrawUndo.setOnClickListener(v -> {
             if (!draftPoints.isEmpty()) {
                 draftPoints.remove(draftPoints.size() - 1);
-                binding.campusMap.setDrawMode(true, draftPoints);
+                renderMapDraft();
                 updateDrawBanner();
             }
         });
@@ -370,6 +383,111 @@ public final class CampusRunActivity extends AppCompatActivity {
             binding.doneOverlay.setVisibility(View.GONE);
             showSetupScreen();
         });
+    }
+
+    // ---------------------------------------------------------------- 真实地图
+
+    private void setupMap() {
+        RouteMapController.OnMapClickListener listener = point -> {
+            if (drawMode) {
+                // 自定义路线仍按固定比例存成设计坐标，底图显示的是真实地点。
+                addDraftPoint(CampusGeo.toDesign(point, CampusRoute.CUSTOM_METERS_PER_UNIT));
+            } else if (teleportArmed) {
+                performTeleport(point);
+            }
+        };
+        MapBackendPolicy.Decision backend = MapBackendPolicy.choose(
+                BuildConfig.AMAP_KEY, Arrays.asList(Build.SUPPORTED_ABIS));
+        DiagnosticLog.info("校园快跑地图引擎：" + backend.reason());
+        boolean amapSdk = false;
+        if (backend.usesAmapSdk()) {
+            // SDK 地图会加在同一个 FrameLayout 里；MapLibre 视图必须藏起来，否则会盖住并吃掉触摸。
+            binding.mapView.setVisibility(View.GONE);
+            try {
+                mapHost = new AmapRouteMapView(this, binding.mapContainer, listener);
+                amapSdk = true;
+            } catch (Throwable error) {
+                DiagnosticLog.warn("高德 SDK 初始化失败，改用栅格瓦片底图：" + error);
+                binding.mapView.setVisibility(View.VISIBLE);
+            }
+        }
+        if (mapHost == null) {
+            mapHost = RouteMapController.attach(binding.mapView, listener);
+        }
+        binding.textMapMode.setText(getString(amapSdk
+                ? R.string.campus_map_mode_amap : R.string.campus_map_mode_tiles));
+        mapHost.registerGestureListener();
+        mapHost.setStatusListener(message -> {
+            if (message == null || message.isEmpty()) {
+                binding.textMapStatus.setVisibility(View.GONE);
+                mapReady = true;
+                if (pendingFit && runScreenVisible) {
+                    pendingFit = false;
+                    fitMapToRoute();
+                }
+            } else {
+                binding.textMapStatus.setText(message);
+                binding.textMapStatus.setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
+    /** 把当前路线画到底图；同一路线对象不重复提交（跑圈状态每秒都在刷新）。 */
+    private void syncMapRoute(boolean force) {
+        if (mapHost == null) {
+            return;
+        }
+        if (route == null) {
+            renderedRoute = null;
+            mapHost.renderRoute(Collections.emptyList(), false);
+            return;
+        }
+        if (!force && route == renderedRoute) {
+            return;
+        }
+        renderedRoute = route;
+        // 自定义路线有上百个平滑采样点，只画线，避免节点把线盖成串珠。
+        mapHost.renderRoute(route.geoPoints(), true, false);
+    }
+
+    /** 画自定义路线时只显示已点下的航点；还没点时保留当前路线作参照。 */
+    private void renderMapDraft() {
+        if (mapHost == null) {
+            return;
+        }
+        if (draftPoints.isEmpty()) {
+            renderedRoute = null;
+            syncMapRoute(false);
+            return;
+        }
+        renderedRoute = null;
+        mapHost.renderRoute(
+                CampusGeo.toGeoList(draftPoints, CampusRoute.CUSTOM_METERS_PER_UNIT),
+                draftPoints.size() >= 3, true);
+    }
+
+    /** 请求把镜头框住当前路线；地图或页面还没就绪时，等就绪回调再取景。 */
+    private void requestMapFit() {
+        if (mapHost == null) {
+            return;
+        }
+        pendingFit = true;
+        if (mapReady && runScreenVisible) {
+            pendingFit = false;
+            fitMapToRoute();
+        }
+    }
+
+    private void fitMapToRoute() {
+        if (mapHost == null) {
+            return;
+        }
+        if (route == null) {
+            // 还没有路线时至少把镜头放到校园基准点，方便开始绘制。
+            mapHost.focusOn(new GeoPoint(CampusGeo.ANCHOR_LAT, CampusGeo.ANCHOR_LON));
+            return;
+        }
+        mapHost.fitRoute(route.geoPoints());
     }
 
     private void showSportMenu(View anchor) {
@@ -443,13 +561,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private String routeSummary(@Nullable CampusRoute value) {
         if (value == null) {
-            return getString(R.string.placeholder);
-        }
-        if (ROUTE_A_ID.equals(value.id())) {
-            return getString(R.string.campus_route_a_summary);
-        }
-        if (ROUTE_B_ID.equals(value.id())) {
-            return getString(R.string.campus_route_b_summary);
+            return getString(R.string.campus_route_none);
         }
         return getString(R.string.campus_route_custom_summary, CampusFormat.lapMeters(value.lapMeters()));
     }
@@ -477,13 +589,13 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.drawBar.setVisibility(View.GONE);
         binding.textTeleportHint.setVisibility(View.GONE);
         binding.root.setBackgroundColor(getColor(R.color.campus_setup_bg));
-        binding.campusMap.setPulse(false);
-        binding.campusMap.setDrawMode(false, draftPoints);
-        binding.campusMap.setRoute(route);
-        binding.campusMap.setProgress(0d);
-        binding.campusMap.setMarker(null);
-        teleportDesign = null;
-        binding.campusMap.setTeleportPoint(null);
+        teleportTarget = null;
+        deviceLocation = null;
+        renderedRoute = null;
+        pendingFit = false;
+        if (mapHost != null) {
+            mapHost.renderRunner(null);
+        }
         renderSetupValues();
     }
 
@@ -493,8 +605,16 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.runScreen.setVisibility(View.VISIBLE);
         binding.doneOverlay.setVisibility(View.GONE);
         binding.root.setBackgroundColor(Color.WHITE);
-        binding.campusMap.setRoute(route);
-        binding.campusMap.setDrawMode(drawMode, draftPoints);
+        if (drawMode) {
+            renderMapDraft();
+        } else {
+            syncMapRoute(false);
+        }
+        binding.mapContainer.post(() -> {
+            if (runScreenVisible) {
+                requestMapFit();
+            }
+        });
         if (!drawMode) {
             binding.drawBar.setVisibility(View.GONE);
         }
@@ -512,7 +632,9 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         showRunScreen();
-        toast(getString(R.string.campus_click_start_hint));
+        toast(getString(route == null
+                ? R.string.campus_route_required
+                : R.string.campus_click_start_hint));
     }
 
     private void handleBack() {
@@ -581,6 +703,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         CampusRoute planRoute = route;
         if (planRoute == null) {
+            toast(getString(R.string.campus_route_required));
             return;
         }
         double speedKmh = 3600d / paceSeconds;
@@ -604,7 +727,6 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         route = planRoute;
-        prefs.edit().putString(KEY_ROUTE, route.id()).apply();
 
         CompiledRoute compiled;
         try {
@@ -622,7 +744,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         baseSpeedKmh = speedKmh;
         naturalPhase1 = Math.random() * Math.PI * 2d;
         naturalPhase2 = Math.random() * Math.PI * 2d;
-        teleportDesign = null;
+        teleportTarget = null;
+        deviceLocation = null;
         activeRunId = request.runId();
         claimOwnSession = true;
         stopRequested = false;
@@ -631,14 +754,13 @@ public final class CampusRunActivity extends AppCompatActivity {
                 .putBoolean(KEY_OWNED, true)
                 .putString(KEY_ACTIVE_RUN_ID, activeRunId)
                 .putFloat(KEY_ACTIVE_LAP, (float) activeLapMeters)
-                .putString(KEY_ROUTE, route.id())
                 .apply();
 
         SimulationService.start(this, request);
         showRunScreen();
-        binding.campusMap.setProgress(0d);
-        binding.campusMap.setMarker(null);
-        binding.campusMap.setTeleportPoint(null);
+        if (mapHost != null) {
+            mapHost.renderRunner(null);
+        }
         binding.buttonRunMain.setText(getString(R.string.campus_starting));
         binding.buttonRunMain.setEnabled(false);
         toast(getString(R.string.campus_toast_starting));
@@ -653,7 +775,155 @@ public final class CampusRunActivity extends AppCompatActivity {
         toast(getString(R.string.campus_stopping));
     }
 
-    // ---------------------------------------------------------------- 传送
+    // ---------------------------------------------------------------- 传送 / 定位
+
+    /** 右下角按钮：先选择「传送」或「定位当前位置」。 */
+    private void showMapActionsMenu(View anchor) {
+        if (drawMode) {
+            toast(getString(R.string.campus_draw_finish_first));
+            return;
+        }
+        if (teleportArmed) {
+            // 传送已待命时再点一次就是取消，不再弹菜单。
+            teleportArmed = false;
+            binding.textTeleportHint.setVisibility(View.GONE);
+            return;
+        }
+        PopupMenu popup = new PopupMenu(this, anchor);
+        popup.getMenu().add(0, 1, 0, getString(R.string.campus_menu_teleport));
+        popup.getMenu().add(0, 2, 1, getString(R.string.campus_menu_locate));
+        popup.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) {
+                onTeleportPressed();
+            } else if (item.getItemId() == 2) {
+                locateCurrentPosition();
+            }
+            return true;
+        });
+        popup.show();
+    }
+
+    /**
+     * 定位当前位置。
+     *
+     * <p>跑圈/单点保持中，App 的「当前位置」就是跑者或传送点，先把镜头移回去；
+     * 空闲时改为读取设备真实定位（与旧版「定位到当前位置」一致），读不到才退回路线起点。
+     */
+    private void locateCurrentPosition() {
+        if (mapHost == null) {
+            return;
+        }
+        if (claimOwnSession && snapshot.hasPosition()
+                && Double.isFinite(snapshot.latitude()) && Double.isFinite(snapshot.longitude())) {
+            mapHost.focusOn(new GeoPoint(snapshot.latitude(), snapshot.longitude()));
+            toast(getString(R.string.campus_locate_done));
+            return;
+        }
+        if (teleportTarget != null) {
+            mapHost.focusOn(teleportTarget);
+            toast(getString(R.string.campus_locate_done));
+            return;
+        }
+        if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            pendingLocate = true;
+            toast(getString(R.string.campus_locate_permission));
+            permissionLauncher.launch(new String[]{Manifest.permission.ACCESS_FINE_LOCATION});
+            return;
+        }
+        locateByDevice();
+    }
+
+    /** 先读系统缓存的最近位置；没有就请求一次实时定位，仍拿不到再退回路线起点。 */
+    @SuppressWarnings("deprecation")
+    private void locateByDevice() {
+        if (mapHost == null) {
+            return;
+        }
+        LocationManager manager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        if (manager == null || !manager.isLocationEnabled()) {
+            toast(getString(R.string.campus_locate_off));
+            locateFallback();
+            return;
+        }
+        SystemLocationReader.Probe best = null;
+        for (SystemLocationReader.Probe probe : SystemLocationReader.readAll(this)) {
+            // 跳过模拟来源：本应用自己跑圈时提交的假位置不能被当成「设备当前位置」。
+            if (!probe.hasFix() || probe.markedMock()) {
+                continue;
+            }
+            if (best == null || probe.ageMillis() < best.ageMillis()) {
+                best = probe;
+            }
+        }
+        if (best != null) {
+            showDeviceLocated(best.point(), best.provider);
+            return;
+        }
+        toast(getString(R.string.campus_locate_searching));
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                manager.getCurrentLocation(LocationManager.GPS_PROVIDER, null, getMainExecutor(),
+                        location -> {
+                            if (location == null) {
+                                locateFallback();
+                            } else {
+                                showDeviceLocated(new GeoPoint(location.getLatitude(),
+                                        location.getLongitude()), location.getProvider());
+                            }
+                        });
+            } else {
+                // Android 10 没有 getCurrentLocation，用一次单次请求代替。
+                manager.requestSingleUpdate(LocationManager.GPS_PROVIDER,
+                        new LocationListener() {
+                            @Override
+                            public void onLocationChanged(@NonNull Location location) {
+                                showDeviceLocated(new GeoPoint(location.getLatitude(),
+                                        location.getLongitude()), location.getProvider());
+                            }
+
+                            @Override
+                            public void onStatusChanged(String provider, int status, Bundle extras) {
+                            }
+
+                            @Override
+                            public void onProviderEnabled(@NonNull String provider) {
+                            }
+
+                            @Override
+                            public void onProviderDisabled(@NonNull String provider) {
+                                locateFallback();
+                            }
+                        }, getMainLooper());
+            }
+        } catch (SecurityException | IllegalArgumentException error) {
+            DiagnosticLog.warn("定位：请求设备位置失败 " + error);
+            locateFallback();
+        }
+    }
+
+    private void showDeviceLocated(GeoPoint point, String provider) {
+        if (mapHost == null) {
+            return;
+        }
+        deviceLocation = point;
+        mapHost.renderRunner(point);
+        mapHost.focusOn(point);
+        binding.textCoordinates.setText(CampusFormat.coordinates(point.latitude(), point.longitude()));
+        toast(getString(R.string.campus_locate_device));
+        DiagnosticLog.info("定位到设备当前位置：" + point.format() + " via " + provider);
+    }
+
+    /** 设备定位不可用时退回路线起点，让「定位」至少回到本页可解释的位置。 */
+    private void locateFallback() {
+        GeoPoint start = route == null ? null : route.startGeo();
+        if (start == null || mapHost == null) {
+            toast(getString(R.string.campus_locate_missing));
+            return;
+        }
+        deviceLocation = null;
+        mapHost.focusOn(start);
+        toast(getString(R.string.campus_locate_fallback));
+    }
 
     private void onTeleportPressed() {
         if (drawMode) {
@@ -674,16 +944,14 @@ public final class CampusRunActivity extends AppCompatActivity {
         toast(getString(R.string.campus_teleport_hint));
     }
 
-    private void performTeleport(CampusPoint designPoint) {
+    private void performTeleport(GeoPoint target) {
         teleportArmed = false;
         binding.textTeleportHint.setVisibility(View.GONE);
-        if (route == null) {
-            return;
+        teleportTarget = target;
+        if (mapHost != null) {
+            mapHost.renderRunner(target);
+            mapHost.focusOn(target);
         }
-        GeoPoint target = CampusGeo.toGeo(designPoint, route.metersPerUnit());
-        teleportDesign = designPoint;
-        binding.campusMap.setTeleportPoint(designPoint);
-        binding.campusMap.setMarker(designPoint);
 
         if (snapshot.isActive()) {
             if (!claimOwnSession) {
@@ -713,7 +981,8 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         RunRequest request = RunRequest.createSinglePoint(target);
-        teleportDesign = route == null ? null : route.toDesign(target.latitude(), target.longitude());
+        teleportTarget = target;
+        deviceLocation = null;
         activeLapMeters = 0d;
         activeRunId = request.runId();
         claimOwnSession = true;
@@ -726,8 +995,10 @@ public final class CampusRunActivity extends AppCompatActivity {
                 .apply();
         SimulationService.start(this, request);
         showRunScreen();
-        binding.campusMap.setTeleportPoint(teleportDesign);
-        binding.campusMap.setMarker(teleportDesign);
+        if (mapHost != null) {
+            mapHost.renderRunner(target);
+            mapHost.focusOn(target);
+        }
         toast(getString(R.string.campus_teleport_hold_started));
     }
 
@@ -749,10 +1020,16 @@ public final class CampusRunActivity extends AppCompatActivity {
         boolean fineGranted = hasPermission(Manifest.permission.ACCESS_FINE_LOCATION);
         GeoPoint teleport = pendingTeleport;
         PendingStart start = pendingStart;
+        boolean locate = pendingLocate;
         pendingTeleport = null;
         pendingStart = null;
+        pendingLocate = false;
         if (!fineGranted) {
-            toast(getString(R.string.campus_permission_missing));
+            toast(getString(locate ? R.string.campus_locate_permission
+                    : R.string.campus_permission_missing));
+            if (locate) {
+                locateFallback();
+            }
             return;
         }
         if (teleport != null) {
@@ -761,6 +1038,10 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         if (start != null) {
             ensureMockReady(() -> startRouteNow(start.route, start.speedKmh, start.loops));
+            return;
+        }
+        if (locate) {
+            locateByDevice();
             return;
         }
         toast(getString(R.string.campus_toast_pending));
@@ -843,7 +1124,6 @@ public final class CampusRunActivity extends AppCompatActivity {
                 .putBoolean(KEY_OWNED, false)
                 .remove(KEY_ACTIVE_RUN_ID)
                 .apply();
-        binding.campusMap.setPulse(false);
 
         if (pendingRouteSwitch != null) {
             CampusRoute target = pendingRouteSwitch;
@@ -930,43 +1210,40 @@ public final class CampusRunActivity extends AppCompatActivity {
                     binding.textLapInfo.setText(getString(R.string.campus_lap_info, current, target));
                 }
             }
+        } else {
+            binding.textRouteInfo.setText(getString(R.string.campus_route_none));
+            binding.textLapInfo.setText(getString(R.string.placeholder));
         }
 
         if (snapshot.hasPosition() && ours
                 && Double.isFinite(snapshot.latitude()) && Double.isFinite(snapshot.longitude())) {
             binding.textCoordinates.setText(
                     CampusFormat.coordinates(snapshot.latitude(), snapshot.longitude()));
+        } else if (!active && deviceLocation != null) {
+            binding.textCoordinates.setText(
+                    CampusFormat.coordinates(deviceLocation.latitude(), deviceLocation.longitude()));
         } else if (route != null) {
             GeoPoint start = route.startGeo();
             binding.textCoordinates.setText(CampusFormat.coordinates(start.latitude(), start.longitude()));
+        } else {
+            binding.textCoordinates.setText(getString(R.string.placeholder));
         }
 
-        if (route != null) {
-            binding.campusMap.setRoute(route);
-            // STARTING 阶段的快照还没有经纬度（NaN），必须先检查有限性再换算。
-            if (ours && snapshot.hasPosition()
-                    && Double.isFinite(snapshot.latitude()) && Double.isFinite(snapshot.longitude())) {
-                binding.campusMap.setMarker(route.toDesign(snapshot.latitude(), snapshot.longitude()));
-            } else if (!active) {
-                binding.campusMap.setMarker(null);
-            }
-            if (single) {
-                binding.campusMap.setProgress(0d);
-            } else if (ours && snapshot.state() == RunState.COMPLETED) {
-                binding.campusMap.setProgress(1d);
-            } else if (ours && active && lapMeters > 0d) {
-                binding.campusMap.setProgress(snapshot.distanceMeters() / lapMeters);
-            } else if (!ours) {
-                binding.campusMap.setProgress(0d);
+        if (mapHost != null) {
+            if (!drawMode) {
+                syncMapRoute(false);
+                // STARTING 阶段的快照还没有经纬度（NaN），必须先检查有限性再换算。
+                if (ours && snapshot.hasPosition()
+                        && Double.isFinite(snapshot.latitude()) && Double.isFinite(snapshot.longitude())) {
+                    mapHost.renderRunner(new GeoPoint(snapshot.latitude(), snapshot.longitude()));
+                } else if (!active) {
+                    mapHost.renderRunner(teleportTarget != null ? teleportTarget : deviceLocation);
+                }
             }
         }
-        binding.campusMap.setTeleportPoint(teleportDesign);
-
-        boolean pulse = active && snapshot.state() == RunState.RUNNING && !single && !drawMode;
-        binding.campusMap.setPulse(pulse);
 
         boolean starting = ours && snapshot.state() == RunState.STARTING;
-        binding.buttonRunMain.setEnabled(!drawMode && !starting);
+        binding.buttonRunMain.setEnabled(!drawMode && !starting && (route != null || active));
         if (starting) {
             binding.buttonRunMain.setText(getString(R.string.campus_starting));
             tintMainButton(R.color.campus_track);
@@ -1025,8 +1302,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         DialogCampusRoutesBinding sheet = DialogCampusRoutesBinding.inflate(getLayoutInflater());
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         sheet.routeList.removeAllViews();
-        addRouteRow(sheet.routeList, CampusRoute.presetA(), dialog);
-        addRouteRow(sheet.routeList, CampusRoute.presetB(), dialog);
+        sheet.textNoRoutes.setVisibility(customRoute == null ? View.VISIBLE : View.GONE);
         if (customRoute != null) {
             addRouteRow(sheet.routeList, customRoute, dialog);
         }
@@ -1133,17 +1409,20 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void applyRoute(CampusRoute candidate) {
         route = candidate;
-        teleportDesign = null;
+        teleportTarget = null;
         activeLapMeters = candidate.lapMeters();
-        prefs.edit().putString(KEY_ROUTE, candidate.id()).apply();
         binding.textRouteSummary.setText(routeSummary(candidate));
-        if (binding.campusMap != null) {
-            binding.campusMap.setRoute(candidate);
-            binding.campusMap.setProgress(0d);
-            binding.campusMap.setMarker(null);
-            binding.campusMap.setTeleportPoint(null);
+        renderedRoute = null;
+        if (mapHost != null) {
+            mapHost.renderRunner(null);
+            if (drawMode) {
+                renderMapDraft();
+            } else {
+                syncMapRoute(true);
+            }
         }
         if (runScreenVisible) {
+            requestMapFit();
             updateRunUi();
         }
     }
@@ -1162,10 +1441,12 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.textTeleportHint.setVisibility(View.GONE);
         binding.drawBar.setVisibility(View.VISIBLE);
         updateDrawBanner();
-        binding.campusMap.setDrawMode(true, draftPoints);
-        binding.campusMap.setProgress(0d);
-        binding.campusMap.setMarker(null);
-        binding.campusMap.setTeleportPoint(null);
+        renderedRoute = null;
+        renderMapDraft();
+        if (mapHost != null) {
+            mapHost.renderRunner(null);
+        }
+        requestMapFit();
         updateRunUi();
     }
 
@@ -1173,7 +1454,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         drawMode = false;
         draftPoints.clear();
         binding.drawBar.setVisibility(View.GONE);
-        binding.campusMap.setDrawMode(false, draftPoints);
+        renderedRoute = null;
+        syncMapRoute(true);
         updateRunUi();
     }
 
@@ -1183,7 +1465,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         draftPoints.add(point);
-        binding.campusMap.setDrawMode(true, draftPoints);
+        renderMapDraft();
         updateDrawBanner();
     }
 
@@ -1217,8 +1499,19 @@ public final class CampusRunActivity extends AppCompatActivity {
     // ---------------------------------------------------------------- 收尾
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        if (mapHost != null) {
+            mapHost.onStart();
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        if (mapHost != null) {
+            mapHost.onResume();
+        }
         if (runScreenVisible) {
             updateRunUi();
         }
@@ -1226,15 +1519,45 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
-        binding.campusMap.setPulse(false);
+        if (mapHost != null) {
+            mapHost.onPause();
+        }
         super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        if (mapHost != null) {
+            mapHost.onStop();
+        }
+        super.onStop();
     }
 
     @Override
     protected void onDestroy() {
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
+        if (mapHost != null) {
+            mapHost.onDestroy();
+            mapHost = null;
+        }
         super.onDestroy();
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (mapHost != null) {
+            mapHost.onLowMemory();
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (mapHost != null) {
+            mapHost.onSaveInstanceState(outState);
+        }
     }
 
     private void toast(String message) {

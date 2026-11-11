@@ -364,7 +364,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="@string/campus_route_a_summary"
+                            android:text="@string/campus_route_none"
                             android:textColor="@color/campus_muted"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -624,7 +624,7 @@
                 android:id="@+id/textRouteInfo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/campus_route_a_summary"
+                android:text="@string/campus_route_none"
                 android:textColor="@color/campus_ink"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -657,13 +657,15 @@
         </LinearLayout>
 
         <FrameLayout
+            android:id="@+id/mapContainer"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginTop="4dp"
             android:layout_weight="1">
 
-            <org.localroute.app.campus.CampusMapView
-                android:id="@+id/campusMap"
+            <!-- 真实底图：MapLibre + 高德/OSM 栅格瓦片；arm 设备有高德 Key 时改用官方 SDK。 -->
+            <org.maplibre.android.maps.MapView
+                android:id="@+id/mapView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
@@ -792,6 +794,21 @@
                         app:cornerRadius="18dp" />
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- 底图加载失败时的原因提示；正常加载完成后隐藏。 -->
+            <TextView
+                android:id="@+id/textMapStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:layout_marginHorizontal="8dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_campus_chip"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="6dp"
+                android:textColor="@color/state_error"
+                android:textSize="11sp"
+                android:visibility="gone" />
         </FrameLayout>
 
         <FrameLayout
@@ -863,7 +880,7 @@
                     android:layout_width="56dp"
                     android:layout_height="56dp"
                     android:background="@drawable/bg_campus_control"
-                    android:contentDescription="@string/campus_teleport"
+                    android:contentDescription="@string/campus_map_actions_desc"
                     android:elevation="3dp"
                     android:padding="13dp"
                     android:src="@drawable/ic_campus_teleport" />
@@ -872,7 +889,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="@string/campus_teleport"
+                    android:text="@string/campus_map_actions_label"
                     android:textColor="@color/campus_muted"
                     android:textSize="11sp" />
             </LinearLayout>
