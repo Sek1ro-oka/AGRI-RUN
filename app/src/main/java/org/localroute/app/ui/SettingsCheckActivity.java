@@ -283,7 +283,7 @@ public class SettingsCheckActivity extends AppCompatActivity {
                 break;
             case DENIED:
                 title = "系统拒绝了模拟位置";
-                message = "请到开发者选项 →「选择模拟位置信息应用」里选中「青禾校园」，本应用需要出现在该列表中。";
+                message = "请到开发者选项 →「选择模拟位置信息应用」里选中「利群工坊」，本应用需要出现在该列表中。";
                 break;
             case PROVIDER_UNSUPPORTED:
                 title = "设备不支持测试 provider";

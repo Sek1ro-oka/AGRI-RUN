@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">青禾校园</string>
+    <string name="app_name">利群工坊</string>
 
     <!-- 地图区 -->
     <string name="map_hint">点击地图添加节点；拖动与双指缩放不会添加节点</string>
@@ -194,14 +194,13 @@
     <string name="home_settings_title">设置</string>
     <string name="home_settings_subtitle">模拟定位与权限检查</string>
     <string name="home_first_use_hint">首次使用请先在「设置」完成模拟定位检查，再进入校园快跑。</string>
-    <string name="home_demo_footer">仅供课程演示 · 虚拟定位不会改变真实位置</string>
 
     <!-- 校园快跑 -->
     <string name="campus_entry_title">校园快跑</string>
     <string name="campus_entry_subtitle">虚拟定位跑圈 · A操 400m / B操 600m</string>
     <string name="campus_entry_subtitle_short">虚拟定位跑圈</string>
     <string name="campus_title">校园快跑</string>
-    <string name="campus_demo_label">虚拟定位 · 演示</string>
+    <string name="campus_demo_label">虚拟定位</string>
     <string name="campus_back">返回</string>
     <string name="campus_sport_run">跑步</string>
     <string name="campus_sport_walk">步行</string>

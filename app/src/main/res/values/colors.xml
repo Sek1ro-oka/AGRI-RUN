@@ -33,4 +33,7 @@
     <color name="overlay_knob_fill">#FF1B2129</color>
     <color name="overlay_knob_ring">#338AE0C0</color>
     <color name="overlay_chevron">#66C3D0CA</color>
+
+    <!-- 应用图标：暖米色底 + 薄荷绿主色 -->
+    <color name="ic_launcher_background">#FCF8E9</color>
 </resources>

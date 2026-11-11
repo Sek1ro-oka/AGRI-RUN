@@ -41,9 +41,9 @@ import org.localroute.core.RunState;
  * 跨应用悬浮「摇杆控制台」。
  *
  * <p>整体是一块紧凑的小面板：最上面是拖动把手，第二行左「返回主界面」、中「暂停/继续跑圈」、
- * 右上角「&lt; &gt;」缩放键；底部左侧是移动摇杆（直径是其他圆形按钮的 1.5 倍），右侧竖排行走 /
- * 跑步 / 骑行三个档位按钮。暂停按钮左右两格等宽，所以始终居中；缩放键沿对角线拖动即可让整个
- * 控制台等比放大缩小（往左下缩小、往右上放大，0.7—1.4 倍，持久化）。
+ * 右上角「⌊ ⌉」缩放键；中间是移动摇杆，下方并排行走 / 跑步 / 骑行三个档位按钮。摇杆与上下
+ * 按钮排宽度接近，左右对称居中。暂停按钮左右两格等宽，所以始终居中；缩放键沿对角线拖动即可让
+ * 整个控制台等比放大缩小（往左下缩小、往右上放大，0.7—1.4 倍，持久化）。
  *
  * <p>摇杆默认锁定，点一下才解锁；只有没有跑圈任务（空闲或悬浮单点保持）时才允许解锁，
  * 路线跑圈期间由快照强制锁定。解锁后按住摇杆，每 500 毫秒向
@@ -67,11 +67,14 @@ public final class OverlayPanel {
     /** 摇杆命令间隔：与服务端 500 ms 的定位节拍一致，方向变化即时生效。 */
     private static final long DRIVE_INTERVAL_MS = 500L;
 
-    /** 面板里其他圆形按钮的基准直径；摇杆取它的 1.5 倍。 */
+    /** 面板里圆形按钮的基准直径。 */
     private static final int BUTTON_DP = 36;
-    private static final int JOYSTICK_DP = 54;
-    /** 顶行三个按钮并排放下的宽度，整块面板以它为基准宽度。 */
-    private static final int CONTENT_DP = 108;
+    /** 摇杆直径：与上下按钮排的宽度接近，居中摆放。 */
+    private static final int JOYSTICK_DP = 108;
+    /** 三枚按钮加两处间距并排放下的宽度，整块面板以它为基准宽度。 */
+    private static final int CONTENT_DP = 120;
+    /** 按钮之间的水平间距。 */
+    private static final int GAP_DP = 6;
 
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -230,7 +233,7 @@ public final class OverlayPanel {
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = prefs(context).getInt(KEY_X, dp(10));
         params.y = prefs(context).getInt(KEY_Y, dp(88));
-        params.setTitle("青禾校园悬浮控制台");
+        params.setTitle("利群工坊悬浮控制台");
         clampToScreen();
     }
 
@@ -304,11 +307,11 @@ public final class OverlayPanel {
         return top;
     }
 
-    /** 底部区域：移动摇杆贴左下角，行走 / 跑步 / 骑行三个档位按钮竖排在右侧。 */
+    /** 控制区：大摇杆居中，下方并排行走 / 跑步 / 骑行三个档位按钮。 */
     private LinearLayout buildControlCluster() {
-        LinearLayout bottom = new LinearLayout(context);
-        bottom.setOrientation(LinearLayout.HORIZONTAL);
-        bottom.setGravity(Gravity.BOTTOM);
+        LinearLayout cluster = new LinearLayout(context);
+        cluster.setOrientation(LinearLayout.VERTICAL);
+        cluster.setGravity(Gravity.CENTER_HORIZONTAL);
 
         joystick = new JoystickView(context);
         joystick.setContentDescription(context.getString(R.string.overlay_joystick_locked));
@@ -343,15 +346,14 @@ public final class OverlayPanel {
                 unlockJoystick();
             }
         });
-        bottom.addView(joystick,
-                new LinearLayout.LayoutParams(dp(JOYSTICK_DP), dp(JOYSTICK_DP)));
-
-        View spacer = new View(context);
-        bottom.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+        LinearLayout.LayoutParams joystickParams =
+                new LinearLayout.LayoutParams(dp(JOYSTICK_DP), dp(JOYSTICK_DP));
+        joystickParams.topMargin = dp(GAP_DP);
+        cluster.addView(joystick, joystickParams);
 
         LinearLayout gears = new LinearLayout(context);
-        gears.setOrientation(LinearLayout.VERTICAL);
-        gears.setGravity(Gravity.END);
+        gears.setOrientation(LinearLayout.HORIZONTAL);
+        gears.setGravity(Gravity.CENTER);
 
         int[] icons = {R.drawable.ic_overlay_walk, R.drawable.ic_overlay_run,
                 R.drawable.ic_overlay_bike};
@@ -366,16 +368,18 @@ public final class OverlayPanel {
             LinearLayout.LayoutParams params =
                     new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP));
             if (i > 0) {
-                params.topMargin = dp(3);
+                params.leftMargin = dp(GAP_DP);
             }
             gears.addView(button, params);
         }
-        bottom.addView(gears,
-                new LinearLayout.LayoutParams(dp(BUTTON_DP), LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams gearParams =
+                new LinearLayout.LayoutParams(dp(CONTENT_DP), dp(BUTTON_DP));
+        gearParams.topMargin = dp(GAP_DP);
+        cluster.addView(gears, gearParams);
 
-        bottom.setLayoutParams(new LinearLayout.LayoutParams(dp(CONTENT_DP),
+        cluster.setLayoutParams(new LinearLayout.LayoutParams(dp(CONTENT_DP),
                 LinearLayout.LayoutParams.WRAP_CONTENT));
-        return bottom;
+        return cluster;
     }
 
     /** 圆形深色按钮：薄荷绿描边 + 轻触涟漪。 */
@@ -621,9 +625,9 @@ public final class OverlayPanel {
         }
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         int width = scaleHost != null && scaleHost.getMeasuredWidth() > 0
-                ? scaleHost.getMeasuredWidth() : dp(168);
+                ? scaleHost.getMeasuredWidth() : dp(180);
         int height = scaleHost != null && scaleHost.getMeasuredHeight() > 0
-                ? scaleHost.getMeasuredHeight() : dp(260);
+                ? scaleHost.getMeasuredHeight() : dp(320);
         int maxX = Math.max(0, metrics.widthPixels - width);
         int maxY = Math.max(0, metrics.heightPixels - height);
         params.x = Math.max(0, Math.min(params.x, maxX));

@@ -16,11 +16,12 @@ import org.localroute.app.R;
 import java.util.Locale;
 
 /**
- * 悬浮窗等比缩放键：右上角一枚圆形「&lt; &gt;」按钮。
+ * 悬浮窗等比缩放键：右上角一枚圆形「⌊ ⌉」按钮。
  *
  * <p>按住后沿对角线拖动调整整个控制台的大小：往左下拖缩小，往右上拖放大；两者是同一根
  * 对角线上的投影，斜着拖也能稳定变化。位移用屏幕原始坐标计算，悬浮窗在拖动过程中实时缩放
- * 不会让手指与按钮错位。平时显示「&lt; &gt;」，拖动期间在按钮中间显示当前百分比。
+ * 不会让手指与按钮错位。平时显示「⌊ ⌉」（左括号保留下半段、右括号保留上半段），拖动期间在
+ * 按钮中间显示当前百分比。
  *
  * <p>整个面板的可视大小由 {@link OverlayScaleHost} 按同一比例缩放窗口，按钮、摇杆与间距
  * 一起等比变化。
@@ -200,19 +201,20 @@ public final class ScaleControlView extends View {
         return super.performClick();
     }
 
-    /** 「&lt; &gt;」两枚朝外的小箭头，整体居中。 */
+    /** 左「⌊」右「⌉」：左括号只留下半段，右括号只留上半段。 */
     private void buildGlyphs(float width, float height) {
         glyphs.reset();
         float cx = width / 2f;
         float cy = height / 2f;
-        float arrow = dp(3.2f);
-        float gap = dp(2.2f);
-        glyphs.moveTo(cx - gap, cy - arrow);
-        glyphs.lineTo(cx - gap - arrow, cy);
-        glyphs.lineTo(cx - gap, cy + arrow);
-        glyphs.moveTo(cx + gap, cy - arrow);
-        glyphs.lineTo(cx + gap + arrow, cy);
-        glyphs.lineTo(cx + gap, cy + arrow);
+        float arm = dp(4.2f);
+        float half = dp(4.6f);
+        float gap = dp(2.4f);
+        glyphs.moveTo(cx - gap, cy);
+        glyphs.lineTo(cx - gap, cy + half);
+        glyphs.lineTo(cx - gap + arm, cy + half);
+        glyphs.moveTo(cx + gap, cy);
+        glyphs.lineTo(cx + gap, cy - half);
+        glyphs.lineTo(cx + gap - arm, cy - half);
     }
 
     private float dp(float value) {
