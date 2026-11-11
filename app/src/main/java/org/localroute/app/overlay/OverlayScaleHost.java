@@ -24,7 +24,7 @@ final class OverlayScaleHost extends FrameLayout {
     }
 
     void setScale(float value) {
-        float next = ScaleSliderView.clamp(value);
+        float next = ScaleControlView.clamp(value);
         if (Math.abs(this.scale - next) < 0.0005f) {
             return;
         }

@@ -1080,7 +1080,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         String message;
         if (probe == SettingsInspector.MockProbeResult.DENIED) {
             message = "系统拒绝了模拟位置请求：请到「开发者选项 → 选择模拟位置信息应用」里选中"
-                    + "「路线工坊」后重试。";
+                    + "「青禾校园」后重试。";
         } else if (probe == SettingsInspector.MockProbeResult.PROVIDER_UNSUPPORTED) {
             message = "当前设备不支持添加测试 provider，无法伪造位置。";
         } else {

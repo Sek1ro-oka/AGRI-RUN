@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">路线工坊</string>
+    <string name="app_name">青禾校园</string>
 
     <!-- 地图区 -->
     <string name="map_hint">点击地图添加节点；拖动与双指缩放不会添加节点</string>
@@ -164,7 +164,7 @@
     <string name="overlay_joystick_locked">摇杆已锁定，点击解锁</string>
     <string name="overlay_unlock_toast">摇杆已解锁，拖动即可控制人物移动</string>
     <string name="overlay_locked_running_toast">跑圈进行中，摇杆保持锁定</string>
-    <string name="overlay_scale">缩放悬浮窗，左右滑动</string>
+    <string name="overlay_scale">缩放悬浮窗：向左下拖动缩小，向右上拖动放大</string>
     <string name="overlay_scale_percent">%1$d%%</string>
     <string name="overlay_grip">拖动悬浮窗</string>
     <string name="overlay_gear_walk">行走</string>

@@ -1267,7 +1267,7 @@ public class SimulationService extends Service {
     private void notifyError(RunErrorCode code, String message) {
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_route_notify)
-                .setContentTitle("路线工坊：模拟位置已停止")
+                .setContentTitle("青禾校园：模拟位置已停止")
                 .setContentText(code == null ? message : code.name() + " · " + message)
                 .setStyle(new NotificationCompat.BigTextStyle()
                         .bigText((code == null ? "" : code.defaultMessage() + "\n") + message))
@@ -1284,7 +1284,7 @@ public class SimulationService extends Service {
     private Notification buildNotification(RunState state, String text, boolean finalState) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_route_notify)
-                .setContentTitle("路线工坊 · " + stateText(state))
+                .setContentTitle("青禾校园 · " + stateText(state))
                 .setContentText(text)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(openAppIntent())
