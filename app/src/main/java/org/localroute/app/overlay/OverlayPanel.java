@@ -40,15 +40,17 @@ import org.localroute.core.RunState;
 /**
  * 跨应用悬浮「摇杆控制台」。
  *
- * <p>布局对齐参考图：顶部一行两个圆形按钮——左「返回主界面」、右「暂停/继续跑圈」，
- * 中间是拖动把手；中间一个大摇杆；底部三个圆形按钮依次是行走 / 跑步 / 骑行。
+ * <p>布局从上到下：拖动把手、顶部一行（左「返回主界面」·中「暂停/继续跑圈」·右缩放滑杆）、
+ * 大摇杆、底部三个圆形按钮依次是行走 / 跑步 / 骑行。暂停按钮左右两格等宽，所以始终居中；
+ * 右侧滑杆让整个控制台等比放大缩小（0.7—1.4 倍，持久化）。
  *
- * <p>摇杆行为：按住时每 200 毫秒按当前运动速度推进一小步，通过
- * {@link SimulationService#teleportTo(Context, GeoPoint)} 提交新的模拟位置。没有运行任务时
- * 第一下拖动会自动开始「单点保持」；路线跑圈中点摇杆会把任务就地切成单点模式（服务的既有
- * 规则），暂停时摇杆不生效。
+ * <p>摇杆默认锁定，点一下才解锁；只有没有跑圈任务（空闲或悬浮单点保持）时才允许解锁，
+ * 路线跑圈期间由快照强制锁定。解锁后按住摇杆，每 500 毫秒向
+ * {@link SimulationService#drive(Context, GeoPoint, double, double, double)} 下发方向与速度，
+ * 由服务端在定位节拍里推进坐标并发布带速度/航向的定位，松手立即停止。
  *
- * <p>面板可拖动、位置持久化；没有「显示在其他应用上层」权限时整体不显示，由设置页引导授权。
+ * <p>面板可拖动、位置与缩放持久化；没有「显示在其他应用上层」权限时整体不显示，
+ * 由设置页引导授权。
  */
 public final class OverlayPanel {
 
@@ -59,10 +61,10 @@ public final class OverlayPanel {
     private static final String KEY_X = "overlay_x";
     private static final String KEY_Y = "overlay_y";
     private static final String KEY_GEAR = "overlay_gear";
+    private static final String KEY_SCALE = "overlay_scale";
 
-    /** 摇杆推进节拍：200 ms 一小步，接近模拟服务 500 ms 的定位节奏，又足够跟手。 */
-    private static final long MOVE_INTERVAL_MS = 200L;
-    private static final double METERS_PER_DEGREE_LAT = 111320d;
+    /** 摇杆命令间隔：与服务端 500 ms 的定位节拍一致，方向变化即时生效。 */
+    private static final long DRIVE_INTERVAL_MS = 500L;
 
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -97,8 +99,10 @@ public final class OverlayPanel {
     private final SpeedPresets presets;
     private final ImageView[] gearButtons = new ImageView[3];
 
+    private OverlayScaleHost scaleHost;
     private LinearLayout root;
     private JoystickView joystick;
+    private ScaleSliderView scaleSlider;
     private ImageView pauseButton;
     private WindowManager.LayoutParams params;
 
@@ -106,10 +110,11 @@ public final class OverlayPanel {
     private boolean running;
     private boolean moving;
     private boolean gestureAnnounced;
+    private boolean joystickUnlocked;
+    private float overlayScale = 1f;
     private int gear;
     private float moveX;
     private float moveY;
-    private GeoPoint lastPoint;
 
     private final Runnable moveRunnable = this::moveStep;
 
@@ -130,6 +135,7 @@ public final class OverlayPanel {
             }
         });
         this.gear = normalizeGear(prefs.getInt(KEY_GEAR, 1));
+        this.overlayScale = ScaleSliderView.clamp(prefs.getFloat(KEY_SCALE, 1f));
     }
 
     public boolean isShowing() {
@@ -153,13 +159,14 @@ public final class OverlayPanel {
         update(snapshot == null ? RunSnapshot.idle() : snapshot);
         if (!running) {
             try {
-                windowManager.addView(root, params);
+                windowManager.addView(scaleHost, params);
                 running = true;
-                root.post(this::clampOnScreen);
+                scaleHost.post(this::clampOnScreen);
             } catch (RuntimeException e) {
                 android.util.Log.w("OverlayPanel", "addView 失败: " + e, e);
                 // 权限被撤销或窗口被系统拒绝：保持安静，不要因为悬浮窗失败影响主流程。
                 root = null;
+                scaleHost = null;
                 running = false;
             }
         }
@@ -170,12 +177,12 @@ public final class OverlayPanel {
         if (joystick != null) {
             joystick.setInputEnabled(false);
         }
-        if (!running || root == null) {
+        if (!running || scaleHost == null) {
             running = false;
             return;
         }
         try {
-            windowManager.removeView(root);
+            windowManager.removeView(scaleHost);
         } catch (RuntimeException ignored) {
             // 已经被系统移除。
         }
@@ -192,10 +199,13 @@ public final class OverlayPanel {
         root.setClipChildren(false);
         root.setClipToPadding(false);
 
+        // 拖动把手独占最上面一行，放在暂停按钮正上方，避免和摇杆、缩放滑杆抢触摸。
+        root.addView(buildDragRow());
         root.addView(buildTopRow());
 
         joystick = new JoystickView(context);
-        joystick.setContentDescription(context.getString(R.string.overlay_joystick));
+        joystick.setContentDescription(context.getString(R.string.overlay_joystick_locked));
+        joystick.setLocked(!joystickUnlocked);
         joystick.setListener(new JoystickView.Listener() {
             @Override
             public void onMove(float x, float y) {
@@ -218,6 +228,12 @@ public final class OverlayPanel {
                 gestureAnnounced = false;
                 moveX = 0f;
                 moveY = 0f;
+                stopMoving();
+            }
+
+            @Override
+            public void onLockedTap() {
+                unlockJoystick();
             }
         });
         LinearLayout.LayoutParams joyParams =
@@ -227,6 +243,12 @@ public final class OverlayPanel {
 
         root.addView(buildGearRow());
         updateGearStyles();
+
+        scaleHost = new OverlayScaleHost(context);
+        scaleHost.addView(root, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT));
+        scaleHost.setScale(overlayScale);
 
         params = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -244,42 +266,73 @@ public final class OverlayPanel {
         clampToScreen();
     }
 
-    private LinearLayout buildTopRow() {
-        LinearLayout top = new LinearLayout(context);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER);
+    /** 顶部拖动把手：一条细胶囊，位置在暂停按钮上方。 */
+    private LinearLayout buildDragRow() {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
 
-        ImageView home = circleIcon(R.drawable.ic_overlay_home, 56, 15,
-                R.color.overlay_icon, R.string.overlay_home);
-        home.setOnClickListener(v -> openMainScreen());
-        top.addView(home, squareParams(56, 0, 0, 10));
-
-        top.addView(buildGrip(), squareParams(56, 0, 0, 10));
-
-        pauseButton = circleIcon(R.drawable.ic_overlay_pause, 56, 15,
-                R.color.overlay_mint, R.string.overlay_pause_run);
-        pauseButton.setOnClickListener(v -> togglePause());
-        top.addView(pauseButton, squareParams(56, 0, 0, 0));
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        top.setLayoutParams(params);
-        return top;
-    }
-
-    private View buildGrip() {
         FrameLayout grip = new FrameLayout(context);
         grip.setContentDescription(context.getString(R.string.overlay_grip));
+        GradientDrawable pill = new GradientDrawable();
+        pill.setShape(GradientDrawable.RECTANGLE);
+        pill.setCornerRadius(dp(11));
+        pill.setColor(ContextCompat.getColor(context, R.color.overlay_button_fill));
+        pill.setStroke(dp(1), ContextCompat.getColor(context, R.color.overlay_ring));
+        grip.setBackground(pill);
+
         ImageView icon = new ImageView(context);
         icon.setImageResource(R.drawable.ic_overlay_grip);
         icon.setImageTintList(ColorStateList.valueOf(
                 ContextCompat.getColor(context, R.color.overlay_icon_muted)));
         icon.setAlpha(0.8f);
-        FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(
-                dp(18), dp(18), Gravity.CENTER);
-        grip.addView(icon, iconParams);
+        grip.addView(icon, new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
         grip.setOnTouchListener(new DragListener());
-        return grip;
+
+        row.addView(grip, new LinearLayout.LayoutParams(dp(84), dp(22)));
+        row.setLayoutParams(new LinearLayout.LayoutParams(dp(224), dp(30)));
+        return row;
+    }
+
+    /** 顶部功能行：左返回、中暂停、右缩放；左右两格等宽让暂停严格居中。 */
+    private LinearLayout buildTopRow() {
+        LinearLayout top = new LinearLayout(context);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+
+        FrameLayout leftCell = new FrameLayout(context);
+        ImageView home = circleIcon(R.drawable.ic_overlay_home, 56, 15,
+                R.color.overlay_icon, R.string.overlay_home);
+        home.setOnClickListener(v -> openMainScreen());
+        leftCell.addView(home, new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER));
+
+        pauseButton = circleIcon(R.drawable.ic_overlay_pause, 56, 15,
+                R.color.overlay_mint, R.string.overlay_pause_run);
+        pauseButton.setOnClickListener(v -> togglePause());
+
+        FrameLayout rightCell = new FrameLayout(context);
+        scaleSlider = new ScaleSliderView(context);
+        scaleSlider.setScale(overlayScale);
+        scaleSlider.setListener(new ScaleSliderView.Listener() {
+            @Override
+            public void onScaleChanged(float scale) {
+                applyScale(scale, false);
+            }
+
+            @Override
+            public void onScaleCommitted(float scale) {
+                applyScale(scale, true);
+            }
+        });
+        rightCell.addView(scaleSlider,
+                new FrameLayout.LayoutParams(dp(72), dp(48), Gravity.CENTER));
+
+        top.addView(leftCell, new LinearLayout.LayoutParams(0, dp(56), 1f));
+        top.addView(pauseButton, new LinearLayout.LayoutParams(dp(56), dp(56)));
+        top.addView(rightCell, new LinearLayout.LayoutParams(0, dp(56), 1f));
+
+        top.setLayoutParams(new LinearLayout.LayoutParams(dp(224), dp(56)));
+        return top;
     }
 
     private LinearLayout buildGearRow() {
@@ -367,14 +420,23 @@ public final class OverlayPanel {
         pauseButton.setEnabled(state.actionEnabled());
         pauseButton.setAlpha(state.actionEnabled() ? 1f : 0.45f);
 
+        boolean routeTask = snapshot.isActive() && !snapshot.singlePoint();
+        if (routeTask && joystickUnlocked) {
+            // 跑圈一开始就收回解锁：摇杆只服务于手动移动，不能干扰路线推进。
+            joystickUnlocked = false;
+            stopMoving();
+        }
+        boolean locked = routeTask || !joystickUnlocked;
         boolean paused = state.mode() == OverlayViewState.Mode.PAUSED;
         if (joystick != null) {
-            joystick.setAlpha(paused ? 0.55f : 1f);
+            joystick.setLocked(locked);
+            joystick.setContentDescription(context.getString(locked
+                    ? R.string.overlay_joystick_locked : R.string.overlay_joystick));
+            joystick.setAlpha(paused ? 0.55f : locked ? 0.72f : 1f);
             joystick.setInputEnabled(!paused);
         }
         if (state.isIdle() || state.mode() == OverlayViewState.Mode.TERMINAL) {
-            // 没有可推进的任务：清零起点，下一次拖动重新从当前位置/校园锚点开始。
-            lastPoint = null;
+            // 没有可推进的任务：停掉驱动，下一次拖动重新从当前位置/校园锚点开始。
             stopMoving();
         }
     }
@@ -414,6 +476,23 @@ public final class OverlayPanel {
         }
     }
 
+    /** 锁定状态下点摇杆：空闲或单点保持时解锁，跑圈任务中保持锁定并说明原因。 */
+    private void unlockJoystick() {
+        if (snapshot.isActive() && !snapshot.singlePoint()) {
+            toast(context.getString(R.string.overlay_locked_running_toast));
+            return;
+        }
+        if (joystickUnlocked) {
+            return;
+        }
+        joystickUnlocked = true;
+        if (joystick != null) {
+            joystick.setLocked(false);
+            joystick.setContentDescription(context.getString(R.string.overlay_joystick));
+        }
+        toast(context.getString(R.string.overlay_unlock_toast));
+    }
+
     private void selectGear(int index, boolean announce) {
         gear = normalizeGear(index);
         prefs(context).edit().putInt(KEY_GEAR, gear).apply();
@@ -422,16 +501,36 @@ public final class OverlayPanel {
             return;
         }
         double kmh = presets.get(gear);
-        // 路线跑圈中立即改速；单点保持会忽略这条命令，速度由摇杆步进决定。
+        // 路线跑圈中立即改速；手动移动时下一次摇杆命令就按新档位计算速度。
         SimulationService.setSpeedKmh(context, kmh);
         toast(context.getString(R.string.overlay_gear_toast,
                 context.getString(gearLabelRes(gear)), SpeedPresets.format(kmh)));
     }
 
-    // ---------------------------------------------------------------- 摇杆推进
+    // ---------------------------------------------------------------- 缩放
+
+    private void applyScale(float scale, boolean persist) {
+        overlayScale = ScaleSliderView.clamp(scale);
+        if (scaleHost != null) {
+            scaleHost.setScale(overlayScale);
+        }
+        if (persist) {
+            prefs(context).edit().putFloat(KEY_SCALE, overlayScale).apply();
+        }
+        if (running && scaleHost != null) {
+            try {
+                windowManager.updateViewLayout(scaleHost, params);
+            } catch (RuntimeException ignored) {
+                // 视图已被移除。
+            }
+            scaleHost.post(this::clampOnScreen);
+        }
+    }
+
+    // ---------------------------------------------------------------- 摇杆驱动
 
     private void startMoving() {
-        if (moving || !running) {
+        if (moving || !running || isLocked()) {
             return;
         }
         moving = true;
@@ -439,53 +538,37 @@ public final class OverlayPanel {
     }
 
     private void stopMoving() {
+        boolean wasMoving = moving;
         moving = false;
         handler.removeCallbacks(moveRunnable);
+        if (wasMoving) {
+            // 松手、暂停或收起都要让服务端把速度归零，人物不能自己一直走。
+            SimulationService.releaseDrive(context);
+        }
+    }
+
+    private boolean isLocked() {
+        return joystick == null || joystick.isLocked();
     }
 
     private void moveStep() {
         if (!moving) {
             return;
         }
-        if (!running || Math.hypot(moveX, moveY) < 0.04f) {
-            moving = false;
+        if (!running || isLocked() || snapshot.state() == RunState.PAUSED
+                || Math.hypot(moveX, moveY) < 0.04f) {
+            stopMoving();
             return;
         }
-        if (snapshot.state() != RunState.PAUSED) {
-            advance();
-        }
-        if (moving) {
-            handler.postDelayed(moveRunnable, MOVE_INTERVAL_MS);
-        }
+        float magnitude = Math.min(1f, (float) Math.hypot(moveX, moveY));
+        double speedKmh = presets.get(gear) * magnitude;
+        // 摇杆向上为北（-y），向右为东（+x）；服务端按方向推进并发布带速度/航向的定位。
+        SimulationService.drive(context, currentBase(), -moveY, moveX, speedKmh);
+        handler.postDelayed(moveRunnable, DRIVE_INTERVAL_MS);
     }
 
-    /** 按摇杆方向与当前运动速度推进一帧，并提交为新的单点位置。 */
-    private void advance() {
-        float vx = moveX;
-        float vy = moveY;
-        float magnitude = (float) Math.hypot(vx, vy);
-        if (magnitude < 1e-4f) {
-            return;
-        }
-        GeoPoint base = currentBase();
-        double speedKmh = presets.get(gear);
-        double stepMeters = speedKmh / 3.6d * (MOVE_INTERVAL_MS / 1000d)
-                * Math.min(1d, magnitude);
-        double north = -vy / magnitude * stepMeters;
-        double east = vx / magnitude * stepMeters;
-        double latitude = base.latitude() + north / METERS_PER_DEGREE_LAT;
-        double longitude = base.longitude() + east
-                / (METERS_PER_DEGREE_LAT * Math.cos(Math.toRadians(base.latitude())));
-        GeoPoint next = new GeoPoint(latitude, longitude);
-        lastPoint = next;
-        // 冷态时 teleportTo 会走前台服务启动路径，自动开始单点保持。
-        SimulationService.teleportTo(context, next);
-    }
-
+    /** 摇杆起步的锚点：优先用快照里的当前位置，完全冷态才退回校园锚点。 */
     private GeoPoint currentBase() {
-        if (lastPoint != null) {
-            return lastPoint;
-        }
         RunSnapshot current = snapshot;
         if (current.hasPosition()
                 && Double.isFinite(current.latitude())
@@ -494,39 +577,40 @@ public final class OverlayPanel {
                 && Math.abs(current.longitude()) < 1e-9)) {
             return new GeoPoint(current.latitude(), current.longitude());
         }
-        // 完全没有位置时从校园演示锚点起步，拖出第一帧后再按步进推进。
         return new GeoPoint(CampusGeo.ANCHOR_LAT, CampusGeo.ANCHOR_LON);
     }
 
     // ---------------------------------------------------------------- 拖动
 
     private void clampOnScreen() {
-        if (!running || root == null || params == null) {
+        if (!running || scaleHost == null || params == null) {
             return;
         }
         clampToScreen();
         try {
-            windowManager.updateViewLayout(root, params);
+            windowManager.updateViewLayout(scaleHost, params);
         } catch (RuntimeException ignored) {
             // 视图已被移除。
         }
     }
 
-    /** 把 x/y 夹在屏幕内，面板永远完整可见。 */
+    /** 把 x/y 夹在屏幕内，面板（含缩放后的尺寸）永远完整可见。 */
     private void clampToScreen() {
         if (params == null) {
             return;
         }
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-        int width = root != null && root.getWidth() > 0 ? root.getWidth() : dp(232);
-        int height = root != null && root.getHeight() > 0 ? root.getHeight() : dp(376);
+        int width = scaleHost != null && scaleHost.getMeasuredWidth() > 0
+                ? scaleHost.getMeasuredWidth() : dp(232);
+        int height = scaleHost != null && scaleHost.getMeasuredHeight() > 0
+                ? scaleHost.getMeasuredHeight() : dp(408);
         int maxX = Math.max(0, metrics.widthPixels - width);
         int maxY = Math.max(0, metrics.heightPixels - height);
         params.x = Math.max(0, Math.min(params.x, maxX));
         params.y = Math.max(0, Math.min(params.y, maxY));
     }
 
-    /** 只挂在顶部中间的拖动把手上，避免吃掉摇杆和按钮的触摸。 */
+    /** 只挂在顶部把手上，避免吃掉摇杆和按钮的触摸。 */
     private final class DragListener implements View.OnTouchListener {
         private int startX;
         private int startY;
@@ -549,9 +633,9 @@ public final class OverlayPanel {
                     params.x = startX + Math.round(event.getRawX() - touchX);
                     params.y = startY + Math.round(event.getRawY() - touchY);
                     clampToScreen();
-                    if (running) {
+                    if (running && scaleHost != null) {
                         try {
-                            windowManager.updateViewLayout(root, params);
+                            windowManager.updateViewLayout(scaleHost, params);
                         } catch (RuntimeException ignored) {
                             // 视图已被移除。
                         }

@@ -144,7 +144,7 @@
     <string name="menu_overlay_on">悬浮控制条已开启：运行中切到别的应用也能暂停/停止</string>
     <string name="menu_overlay_off">悬浮控制条已关闭</string>
     <string name="settings_overlay_title">摇杆悬浮窗</string>
-    <string name="settings_overlay_hint">浮在其他应用上方，用摇杆控制人物行走</string>
+    <string name="settings_overlay_hint">浮在其他应用上方，用摇杆控制人物行走（默认锁定，点一下解锁）</string>
     <string name="settings_overlay_grant">去授权</string>
     <string name="settings_overlay_ok">已授权</string>
     <string name="settings_overlay_missing">未授权</string>
@@ -161,6 +161,11 @@
     <string name="overlay_pause_run">暂停跑圈</string>
     <string name="overlay_resume_run">继续跑圈</string>
     <string name="overlay_joystick">虚拟摇杆，拖动控制人物行走</string>
+    <string name="overlay_joystick_locked">摇杆已锁定，点击解锁</string>
+    <string name="overlay_unlock_toast">摇杆已解锁，拖动即可控制人物移动</string>
+    <string name="overlay_locked_running_toast">跑圈进行中，摇杆保持锁定</string>
+    <string name="overlay_scale">缩放悬浮窗，左右滑动</string>
+    <string name="overlay_scale_percent">%1$d%%</string>
     <string name="overlay_grip">拖动悬浮窗</string>
     <string name="overlay_gear_walk">行走</string>
     <string name="overlay_gear_run">跑步</string>
@@ -169,7 +174,7 @@
     <string name="overlay_paused_toast">已暂停跑圈</string>
     <string name="overlay_resumed_toast">已继续跑圈</string>
     <string name="overlay_starting_toast">正在启动，请稍候</string>
-    <string name="overlay_idle_toast">当前没有跑圈，拖动摇杆即可开始单点保持</string>
+    <string name="overlay_idle_toast">当前没有跑圈，拖动摇杆即可手动移动</string>
     <string name="overlay_need_permission">请先授予「显示在其他应用上层」权限</string>
     <string name="option_connect_first">将当前末点连接到第一个点</string>
     <string name="label_end_behavior">到终点</string>

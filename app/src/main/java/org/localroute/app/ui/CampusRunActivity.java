@@ -623,7 +623,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     private void onGoClicked() {
-        if (snapshot.isActive()) {
+        if (snapshot.isActive() && !snapshot.singlePoint()) {
             if (claimOwnSession) {
                 showRunScreen();
             } else {
@@ -631,6 +631,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             }
             return;
         }
+        // 悬浮摇杆留下的单点保持不算跑圈任务：照常进入跑圈页，开始后由服务端就地替换。
         showRunScreen();
         toast(getString(route == null
                 ? R.string.campus_route_required
@@ -684,7 +685,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 return;
             }
         }
-        if (snapshot.isActive()) {
+        if (snapshot.isActive() && !snapshot.singlePoint()) {
             toast(getString(R.string.campus_toast_existing));
             return;
         }
@@ -693,7 +694,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void startRouteFlow() {
         binding.doneOverlay.setVisibility(View.GONE);
-        if (snapshot.isActive()) {
+        if (snapshot.isActive() && !snapshot.singlePoint()) {
             if (claimOwnSession) {
                 showRunScreen();
             } else {
@@ -713,7 +714,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     private void requestPermissionsThenStart(CampusRoute planRoute, double speedKmh, int loops) {
         List<String> needed = neededPermissions();
         if (needed.isEmpty()) {
-            ensureMockReady(() -> startRouteNow(planRoute, speedKmh, loops));
+            ensureMockReadyForRoute(planRoute, speedKmh, loops);
             return;
         }
         pendingStart = new PendingStart(planRoute, speedKmh, loops);
@@ -721,8 +722,23 @@ public final class CampusRunActivity extends AppCompatActivity {
         permissionLauncher.launch(needed.toArray(new String[0]));
     }
 
+    /**
+     * 开始跑圈前的模拟位置检查。
+     *
+     * <p>已有悬浮摇杆的单点会话时不能做探测：探测会临时移除 gps 测试 provider，把正在使用它的
+     * 单点会话直接打失败。此时直接启动，服务端会先结束单点并沿用新的 provider 会话开始跑圈。
+     */
+    private void ensureMockReadyForRoute(CampusRoute planRoute, double speedKmh, int loops) {
+        if (snapshot.isActive() && snapshot.singlePoint()) {
+            DiagnosticLog.info("已有单点会话：跳过模拟位置探测，直接切换到跑圈");
+            startRouteNow(planRoute, speedKmh, loops);
+            return;
+        }
+        ensureMockReady(() -> startRouteNow(planRoute, speedKmh, loops));
+    }
+
     private void startRouteNow(CampusRoute planRoute, double speedKmh, int loops) {
-        if (snapshot.isActive()) {
+        if (snapshot.isActive() && !snapshot.singlePoint()) {
             toast(getString(R.string.campus_toast_existing));
             return;
         }
@@ -1037,7 +1053,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         if (start != null) {
-            ensureMockReady(() -> startRouteNow(start.route, start.speedKmh, start.loops));
+            ensureMockReadyForRoute(start.route, start.speedKmh, start.loops);
             return;
         }
         if (locate) {
