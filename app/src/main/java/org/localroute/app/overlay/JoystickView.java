@@ -187,8 +187,8 @@ public final class JoystickView extends View {
     /**
      * 锁标识：上方半圆锁梁 + 下方圆角锁体。
      *
-     * <p>{@code open == true} 时把锁梁向左旋转，右端离开锁体，形成开口锁图形；
-     * 锁定状态保持正上方闭合的锁梁。
+     * <p>闭锁时锁梁两端都落在锁体顶边；解锁时锁梁整体向上提，左端用一段竖线连回
+     * 锁体左肩，右端悬空且明显高于锁体，形成一眼可辨的开口锁。
      */
     private void drawLockGlyph(Canvas canvas, boolean open) {
         float bodyWidth = baseRadius * 0.62f;
@@ -199,14 +199,22 @@ public final class JoystickView extends View {
         canvas.drawRoundRect(body, dp(4f), dp(4f), lockPaint);
 
         float shackleRadius = bodyWidth * 0.30f;
-        RectF shackle = new RectF(centerX - shackleRadius, top - shackleRadius * 1.55f,
-                centerX + shackleRadius, top + shackleRadius * 0.55f);
+        float left = centerX - shackleRadius;
+        float right = centerX + shackleRadius;
         if (open) {
-            canvas.save();
-            canvas.rotate(-30f, centerX, top);
-            canvas.drawArc(shackle, 180f, 180f, false, lockPaint);
-            canvas.restore();
+            // 开口锁：左腿接在锁体左肩，半圆弧向上展开，右端停在锁体上方不闭合。
+            float arcCenterY = top - shackleRadius * 0.55f;
+            RectF shackle = new RectF(left, arcCenterY - shackleRadius,
+                    right, arcCenterY + shackleRadius);
+            Path path = new Path();
+            path.moveTo(left, top);
+            path.lineTo(left, arcCenterY);
+            path.arcTo(shackle, 180f, 180f, false);
+            canvas.drawPath(path, lockPaint);
         } else {
+            // 闭锁：半圆两端正好落在锁体顶边，锁梁与锁体相连。
+            RectF shackle = new RectF(left, top - shackleRadius,
+                    right, top + shackleRadius);
             canvas.drawArc(shackle, 180f, 180f, false, lockPaint);
         }
         // 锁体中心的小锁孔，让两种状态在深色圆盘上都更容易辨认。

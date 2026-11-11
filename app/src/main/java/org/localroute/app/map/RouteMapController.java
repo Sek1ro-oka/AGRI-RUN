@@ -1,7 +1,6 @@
 package org.localroute.app.map;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -36,14 +35,17 @@ import java.util.Locale;
 /**
  * MapLibre 地图封装：只负责“画路线 + 画当前模拟位置 + 把点击坐标交回界面”。
  *
- * <p>瓦片使用 OpenStreetMap 生态的公开栅格服务，遵守其使用政策：保留署名、按需加载、
- * 不做批量预取；若将来高频使用应换成自建或商业瓦片服务（见交付文档）。
+ * <p>瓦片使用高德的公开栅格服务（非官方接口），遵守按需加载、不做批量预取；
+ * 保留 {@code © 高德地图} 署名。若将来高频使用应换成自建或商业瓦片服务。
  *
- * <p>0.1.1 起加了三道兜底，避免用户看到“一片黑”却没有任何解释：
+ * <p>0.5.0 起只暴露两个图层：卫星影像（默认）与标准路网。两者都是 GCJ-02 底图，
+ * 显示层由 {@link ChinaShift} 换算，存储与路线计算始终是 WGS-84。
+ *
+ * <p>同时保留三道兜底，避免用户看到“一片黑”却没有任何解释：
  * <ol>
  *   <li>样式里先放一层浅色 {@code background}，瓦片就算全部失败也不会显示成黑屏；</li>
  *   <li>样式 10 秒内没加载成功就通过 {@link StatusListener} 把原因交给界面显示；</li>
- *   <li>提供多个瓦片源，用户可以在界面里切换并重试。</li>
+ *   <li>图层切换会重建样式并重试，瓦片下载失败时状态行给出原因。</li>
  * </ol>
  */
 public final class RouteMapController implements RouteMapHost {
@@ -68,40 +70,25 @@ public final class RouteMapController implements RouteMapHost {
     /** 探测瓦片时带的 UA：与 OSM 使用政策中「可识别应用」的要求保持一致。 */
     private static final String USER_AGENT = "RouteWorkshop/0.1.3 (Android; local route simulation)";
 
-    private static final String PREFS = "map";
-    private static final String PREF_TILE_SOURCE = "tile_source";
-
     /**
-     * 可选瓦片源。默认用「高德」：国内网络通常能直连，而 tile.openstreetmap.org
-     * 在国内经常 TLS 握手失败（实测 SSLHandshakeException），用户会只看到一张空白底图。
+     * 用户可选的两个图层，顺序与 {@link #currentTileSource()} 对应：卫星在前、标准在后。
      *
-     * <p>高德这组地址是非官方公开接口、且用 GCJ-02 坐标系：前者可能随时失效（失效时可切回 OSM），
-     * 后者由 {@link ChinaShift} 在显示层换算，存储与计算始终是 WGS-84。
+     * <p>两组地址都是非官方公开接口、用 GCJ-02 坐标系：接口可能随时失效，坐标系由
+     * {@link ChinaShift} 在显示层换算，存储与计算始终是 WGS-84。
      */
     private static final List<TileSource> TILE_SOURCES = Arrays.asList(
-            new TileSource("amap", "高德地图（GCJ-02，非官方接口）", CoordSystem.GCJ02, 18,
+            new TileSource("satellite", "卫星地图", CoordSystem.GCJ02, 18,
+                    "© 高德地图",
+                    "https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}",
+                    "https://webst02.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}",
+                    "https://webst03.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}",
+                    "https://webst04.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}"),
+            new TileSource("standard", "当前地图", CoordSystem.GCJ02, 18,
                     "© 高德地图",
                     "https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
                     "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
                     "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
-                    "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}"),
-            // 腾讯地图（审查 D）：同样是国内可用、GCJ-02 的非官方瓦片接口，作为高德的备选。
-            // 行列号按标准 XYZ 使用；若某天出现错位，切回高德即可，不影响存储的 WGS-84 数据。
-            new TileSource("tencent", "腾讯地图（GCJ-02，非官方接口）", CoordSystem.GCJ02, 18,
-                    "© 腾讯地图",
-                    "https://rt0.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=1",
-                    "https://rt1.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=1",
-                    "https://rt2.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=1",
-                    "https://rt3.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=1"),
-            new TileSource("osm", "OpenStreetMap 官方", CoordSystem.WGS84, 19,
-                    "© OpenStreetMap contributors",
-                    "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
-            new TileSource("osmfr", "OSM France（备用）", CoordSystem.WGS84, 19,
-                    "© OpenStreetMap contributors",
-                    "https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png"),
-            new TileSource("osmde", "OSM Germany（备用）", CoordSystem.WGS84, 18,
-                    "© OpenStreetMap contributors",
-                    "https://tile.openstreetmap.de/{z}/{x}/{y}.png"));
+                    "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}"));
 
     /** 瓦片底图的坐标系。应用内部一律 WGS-84，只有画/点 GCJ-02 底图时才需要换算。 */
     public enum CoordSystem {
@@ -138,7 +125,7 @@ public final class RouteMapController implements RouteMapHost {
     private boolean followRunner = true;
     private boolean gestureListenerWanted;
     private boolean gestureListenerAttached;
-    private int tileSourceIndex;
+    private BaseLayer baseLayer = BaseLayer.SATELLITE;
 
     @Nullable
     private Runnable styleTimeout;
@@ -208,6 +195,7 @@ public final class RouteMapController implements RouteMapHost {
 
     private RouteMapController(MapView mapView) {
         this.mapView = mapView;
+        this.baseLayer = MapBaseLayerStore.load(mapView.getContext());
         // MapView 必须先 onCreate，之后 getMapAsync 才会回调；map 字段在回调里赋值。
         mapView.onCreate(null);
         mapView.getMapAsync(this::onMapReady);
@@ -237,7 +225,6 @@ public final class RouteMapController implements RouteMapHost {
 
     public void onMapReady(@NonNull MapLibreMap mapLibreMap) {
         this.map = mapLibreMap;
-        tileSourceIndex = loadTileSourceIndex();
 
         mapLibreMap.getUiSettings().setAttributionEnabled(true);
         mapLibreMap.getUiSettings().setLogoEnabled(false);
@@ -336,7 +323,7 @@ public final class RouteMapController implements RouteMapHost {
                 }
                 if (!reachable) {
                     tileWarning = String.format(Locale.US,
-                            "%s 的瓦片下载失败（%s），可在菜单「地图瓦片源」换一个或点「重新加载」",
+                            "%s 的瓦片下载失败（%s），可在「地图图层」切换到另一图层",
                             source.label(), failure);
                     DiagnosticLog.warn("瓦片探测失败：" + tileWarning);
                     notifyStatus(tileWarning);
@@ -391,17 +378,27 @@ public final class RouteMapController implements RouteMapHost {
                 + "]}";
     }
 
-    /** 供界面/诊断页展示的瓦片源列表。 */
-    public static List<TileSource> tileSources() {
-        return new ArrayList<>(TILE_SOURCES);
-    }
-
     public TileSource currentTileSource() {
-        return TILE_SOURCES.get(clampIndex(tileSourceIndex));
+        return TILE_SOURCES.get(baseLayer == BaseLayer.SATELLITE ? 0 : 1);
     }
 
-    public int currentTileSourceIndex() {
-        return clampIndex(tileSourceIndex);
+    @Override
+    public BaseLayer baseLayer() {
+        return baseLayer;
+    }
+
+    @Override
+    public void setBaseLayer(BaseLayer layer) {
+        if (layer == null) {
+            return;
+        }
+        BaseLayer next = layer == BaseLayer.STANDARD ? BaseLayer.STANDARD : BaseLayer.SATELLITE;
+        if (next == baseLayer) {
+            return;
+        }
+        baseLayer = next;
+        MapBaseLayerStore.save(mapView.getContext(), next);
+        applyStyle();
     }
 
     private boolean usesGcj02() {
@@ -431,45 +428,9 @@ public final class RouteMapController implements RouteMapHost {
         return Point.fromLngLat(display.getLongitude(), display.getLatitude());
     }
 
-    /**
-     * 切换瓦片源并立即重试。
-     *
-     * <p>同一个源也允许重试（返回 true）：用户在看到“瓦片下载失败”后第一反应就是再点一次，
-     * 早期版本因为「索引没变直接 return false」被当成没反应（R-008）。
-     */
-    public boolean selectTileSource(int index) {
-        tileSourceIndex = clampIndex(index);
-        saveTileSourceIndex(tileSourceIndex);
-        applyStyle();
-        return true;
-    }
-
-    /** 用当前源重新加载样式（菜单「重新加载地图」用）。 */
+    /** 用当前图层重新加载样式（诊断/排障用）。 */
     public void reloadStyle() {
         applyStyle();
-    }
-
-    private static int clampIndex(int index) {
-        if (index < 0 || index >= TILE_SOURCES.size()) {
-            return 0;
-        }
-        return index;
-    }
-
-    private int loadTileSourceIndex() {
-        SharedPreferences prefs = mapView.getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String id = prefs.getString(PREF_TILE_SOURCE, TILE_SOURCES.get(0).id());
-        for (int i = 0; i < TILE_SOURCES.size(); i++) {
-            if (TILE_SOURCES.get(i).id().equals(id)) {
-                return i;
-            }
-        }
-        return 0;
-    }
-
-    private void saveTileSourceIndex(int index) {
-        mapView.getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putString(PREF_TILE_SOURCE, TILE_SOURCES.get(index).id()).apply();
     }
 
     private void addSources(@NonNull Style loaded) {
@@ -773,7 +734,8 @@ public final class RouteMapController implements RouteMapHost {
 
     @Override
     public String engineLabel() {
-        return "MapLibre + 高德瓦片";
+        return baseLayer == BaseLayer.SATELLITE
+                ? "MapLibre + 卫星瓦片" : "MapLibre + 标准瓦片";
     }
 
     @Override

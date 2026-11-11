@@ -454,6 +454,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         binding.textMapMode.setText(getString(amapSdk
                 ? R.string.campus_map_mode_amap : R.string.campus_map_mode_tiles));
+        binding.textMapLayer.setOnClickListener(v -> showMapLayerDialog());
+        renderMapLayerLabel(mapHost.baseLayer());
         mapHost.registerGestureListener();
         mapHost.setStatusListener(message -> {
             if (message == null || message.isEmpty()) {
@@ -468,6 +470,40 @@ public final class CampusRunActivity extends AppCompatActivity {
                 binding.textMapStatus.setVisibility(View.VISIBLE);
             }
         });
+    }
+
+    /** 地图左上角图层按钮：在「当前地图」与「卫星地图」之间二选一。 */
+    private void showMapLayerDialog() {
+        if (mapHost == null) {
+            return;
+        }
+        CharSequence[] labels = new CharSequence[]{
+                getString(R.string.campus_map_layer_standard),
+                getString(R.string.campus_map_layer_satellite)};
+        int checked = mapHost.baseLayer() == RouteMapHost.BaseLayer.SATELLITE ? 1 : 0;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.campus_map_layer_title)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    RouteMapHost.BaseLayer layer = which == 1
+                            ? RouteMapHost.BaseLayer.SATELLITE
+                            : RouteMapHost.BaseLayer.STANDARD;
+                    mapHost.setBaseLayer(layer);
+                    renderMapLayerLabel(layer);
+                    dialog.dismiss();
+                    toast(getString(R.string.campus_map_layer_switched, labels[which]));
+                })
+                .setNegativeButton(R.string.campus_cancel, null)
+                .show();
+    }
+
+    private void renderMapLayerLabel(RouteMapHost.BaseLayer layer) {
+        boolean satellite = layer != RouteMapHost.BaseLayer.STANDARD;
+        int label = satellite
+                ? R.string.campus_map_layer_satellite
+                : R.string.campus_map_layer_standard;
+        binding.textMapLayer.setText(label);
+        binding.textMapLayer.setContentDescription(
+                getString(R.string.campus_map_layer_action, getString(label)));
     }
 
     /** 把当前路线画到底图；同一路线对象不重复提交（跑圈状态每秒都在刷新）。 */

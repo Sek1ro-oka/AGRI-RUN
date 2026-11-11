@@ -246,6 +246,12 @@
     <string name="campus_map_mode">系统模拟</string>
     <string name="campus_map_mode_amap">高德 SDK</string>
     <string name="campus_map_mode_tiles">高德瓦片</string>
+    <string name="campus_map_layer_title">地图图层</string>
+    <string name="campus_map_layer_standard">当前地图</string>
+    <string name="campus_map_layer_satellite">卫星地图</string>
+    <string name="campus_map_layer_action">切换地图图层（当前：%1$s）</string>
+    <string name="campus_map_layer_default_action">切换地图图层</string>
+    <string name="campus_map_layer_switched">已切换到%1$s</string>
     <string name="campus_goal">目标</string>
     <string name="campus_teleport">传送</string>
     <string name="campus_map_actions_label">传送/定位</string>
