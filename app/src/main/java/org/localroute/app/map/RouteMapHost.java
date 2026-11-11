@@ -22,6 +22,21 @@ public interface RouteMapHost {
         void onStatusChanged(@Nullable String message);
     }
 
+    /** 底图图层：标准路网或卫星影像。默认卫星，与产品选择一致。 */
+    enum BaseLayer {
+        STANDARD,
+        SATELLITE
+    }
+
+    /** 当前底图图层；实现方未接入时按默认卫星处理。 */
+    default BaseLayer baseLayer() {
+        return BaseLayer.SATELLITE;
+    }
+
+    /** 切换底图图层并持久化；同一图层重复设置应当是无害的。 */
+    default void setBaseLayer(BaseLayer layer) {
+    }
+
     void registerGestureListener();
 
     void setStatusListener(@Nullable StatusListener listener);

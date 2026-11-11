@@ -40,18 +40,19 @@ import org.localroute.core.RunState;
 /**
  * 跨应用悬浮「摇杆控制台」。
  *
- * <p>整体是一块紧凑的小面板：最上面是拖动把手，第二行左「返回主界面」、中「暂停/继续跑圈」、
- * 右上角「&lt; &gt;」缩放键；底部左侧是移动摇杆（直径是其他圆形按钮的 1.5 倍），右侧竖排行走 /
- * 跑步 / 骑行三个档位按钮。暂停按钮左右两格等宽，所以始终居中；缩放键沿对角线拖动即可让整个
- * 控制台等比放大缩小（往左下缩小、往右上放大，0.7—1.4 倍，持久化）。
+ * <p>整体是一块紧凑的小面板：顶部功能行左「返回主界面」、中「暂停/继续跑圈」、
+ * 右上角「⌊ ⌉」缩放键；中间一行左侧是「移动」按钮、中央是摇杆、右侧是「关闭悬浮屏」按钮；
+ * 下方并排行走 / 跑步 / 骑行三个档位按钮。暂停按钮左右两格等宽，所以始终居中；缩放键沿
+ * 对角线拖动即可让整个控制台等比放大缩小（往左下缩小、往右上放大，0.7—1.4 倍，持久化）。
  *
- * <p>摇杆默认锁定，点一下才解锁；只有没有跑圈任务（空闲或悬浮单点保持）时才允许解锁，
- * 路线跑圈期间由快照强制锁定。解锁后按住摇杆，每 500 毫秒向
+ * <p>摇杆默认锁定，点一下切到开口锁图样并解锁，再点一下回到闭锁；只有没有跑圈任务
+ * （空闲或悬浮单点保持）时才允许解锁，路线跑圈期间由快照强制锁定。解锁后按住摇杆，
+ * 每 500 毫秒向
  * {@link SimulationService#drive(Context, GeoPoint, double, double, double)} 下发方向与速度，
  * 由服务端在定位节拍里推进坐标并发布带速度/航向的定位，松手立即停止。
  *
- * <p>面板可拖动、位置与缩放持久化；没有「显示在其他应用上层」权限时整体不显示，
- * 由设置页引导授权。
+ * <p>面板只在 Legion 切到后台且开关打开时显示；前台不覆盖应用界面。面板可拖动、位置与
+ * 缩放持久化；没有「显示在其他应用上层」权限时整体不显示，由设置页引导授权。
  */
 public final class OverlayPanel {
 
@@ -67,11 +68,16 @@ public final class OverlayPanel {
     /** 摇杆命令间隔：与服务端 500 ms 的定位节拍一致，方向变化即时生效。 */
     private static final long DRIVE_INTERVAL_MS = 500L;
 
-    /** 面板里其他圆形按钮的基准直径；摇杆取它的 1.5 倍。 */
+    /** 面板里圆形按钮的基准直径。 */
     private static final int BUTTON_DP = 36;
-    private static final int JOYSTICK_DP = 54;
-    /** 顶行三个按钮并排放下的宽度，整块面板以它为基准宽度。 */
-    private static final int CONTENT_DP = 108;
+    /** 摇杆直径：与上下按钮排的宽度接近，居中摆放。 */
+    private static final int JOYSTICK_DP = 108;
+    /** 按钮之间的水平间距。 */
+    private static final int GAP_DP = 6;
+    /** 三枚按钮加两处间距并排放下的宽度，上下两行以它为基准宽度。 */
+    private static final int CONTENT_DP = 120;
+    /** 摇杆两侧各有「移动」「关闭」按钮，中间行比上下按钮排更宽。 */
+    private static final int MIDDLE_DP = BUTTON_DP * 2 + JOYSTICK_DP + GAP_DP * 2;
 
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -105,6 +111,8 @@ public final class OverlayPanel {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final SpeedPresets presets;
     private final ImageView[] gearButtons = new ImageView[3];
+    /** 用户点「关闭悬浮屏」时回调宿主，由宿主关开关、停止订阅。 */
+    private final Runnable closeAction;
 
     private OverlayScaleHost scaleHost;
     private LinearLayout root;
@@ -125,8 +133,9 @@ public final class OverlayPanel {
 
     private final Runnable moveRunnable = this::moveStep;
 
-    public OverlayPanel(Context context) {
+    public OverlayPanel(Context context, Runnable closeAction) {
         this.context = context.getApplicationContext();
+        this.closeAction = closeAction;
         this.windowManager =
                 (WindowManager) this.context.getSystemService(Context.WINDOW_SERVICE);
         SharedPreferences prefs = prefs(this.context);
@@ -181,7 +190,10 @@ public final class OverlayPanel {
 
     public void hide() {
         stopMoving();
+        // 每次收起（回前台或点关闭）都恢复默认闭锁，下次出现时不会带着解锁状态。
+        joystickUnlocked = false;
         if (joystick != null) {
+            joystick.setLocked(true);
             joystick.setInputEnabled(false);
         }
         if (!running || scaleHost == null) {
@@ -206,8 +218,7 @@ public final class OverlayPanel {
         root.setClipChildren(false);
         root.setClipToPadding(false);
 
-        // 拖动把手独占最上面一行，放在暂停按钮正上方，避免和摇杆、缩放键抢触摸。
-        root.addView(buildDragRow());
+        // 中间行最宽：左「移动」、中摇杆、右「关闭」；上下两行仍按 120dp 居中。
         root.addView(buildTopRow());
         root.addView(buildControlCluster());
         updateGearStyles();
@@ -230,36 +241,8 @@ public final class OverlayPanel {
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = prefs(context).getInt(KEY_X, dp(10));
         params.y = prefs(context).getInt(KEY_Y, dp(88));
-        params.setTitle("青禾校园悬浮控制台");
+        params.setTitle("Legion悬浮控制台");
         clampToScreen();
-    }
-
-    /** 顶部拖动把手：一条细胶囊，位置在暂停按钮上方。 */
-    private LinearLayout buildDragRow() {
-        LinearLayout row = new LinearLayout(context);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-
-        FrameLayout grip = new FrameLayout(context);
-        grip.setContentDescription(context.getString(R.string.overlay_grip));
-        GradientDrawable pill = new GradientDrawable();
-        pill.setShape(GradientDrawable.RECTANGLE);
-        pill.setCornerRadius(dp(7));
-        pill.setColor(ContextCompat.getColor(context, R.color.overlay_button_fill));
-        pill.setStroke(dp(1), ContextCompat.getColor(context, R.color.overlay_ring));
-        grip.setBackground(pill);
-
-        ImageView icon = new ImageView(context);
-        icon.setImageResource(R.drawable.ic_overlay_grip);
-        icon.setImageTintList(ColorStateList.valueOf(
-                ContextCompat.getColor(context, R.color.overlay_icon_muted)));
-        icon.setAlpha(0.8f);
-        grip.addView(icon, new FrameLayout.LayoutParams(dp(12), dp(12), Gravity.CENTER));
-        grip.setOnTouchListener(new DragListener());
-
-        row.addView(grip, new LinearLayout.LayoutParams(dp(56), dp(14)));
-        row.setLayoutParams(new LinearLayout.LayoutParams(dp(CONTENT_DP), dp(20)));
-        return row;
     }
 
     /** 顶部功能行：左返回、中暂停、右上角缩放键；左右两格等宽让暂停严格居中。 */
@@ -304,11 +287,11 @@ public final class OverlayPanel {
         return top;
     }
 
-    /** 底部区域：移动摇杆贴左下角，行走 / 跑步 / 骑行三个档位按钮竖排在右侧。 */
+    /** 控制区：左「移动」、中摇杆、右「关闭」，下方并排行走 / 跑步 / 骑行三个档位按钮。 */
     private LinearLayout buildControlCluster() {
-        LinearLayout bottom = new LinearLayout(context);
-        bottom.setOrientation(LinearLayout.HORIZONTAL);
-        bottom.setGravity(Gravity.BOTTOM);
+        LinearLayout cluster = new LinearLayout(context);
+        cluster.setOrientation(LinearLayout.VERTICAL);
+        cluster.setGravity(Gravity.CENTER_HORIZONTAL);
 
         joystick = new JoystickView(context);
         joystick.setContentDescription(context.getString(R.string.overlay_joystick_locked));
@@ -339,19 +322,50 @@ public final class OverlayPanel {
             }
 
             @Override
-            public void onLockedTap() {
-                unlockJoystick();
+            public void onTap() {
+                toggleJoystickLock();
             }
         });
-        bottom.addView(joystick,
-                new LinearLayout.LayoutParams(dp(JOYSTICK_DP), dp(JOYSTICK_DP)));
 
-        View spacer = new View(context);
-        bottom.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+        LinearLayout middle = new LinearLayout(context);
+        middle.setOrientation(LinearLayout.HORIZONTAL);
+        middle.setGravity(Gravity.CENTER);
+
+        // 左：移动悬浮窗；按住拖动，与摇杆、关闭键互不抢触摸。
+        ImageView moveButton = circleIcon(R.drawable.ic_overlay_move, BUTTON_DP, 7,
+                R.color.overlay_icon, R.string.overlay_grip);
+        moveButton.setOnTouchListener(new DragListener());
+        middle.addView(moveButton,
+                new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)));
+
+        LinearLayout.LayoutParams joystickParams =
+                new LinearLayout.LayoutParams(dp(JOYSTICK_DP), dp(JOYSTICK_DP));
+        joystickParams.leftMargin = dp(GAP_DP);
+        joystickParams.rightMargin = dp(GAP_DP);
+        middle.addView(joystick, joystickParams);
+
+        // 右：关闭悬浮屏并记住开关；下次在设置页手动开启，切到后台才再出现。
+        ImageView closeButton = circleIcon(R.drawable.ic_overlay_close, BUTTON_DP, 9,
+                R.color.overlay_close, R.string.overlay_close);
+        closeButton.setOnClickListener(v -> {
+            toast(context.getString(R.string.overlay_closed_toast));
+            if (closeAction != null) {
+                closeAction.run();
+            } else {
+                hide();
+            }
+        });
+        middle.addView(closeButton,
+                new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)));
+
+        LinearLayout.LayoutParams middleParams =
+                new LinearLayout.LayoutParams(dp(MIDDLE_DP), dp(JOYSTICK_DP));
+        middleParams.topMargin = dp(GAP_DP);
+        cluster.addView(middle, middleParams);
 
         LinearLayout gears = new LinearLayout(context);
-        gears.setOrientation(LinearLayout.VERTICAL);
-        gears.setGravity(Gravity.END);
+        gears.setOrientation(LinearLayout.HORIZONTAL);
+        gears.setGravity(Gravity.CENTER);
 
         int[] icons = {R.drawable.ic_overlay_walk, R.drawable.ic_overlay_run,
                 R.drawable.ic_overlay_bike};
@@ -366,16 +380,18 @@ public final class OverlayPanel {
             LinearLayout.LayoutParams params =
                     new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP));
             if (i > 0) {
-                params.topMargin = dp(3);
+                params.leftMargin = dp(GAP_DP);
             }
             gears.addView(button, params);
         }
-        bottom.addView(gears,
-                new LinearLayout.LayoutParams(dp(BUTTON_DP), LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams gearParams =
+                new LinearLayout.LayoutParams(dp(CONTENT_DP), dp(BUTTON_DP));
+        gearParams.topMargin = dp(GAP_DP);
+        cluster.addView(gears, gearParams);
 
-        bottom.setLayoutParams(new LinearLayout.LayoutParams(dp(CONTENT_DP),
+        cluster.setLayoutParams(new LinearLayout.LayoutParams(dp(MIDDLE_DP),
                 LinearLayout.LayoutParams.WRAP_CONTENT));
-        return bottom;
+        return cluster;
     }
 
     /** 圆形深色按钮：薄荷绿描边 + 轻触涟漪。 */
@@ -496,21 +512,26 @@ public final class OverlayPanel {
         }
     }
 
-    /** 锁定状态下点摇杆：空闲或单点保持时解锁，跑圈任务中保持锁定并说明原因。 */
-    private void unlockJoystick() {
+    /**
+     * 点一下摇杆切换锁定 / 解锁。
+     *
+     * <p>空闲或单点保持时允许切换；路线跑圈期间保持锁定并说明原因。解锁后摇杆中心显示
+     * 开口锁图样，拖动才会产生移动；再点一下摇杆立刻回到闭锁图样并停止推进。
+     */
+    private void toggleJoystickLock() {
         if (snapshot.isActive() && !snapshot.singlePoint()) {
             toast(context.getString(R.string.overlay_locked_running_toast));
             return;
         }
+        joystickUnlocked = !joystickUnlocked;
         if (joystickUnlocked) {
-            return;
+            toast(context.getString(R.string.overlay_unlock_toast));
+        } else {
+            stopMoving();
+            toast(context.getString(R.string.overlay_lock_toast));
         }
-        joystickUnlocked = true;
-        if (joystick != null) {
-            joystick.setLocked(false);
-            joystick.setContentDescription(context.getString(R.string.overlay_joystick));
-        }
-        toast(context.getString(R.string.overlay_unlock_toast));
+        // 复用统一的渲染路径：锁定状态、透明度、无障碍描述都在这里更新。
+        update(snapshot);
     }
 
     private void selectGear(int index, boolean announce) {
@@ -621,16 +642,16 @@ public final class OverlayPanel {
         }
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         int width = scaleHost != null && scaleHost.getMeasuredWidth() > 0
-                ? scaleHost.getMeasuredWidth() : dp(168);
+                ? scaleHost.getMeasuredWidth() : dp(MIDDLE_DP + 12);
         int height = scaleHost != null && scaleHost.getMeasuredHeight() > 0
-                ? scaleHost.getMeasuredHeight() : dp(260);
+                ? scaleHost.getMeasuredHeight() : dp(320);
         int maxX = Math.max(0, metrics.widthPixels - width);
         int maxY = Math.max(0, metrics.heightPixels - height);
         params.x = Math.max(0, Math.min(params.x, maxX));
         params.y = Math.max(0, Math.min(params.y, maxY));
     }
 
-    /** 只挂在顶部把手上，避免吃掉摇杆和按钮的触摸。 */
+    /** 只挂在左侧「移动」按钮上，避免吃掉摇杆和其余按钮的触摸。 */
     private final class DragListener implements View.OnTouchListener {
         private int startX;
         private int startY;

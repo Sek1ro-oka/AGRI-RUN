@@ -19,6 +19,8 @@
     <color name="campus_setup_bg">#F3FBF9</color>
     <color name="campus_track">#E3EDE8</color>
     <color name="campus_card_stroke">#E4F0EA</color>
+    <color name="campus_row_bg">#FFFFFFFF</color>
+    <color name="campus_danger">#D64545</color>
 
     <!-- 悬浮摇杆控制台：深色半透明圆盘 + 薄荷绿描边（参考图配色） -->
     <color name="overlay_button_fill">#F2242A33</color>
@@ -33,4 +35,8 @@
     <color name="overlay_knob_fill">#FF1B2129</color>
     <color name="overlay_knob_ring">#338AE0C0</color>
     <color name="overlay_chevron">#66C3D0CA</color>
+    <color name="overlay_close">#FF9A93</color>
+
+    <!-- 应用图标：暖米色底 + 薄荷绿主色 -->
+    <color name="ic_launcher_background">#FCF8E9</color>
 </resources>

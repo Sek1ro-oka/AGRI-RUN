@@ -16,12 +16,29 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <LinearLayout
-        android:id="@+id/routeList"
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="@string/campus_routes_swipe_hint"
+        android:textColor="@color/campus_muted"
+        android:textSize="12sp" />
+
+    <ScrollView
+        android:id="@+id/routeScroll"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:orientation="vertical" />
+        android:fillViewport="true"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/routeList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
 
     <TextView
         android:id="@+id/textNoRoutes"

@@ -663,7 +663,7 @@
             android:layout_marginTop="4dp"
             android:layout_weight="1">
 
-            <!-- 真实底图：MapLibre + 高德/OSM 栅格瓦片；arm 设备有高德 Key 时改用官方 SDK。 -->
+            <!-- 真实底图：MapLibre + 高德卫星/标准栅格瓦片；arm 设备有高德 Key 时改用官方 SDK。 -->
             <org.maplibre.android.maps.MapView
                 android:id="@+id/mapView"
                 android:layout_width="match_parent"
@@ -684,6 +684,26 @@
                 android:textColor="@color/campus_ink"
                 android:textSize="10sp"
                 app:drawableStartCompat="@drawable/ic_campus_dot" />
+
+            <TextView
+                android:id="@+id/textMapLayer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="40dp"
+                android:background="@drawable/bg_campus_chip"
+                android:clickable="true"
+                android:contentDescription="@string/campus_map_layer_default_action"
+                android:drawablePadding="5dp"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="9dp"
+                android:paddingVertical="5dp"
+                android:text="@string/campus_map_layer_satellite"
+                android:textColor="@color/campus_mint_dark"
+                android:textSize="10sp"
+                app:drawableStartCompat="@drawable/ic_campus_layers" />
 
             <TextView
                 android:id="@+id/textCoordinates"

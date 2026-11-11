@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">青禾校园</string>
+    <string name="app_name">Legion</string>
 
     <!-- 地图区 -->
     <string name="map_hint">点击地图添加节点；拖动与双指缩放不会添加节点</string>
@@ -144,14 +144,14 @@
     <string name="menu_overlay_on">悬浮控制条已开启：运行中切到别的应用也能暂停/停止</string>
     <string name="menu_overlay_off">悬浮控制条已关闭</string>
     <string name="settings_overlay_title">摇杆悬浮窗</string>
-    <string name="settings_overlay_hint">浮在其他应用上方，用摇杆控制人物行走（默认锁定，点一下解锁）</string>
+    <string name="settings_overlay_hint">开启后只在 Legion 切到后台时显示；摇杆默认锁定，点一下解锁、再点一下锁定</string>
     <string name="settings_overlay_grant">去授权</string>
     <string name="settings_overlay_ok">已授权</string>
     <string name="settings_overlay_missing">未授权</string>
-    <string name="settings_overlay_status_on">已开启 · 已授权</string>
+    <string name="settings_overlay_status_on">已开启 · 切到后台时显示</string>
     <string name="settings_overlay_status_on_missing">已开启 · 未授权</string>
     <string name="settings_overlay_status_off">未开启</string>
-    <string name="settings_overlay_enable_toast">悬浮控制台已开启</string>
+    <string name="settings_overlay_enable_toast">悬浮控制台已开启：切到后台后显示</string>
     <string name="settings_overlay_disable_toast">悬浮控制台已关闭</string>
     <string name="settings_overlay_need_permission_toast">需要「显示在其他应用上层」权限，授权后回来再打开开关</string>
     <string name="settings_overlay_denied_toast">还没获得悬浮窗权限，开关保持关闭</string>
@@ -160,10 +160,13 @@
     <string name="overlay_home">返回主界面</string>
     <string name="overlay_pause_run">暂停跑圈</string>
     <string name="overlay_resume_run">继续跑圈</string>
-    <string name="overlay_joystick">虚拟摇杆，拖动控制人物行走</string>
-    <string name="overlay_joystick_locked">摇杆已锁定，点击解锁</string>
+    <string name="overlay_joystick">摇杆已解锁：拖动控制人物移动，点一下锁定</string>
+    <string name="overlay_joystick_locked">摇杆已锁定，点一下解锁</string>
     <string name="overlay_unlock_toast">摇杆已解锁，拖动即可控制人物移动</string>
+    <string name="overlay_lock_toast">摇杆已锁定</string>
     <string name="overlay_locked_running_toast">跑圈进行中，摇杆保持锁定</string>
+    <string name="overlay_close">关闭悬浮屏</string>
+    <string name="overlay_closed_toast">悬浮屏已关闭，可在设置页重新开启</string>
     <string name="overlay_scale">缩放悬浮窗：向左下拖动缩小，向右上拖动放大</string>
     <string name="overlay_scale_percent">%1$d%%</string>
     <string name="overlay_grip">拖动悬浮窗</string>
@@ -194,14 +197,13 @@
     <string name="home_settings_title">设置</string>
     <string name="home_settings_subtitle">模拟定位与权限检查</string>
     <string name="home_first_use_hint">首次使用请先在「设置」完成模拟定位检查，再进入校园快跑。</string>
-    <string name="home_demo_footer">仅供课程演示 · 虚拟定位不会改变真实位置</string>
 
     <!-- 校园快跑 -->
     <string name="campus_entry_title">校园快跑</string>
     <string name="campus_entry_subtitle">虚拟定位跑圈 · A操 400m / B操 600m</string>
     <string name="campus_entry_subtitle_short">虚拟定位跑圈</string>
     <string name="campus_title">校园快跑</string>
-    <string name="campus_demo_label">虚拟定位 · 演示</string>
+    <string name="campus_demo_label">虚拟定位</string>
     <string name="campus_back">返回</string>
     <string name="campus_sport_run">跑步</string>
     <string name="campus_sport_walk">步行</string>
@@ -223,7 +225,7 @@
     <string name="campus_route_hint">选择或绘制路线</string>
     <string name="campus_route_none">未选择路线</string>
     <string name="campus_route_required">还没有路线，请先点「目标」绘制一条</string>
-    <string name="campus_route_custom_summary">自定义路线 · 单圈 %1$s</string>
+    <string name="campus_route_summary">%1$s · 单圈 %2$s</string>
     <string name="campus_route_info">%1$s · 单圈 %2$s</string>
     <string name="campus_route_lap_only">单圈 %1$s</string>
     <string name="campus_go_enter">进入跑圈地图</string>
@@ -244,6 +246,12 @@
     <string name="campus_map_mode">系统模拟</string>
     <string name="campus_map_mode_amap">高德 SDK</string>
     <string name="campus_map_mode_tiles">高德瓦片</string>
+    <string name="campus_map_layer_title">地图图层</string>
+    <string name="campus_map_layer_standard">当前地图</string>
+    <string name="campus_map_layer_satellite">卫星地图</string>
+    <string name="campus_map_layer_action">切换地图图层（当前：%1$s）</string>
+    <string name="campus_map_layer_default_action">切换地图图层</string>
+    <string name="campus_map_layer_switched">已切换到%1$s</string>
     <string name="campus_goal">目标</string>
     <string name="campus_teleport">传送</string>
     <string name="campus_map_actions_label">传送/定位</string>
@@ -269,6 +277,7 @@
     <string name="campus_teleport_hold_hint">单点保持中：点「结束」可停止</string>
     <string name="campus_draw_banner">绘制自定义路线：点击地图添加节点（3—24 个）</string>
     <string name="campus_draw_count">已添加 %1$d 个节点 · 点击地图继续，完成后点「完成」</string>
+    <string name="campus_draw_count_edit">修改中：已有 %1$d 个节点 · 点击地图继续，完成后点「完成」</string>
     <string name="campus_custom_name">自定义路线</string>
     <string name="campus_draw_undo">撤销</string>
     <string name="campus_draw_done">完成</string>
@@ -280,13 +289,25 @@
     <string name="campus_draw_saved">已保存自定义路线：%1$s</string>
     <string name="campus_draw_stop_first">请先结束当前跑圈再绘制新路线</string>
     <string name="campus_draw_finish_first">请先完成或取消当前绘制</string>
-    <string name="campus_draw_overwrite_title">覆盖自定义路线</string>
-    <string name="campus_draw_overwrite_message">重新绘制会覆盖已保存的自定义路线，确定继续？</string>
-    <string name="campus_draw_overwrite_confirm">继续绘制</string>
-    <string name="campus_routes_title">选择跑圈路线</string>
-    <string name="campus_routes_empty">还没有路线。点下方按钮在地图上绘制一条。</string>
-    <string name="campus_routes_draw">＋ 绘制自定义路线</string>
+    <string name="campus_routes_title">跑圈路线</string>
+    <string name="campus_routes_empty">还没有路线。点下方「新增路线」在地图上绘制一条。</string>
+    <string name="campus_routes_draw">＋ 新增路线</string>
     <string name="campus_routes_close">关闭</string>
+    <string name="campus_routes_swipe_hint">左右滑动列表；向左滑动路线可修改或删除</string>
+    <string name="campus_route_name_title">给路线命名</string>
+    <string name="campus_route_name_hint">路线名称</string>
+    <string name="campus_route_name_default">我的路线 %1$d</string>
+    <string name="campus_route_name_empty">名称不能为空</string>
+    <string name="campus_route_name_saved">已保存「%1$s」· 单圈 %2$s</string>
+    <string name="campus_route_renamed">已重命名为「%1$s」</string>
+    <string name="campus_route_edit">修改</string>
+    <string name="campus_route_edit_title">修改路线</string>
+    <string name="campus_route_edit_rename">重命名</string>
+    <string name="campus_route_edit_redraw">重新绘制路线</string>
+    <string name="campus_route_rename_title">重命名路线</string>
+    <string name="campus_route_delete">删除</string>
+    <string name="campus_route_deleted">已删除路线「%1$s」</string>
+    <string name="campus_route_delete_running">跑圈进行中，不能删除当前路线</string>
     <string name="campus_done_completed">跑圈完成</string>
     <string name="campus_done_stopped">已结束</string>
     <string name="campus_done_error">跑圈出错</string>
@@ -311,6 +332,7 @@
     <string name="campus_sheet_switch_message">从「%1$s」切换到「%2$s」会结束当前跑圈，当前进度不会保留。</string>
     <string name="campus_sheet_switch_confirm">切换并结束</string>
     <string name="campus_cancel">取消</string>
+    <string name="campus_save">保存</string>
     <string name="campus_row_check">已选择</string>
     <string name="campus_sport_changed">已切换为%1$s，默认配速 %2$s/km</string>
 </resources>

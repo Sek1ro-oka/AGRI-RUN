@@ -63,6 +63,7 @@ public final class AmapRouteMapView implements RouteMapHost {
     private GeoPoint following;
     private boolean followingEnabled;
     private boolean setupDone;
+    private BaseLayer baseLayer = BaseLayer.SATELLITE;
     private String lastStatus = "";
 
     public AmapRouteMapView(Context context, FrameLayout container,
@@ -70,6 +71,7 @@ public final class AmapRouteMapView implements RouteMapHost {
         this.context = context.getApplicationContext();
         this.clickListener = listener;
         this.density = context.getResources().getDisplayMetrics().density;
+        this.baseLayer = MapBaseLayerStore.load(this.context);
         // 10.x 起有隐私合规开关，不调用会只画底色、不加载瓦片。
         try {
             MapsInitializer.updatePrivacyShow(context, true, true);
@@ -100,6 +102,7 @@ public final class AmapRouteMapView implements RouteMapHost {
             return;
         }
         setupDone = true;
+        applyBaseLayer();
         map.getUiSettings().setZoomControlsEnabled(false);
         map.getUiSettings().setScaleControlsEnabled(true);
         map.setOnMapClickListener(latLng -> {
@@ -124,6 +127,33 @@ public final class AmapRouteMapView implements RouteMapHost {
     }
 
     @Override
+    public BaseLayer baseLayer() {
+        return baseLayer;
+    }
+
+    @Override
+    public void setBaseLayer(BaseLayer layer) {
+        if (layer == null) {
+            return;
+        }
+        BaseLayer next = layer == BaseLayer.STANDARD ? BaseLayer.STANDARD : BaseLayer.SATELLITE;
+        if (next == baseLayer) {
+            return;
+        }
+        baseLayer = next;
+        MapBaseLayerStore.save(context, next);
+        applyBaseLayer();
+    }
+
+    private void applyBaseLayer() {
+        if (map == null) {
+            return;
+        }
+        map.setMapType(baseLayer == BaseLayer.SATELLITE
+                ? AMap.MAP_TYPE_SATELLITE : AMap.MAP_TYPE_NORMAL);
+    }
+
+    @Override
     public void registerGestureListener() {
         // 触摸监听已在 setup() 里注册，这里保留接口形状。
     }
@@ -145,6 +175,11 @@ public final class AmapRouteMapView implements RouteMapHost {
 
     @Override
     public void renderRoute(List<GeoPoint> points, boolean closed) {
+        renderRoute(points, closed, true);
+    }
+
+    @Override
+    public void renderRoute(List<GeoPoint> points, boolean closed, boolean showVertices) {
         clearRoute();
         if (map == null || points == null || points.isEmpty()) {
             return;
@@ -163,12 +198,22 @@ public final class AmapRouteMapView implements RouteMapHost {
         if (polyline != null) {
             routeLines.add(polyline);
         }
-        startMarker = map.addMarker(new MarkerOptions()
-                .position(toDisplay(points.get(0)))
-                .anchor(0.5f, 0.5f)
-                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE)));
-        if (startMarker != null) {
-            vertexMarkers.add(startMarker);
+        // 绘制/编辑阶段每个航点都用与起点相同的橙色图标；完成后只留起点。
+        for (int i = 0; i < points.size(); i++) {
+            if (i > 0 && !showVertices) {
+                break;
+            }
+            Marker marker = map.addMarker(new MarkerOptions()
+                    .position(toDisplay(points.get(i)))
+                    .anchor(0.5f, 0.5f)
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE)));
+            if (marker == null) {
+                continue;
+            }
+            vertexMarkers.add(marker);
+            if (i == 0) {
+                startMarker = marker;
+            }
         }
     }
 
