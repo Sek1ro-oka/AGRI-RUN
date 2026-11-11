@@ -271,7 +271,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
         if (clipboard == null) {
             return;
         }
-        clipboard.setPrimaryClip(ClipData.newPlainText("利群工坊诊断", binding.textReport.getText()));
+        clipboard.setPrimaryClip(ClipData.newPlainText("Legion诊断", binding.textReport.getText()));
         toast("已复制到剪贴板");
     }
 

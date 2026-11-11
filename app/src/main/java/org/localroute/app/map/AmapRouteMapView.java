@@ -145,6 +145,11 @@ public final class AmapRouteMapView implements RouteMapHost {
 
     @Override
     public void renderRoute(List<GeoPoint> points, boolean closed) {
+        renderRoute(points, closed, true);
+    }
+
+    @Override
+    public void renderRoute(List<GeoPoint> points, boolean closed, boolean showVertices) {
         clearRoute();
         if (map == null || points == null || points.isEmpty()) {
             return;
@@ -163,12 +168,22 @@ public final class AmapRouteMapView implements RouteMapHost {
         if (polyline != null) {
             routeLines.add(polyline);
         }
-        startMarker = map.addMarker(new MarkerOptions()
-                .position(toDisplay(points.get(0)))
-                .anchor(0.5f, 0.5f)
-                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE)));
-        if (startMarker != null) {
-            vertexMarkers.add(startMarker);
+        // 绘制/编辑阶段每个航点都用与起点相同的橙色图标；完成后只留起点。
+        for (int i = 0; i < points.size(); i++) {
+            if (i > 0 && !showVertices) {
+                break;
+            }
+            Marker marker = map.addMarker(new MarkerOptions()
+                    .position(toDisplay(points.get(i)))
+                    .anchor(0.5f, 0.5f)
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE)));
+            if (marker == null) {
+                continue;
+            }
+            vertexMarkers.add(marker);
+            if (i == 0) {
+                startMarker = marker;
+            }
         }
     }
 

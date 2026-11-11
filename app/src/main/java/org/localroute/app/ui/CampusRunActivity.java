@@ -14,11 +14,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -45,6 +47,7 @@ import org.localroute.app.campus.CampusFormat;
 import org.localroute.app.campus.CampusGeo;
 import org.localroute.app.campus.CampusPoint;
 import org.localroute.app.campus.CampusRoute;
+import org.localroute.app.campus.CampusRouteCodec;
 import org.localroute.app.databinding.ActivityCampusRunBinding;
 import org.localroute.app.databinding.DialogCampusRoutesBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
@@ -58,6 +61,7 @@ import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.SettingsInspector;
+import org.localroute.app.storage.RouteRepository;
 import org.localroute.core.CompiledRoute;
 import org.localroute.core.EndBehavior;
 import org.localroute.core.GeoPoint;
@@ -71,7 +75,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * 校园快跑：虚拟定位跑圈。
@@ -89,6 +92,8 @@ public final class CampusRunActivity extends AppCompatActivity {
     private static final String KEY_NATURAL = "natural_speed";
     private static final String KEY_VARY = "vary_path";
     private static final String KEY_CUSTOM_POINTS = "custom_points";
+    private static final String KEY_CUSTOM_ROUTES = "custom_routes";
+    private static final String KEY_SELECTED_ROUTE = "selected_route_id";
     private static final String KEY_ACTIVE_RUN_ID = "active_run_id";
     private static final String KEY_ACTIVE_LAP = "active_lap_meters";
     private static final String KEY_OWNED = "campus_owned";
@@ -108,6 +113,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     private static final double CUSTOM_MAX_METERS = 800d;
     private static final long NATURAL_INTERVAL_MS = 2500L;
 
+    /** 旧版单路线存储的迁移 ID；新路线使用 {@link RouteRepository#newRouteId()}。 */
     private static final String ROUTE_CUSTOM_ID = "custom";
 
     /** 权限弹窗期间 Activity 可能重建，用静态字段保存待执行动作（只含纯数据）。 */
@@ -124,8 +130,10 @@ public final class CampusRunActivity extends AppCompatActivity {
     private RunSnapshot snapshot = RunSnapshot.idle();
     @Nullable
     private CampusRoute route;
+    private final List<CampusRoute> customRoutes = new ArrayList<>();
+    /** 正在重新绘制的路线 ID；为 null 表示在新增路线。 */
     @Nullable
-    private CampusRoute customRoute;
+    private String editingRouteId;
     /** 传送预览点；真实底图直接保存 WGS-84，不再经过设计坐标。 */
     @Nullable
     private GeoPoint teleportTarget;
@@ -247,9 +255,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 RunConfig.MIN_LOOPS, RunConfig.MAX_LOOPS);
         naturalEnabled = prefs.getBoolean(KEY_NATURAL, true);
         varyEnabled = prefs.getBoolean(KEY_VARY, true);
-        customRoute = loadCustomRoute();
-        // 目前没有内置路线，只有用户绘制并保存的自定义路线。
-        route = customRoute;
+        loadRoutes();
         activeRunId = prefs.getString(KEY_ACTIVE_RUN_ID, "");
         activeLapMeters = prefs.getFloat(KEY_ACTIVE_LAP,
                 route == null ? 0f : (float) route.lapMeters());
@@ -275,8 +281,39 @@ public final class CampusRunActivity extends AppCompatActivity {
         return false;
     }
 
+    /**
+     * 读取全部自定义路线，并恢复上次选中的路线。
+     *
+     * <p>旧版本只保存一条 {@code custom_points}；首次升级时把它转成新格式，
+     * 之后不再写旧键。单条数据损坏只跳过该条，不影响其它路线。
+     */
+    private void loadRoutes() {
+        customRoutes.clear();
+        customRoutes.addAll(CampusRouteCodec.decode(prefs.getString(KEY_CUSTOM_ROUTES, "")));
+        if (customRoutes.isEmpty()) {
+            CampusRoute legacy = loadLegacyRoute();
+            if (legacy != null) {
+                customRoutes.add(legacy);
+                saveRoutes();
+                prefs.edit().remove(KEY_CUSTOM_POINTS).apply();
+            }
+        }
+        String selectedId = prefs.getString(KEY_SELECTED_ROUTE, "");
+        route = null;
+        for (CampusRoute candidate : customRoutes) {
+            if (candidate.id().equals(selectedId)) {
+                route = candidate;
+                break;
+            }
+        }
+        if (route == null && !customRoutes.isEmpty()) {
+            route = customRoutes.get(0);
+        }
+    }
+
+    /** 解析旧版单条路线；格式不合法或长度越界时返回 null。 */
     @Nullable
-    private CampusRoute loadCustomRoute() {
+    private CampusRoute loadLegacyRoute() {
         String raw = prefs.getString(KEY_CUSTOM_POINTS, "");
         if (raw == null || raw.trim().isEmpty()) {
             return null;
@@ -300,23 +337,24 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (points.size() < DRAFT_MIN) {
             return null;
         }
-        CampusRoute custom = CampusRoute.custom(ROUTE_CUSTOM_ID, getString(R.string.campus_custom_name), points);
+        CampusRoute custom = CampusRoute.custom(ROUTE_CUSTOM_ID,
+                getString(R.string.campus_custom_name), points);
         if (custom.lapMeters() < CUSTOM_MIN_METERS || custom.lapMeters() > CUSTOM_MAX_METERS) {
             return null;
         }
         return custom;
     }
 
-    private void saveCustomRoute(CampusRoute custom) {
-        List<CampusPoint> points = custom.waypointsForSave();
-        StringBuilder builder = new StringBuilder();
-        for (CampusPoint point : points) {
-            if (builder.length() > 0) {
-                builder.append(';');
-            }
-            builder.append(String.format(Locale.US, "%.2f,%.2f", point.x, point.y));
-        }
-        prefs.edit().putString(KEY_CUSTOM_POINTS, builder.toString()).apply();
+    private void saveRoutes() {
+        prefs.edit()
+                .putString(KEY_CUSTOM_ROUTES, CampusRouteCodec.encode(customRoutes))
+                .apply();
+    }
+
+    private void persistSelectedRoute(@Nullable CampusRoute selected) {
+        prefs.edit()
+                .putString(KEY_SELECTED_ROUTE, selected == null ? "" : selected.id())
+                .apply();
     }
 
     // ---------------------------------------------------------------- 控件
@@ -563,7 +601,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (value == null) {
             return getString(R.string.campus_route_none);
         }
-        return getString(R.string.campus_route_custom_summary, CampusFormat.lapMeters(value.lapMeters()));
+        return getString(R.string.campus_route_summary,
+                value.name(), CampusFormat.lapMeters(value.lapMeters()));
     }
 
     private int defaultPaceSeconds(String sport) {
@@ -581,6 +620,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     private void showSetupScreen() {
         runScreenVisible = false;
         drawMode = false;
+        editingRouteId = null;
         teleportArmed = false;
         draftPoints.clear();
         binding.setupScreen.setVisibility(View.VISIBLE);
@@ -1080,7 +1120,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         String message;
         if (probe == SettingsInspector.MockProbeResult.DENIED) {
             message = "系统拒绝了模拟位置请求：请到「开发者选项 → 选择模拟位置信息应用」里选中"
-                    + "「利群工坊」后重试。";
+                    + "「Legion」后重试。";
         } else if (probe == SettingsInspector.MockProbeResult.PROVIDER_UNSUPPORTED) {
             message = "当前设备不支持添加测试 provider，无法伪造位置。";
         } else {
@@ -1318,9 +1358,17 @@ public final class CampusRunActivity extends AppCompatActivity {
         DialogCampusRoutesBinding sheet = DialogCampusRoutesBinding.inflate(getLayoutInflater());
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         sheet.routeList.removeAllViews();
-        sheet.textNoRoutes.setVisibility(customRoute == null ? View.VISIBLE : View.GONE);
-        if (customRoute != null) {
-            addRouteRow(sheet.routeList, customRoute, dialog);
+        boolean empty = customRoutes.isEmpty();
+        sheet.routeScroll.setVisibility(empty ? View.GONE : View.VISIBLE);
+        sheet.textNoRoutes.setVisibility(empty ? View.VISIBLE : View.GONE);
+        if (!empty) {
+            for (CampusRoute candidate : customRoutes) {
+                addRouteRow(sheet.routeList, candidate, dialog);
+            }
+            // 路线多时列表内部滚动，底部的「新增路线」「关闭」始终露在外面。
+            ViewGroup.LayoutParams scrollParams = sheet.routeScroll.getLayoutParams();
+            scrollParams.height = Math.min(customRoutes.size() * dp(68), dp(330));
+            sheet.routeScroll.setLayoutParams(scrollParams);
         }
         sheet.buttonDrawRoute.setOnClickListener(v -> {
             dialog.dismiss();
@@ -1328,17 +1376,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 toast(getString(R.string.campus_draw_stop_first));
                 return;
             }
-            if (customRoute != null) {
-                new AlertDialog.Builder(this)
-                        .setTitle(R.string.campus_draw_overwrite_title)
-                        .setMessage(R.string.campus_draw_overwrite_message)
-                        .setPositiveButton(R.string.campus_draw_overwrite_confirm,
-                                (d, w) -> enterDrawMode())
-                        .setNegativeButton(R.string.campus_cancel, null)
-                        .show();
-                return;
-            }
-            enterDrawMode();
+            enterDrawMode(null);
         });
         sheet.buttonCloseRoutes.setOnClickListener(v -> dialog.dismiss());
         dialog.setContentView(sheet.getRoot());
@@ -1347,13 +1385,16 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void addRouteRow(LinearLayout list, CampusRoute candidate, BottomSheetDialog dialog) {
         boolean selected = route != null && route.id().equals(candidate.id());
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(6), dp(14), dp(6), dp(14));
-        TypedValue ripple = new TypedValue();
-        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, ripple, true);
-        row.setBackgroundResource(ripple.resourceId);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.HORIZONTAL);
+        content.setGravity(Gravity.CENTER_VERTICAL);
+        content.setPadding(dp(6), dp(14), dp(6), dp(14));
+        // 内容层必须是完全不透明的，收起时才能盖住下面的操作按钮。
+        android.graphics.drawable.GradientDrawable base = new android.graphics.drawable.GradientDrawable();
+        base.setColor(getColor(R.color.campus_row_bg));
+        content.setBackground(new android.graphics.drawable.RippleDrawable(
+                ColorStateList.valueOf(0x1F000000), base, null));
 
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
@@ -1374,7 +1415,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         subtitle.setTextColor(getColor(R.color.campus_muted));
         subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
         texts.addView(subtitle);
-        row.addView(texts);
+        content.addView(texts);
 
         TextView check = new TextView(this);
         check.setText(selected ? "✓" : "");
@@ -1383,17 +1424,122 @@ public final class CampusRunActivity extends AppCompatActivity {
         check.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f);
         check.setTypeface(check.getTypeface(), android.graphics.Typeface.BOLD);
         check.setPadding(dp(10), 0, dp(4), 0);
-        row.addView(check);
+        content.addView(check);
+
+        content.setOnClickListener(v -> {
+            dialog.dismiss();
+            selectRoute(candidate);
+        });
+
+        SwipeActionRow swipe = new SwipeActionRow(this);
+        swipe.setContent(content);
+        // 先添加「修改」、后添加「删除」：删除贴在最右侧，修改紧挨着它。
+        swipe.addAction(getString(R.string.campus_route_edit),
+                getColor(R.color.campus_mint_dark),
+                () -> showRouteEditDialog(candidate, dialog));
+        swipe.addAction(getString(R.string.campus_route_delete),
+                getColor(R.color.campus_danger),
+                () -> deleteRoute(candidate, dialog));
 
         LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         rowParams.topMargin = dp(2);
-        row.setLayoutParams(rowParams);
-        row.setOnClickListener(v -> {
+        list.addView(swipe, rowParams);
+    }
+
+    private void showRouteEditDialog(CampusRoute candidate, BottomSheetDialog sheet) {
+        sheet.dismiss();
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.campus_route_edit_title) + " · " + candidate.name())
+                .setItems(new CharSequence[]{
+                        getString(R.string.campus_route_edit_rename),
+                        getString(R.string.campus_route_edit_redraw)}, (dialog, which) -> {
+                    if (which == 0) {
+                        promptRenameRoute(candidate);
+                    } else {
+                        startRedrawRoute(candidate);
+                    }
+                })
+                .setNegativeButton(R.string.campus_cancel, null)
+                .show();
+    }
+
+    private void promptRenameRoute(CampusRoute candidate) {
+        EditText input = routeNameInput(candidate.name());
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.campus_route_rename_title)
+                .setView(input)
+                .setPositiveButton(R.string.campus_save, null)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        toast(getString(R.string.campus_route_name_empty));
+                        return;
+                    }
+                    int index = indexOfRoute(candidate.id());
+                    if (index < 0) {
+                        dialog.dismiss();
+                        return;
+                    }
+                    CampusRoute renamed = CampusRoute.custom(
+                            candidate.id(), name, candidate.waypointsForSave());
+                    customRoutes.set(index, renamed);
+                    saveRoutes();
+                    if (route != null && route.id().equals(renamed.id())) {
+                        applyRoute(renamed);
+                    } else {
+                        renderSetupValues();
+                    }
+                    dialog.dismiss();
+                    toast(getString(R.string.campus_route_renamed, name));
+                    showRouteSheet();
+                }));
+        dialog.show();
+    }
+
+    private EditText routeNameInput(String initial) {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setSingleLine(true);
+        input.setHint(R.string.campus_route_name_hint);
+        input.setText(initial);
+        input.setSelection(input.getText().length());
+        return input;
+    }
+
+    private void deleteRoute(CampusRoute candidate, BottomSheetDialog dialog) {
+        boolean selected = route != null && route.id().equals(candidate.id());
+        if (selected && claimOwnSession && snapshot.isActive() && !snapshot.singlePoint()) {
+            toast(getString(R.string.campus_route_delete_running));
+            return;
+        }
+        int index = indexOfRoute(candidate.id());
+        if (index < 0) {
             dialog.dismiss();
-            selectRoute(candidate);
-        });
-        list.addView(row);
+            return;
+        }
+        customRoutes.remove(index);
+        saveRoutes();
+        if (selected) {
+            applyRoute(customRoutes.isEmpty() ? null : customRoutes.get(0));
+        } else {
+            renderSetupValues();
+        }
+        dialog.dismiss();
+        toast(getString(R.string.campus_route_deleted, candidate.name()));
+        showRouteSheet();
+    }
+
+    private int indexOfRoute(String id) {
+        for (int i = 0; i < customRoutes.size(); i++) {
+            if (customRoutes.get(i).id().equals(id)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void selectRoute(CampusRoute candidate) {
@@ -1423,10 +1569,11 @@ public final class CampusRunActivity extends AppCompatActivity {
         applyRoute(candidate);
     }
 
-    private void applyRoute(CampusRoute candidate) {
+    private void applyRoute(@Nullable CampusRoute candidate) {
         route = candidate;
+        persistSelectedRoute(candidate);
         teleportTarget = null;
-        activeLapMeters = candidate.lapMeters();
+        activeLapMeters = candidate == null ? 0d : candidate.lapMeters();
         binding.textRouteSummary.setText(routeSummary(candidate));
         renderedRoute = null;
         if (mapHost != null) {
@@ -1443,7 +1590,11 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
     }
 
-    private void enterDrawMode() {
+    /**
+     * 进入绘制模式。{@code editTarget} 为 null 时新增路线，否则载入该路线的航点重新绘制；
+     * 两种模式都只在点「完成」并命名后才写回存储。
+     */
+    private void enterDrawMode(@Nullable CampusRoute editTarget) {
         if (snapshot.isActive()) {
             toast(getString(R.string.campus_draw_stop_first));
             return;
@@ -1451,9 +1602,13 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (!runScreenVisible) {
             showRunScreen();
         }
+        editingRouteId = editTarget == null ? null : editTarget.id();
         drawMode = true;
         teleportArmed = false;
         draftPoints.clear();
+        if (editTarget != null) {
+            draftPoints.addAll(editTarget.waypointsForSave());
+        }
         binding.textTeleportHint.setVisibility(View.GONE);
         binding.drawBar.setVisibility(View.VISIBLE);
         updateDrawBanner();
@@ -1466,8 +1621,13 @@ public final class CampusRunActivity extends AppCompatActivity {
         updateRunUi();
     }
 
+    private void startRedrawRoute(CampusRoute candidate) {
+        enterDrawMode(candidate);
+    }
+
     private void exitDrawMode() {
         drawMode = false;
+        editingRouteId = null;
         draftPoints.clear();
         binding.drawBar.setVisibility(View.GONE);
         renderedRoute = null;
@@ -1486,7 +1646,9 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     private void updateDrawBanner() {
-        binding.textDrawBanner.setText(getString(R.string.campus_draw_count, draftPoints.size()));
+        binding.textDrawBanner.setText(getString(editingRouteId == null
+                ? R.string.campus_draw_count : R.string.campus_draw_count_edit,
+                draftPoints.size()));
     }
 
     private void finishDrawMode() {
@@ -1494,22 +1656,60 @@ public final class CampusRunActivity extends AppCompatActivity {
             toast(getString(R.string.campus_draw_too_few));
             return;
         }
-        CampusRoute custom = CampusRoute.custom(ROUTE_CUSTOM_ID,
-                getString(R.string.campus_custom_name), new ArrayList<>(draftPoints));
-        if (custom.lapMeters() < CUSTOM_MIN_METERS) {
+        String id = editingRouteId != null ? editingRouteId : RouteRepository.newRouteId();
+        String suggestedName;
+        if (editingRouteId != null) {
+            int index = indexOfRoute(editingRouteId);
+            suggestedName = index >= 0 ? customRoutes.get(index).name()
+                    : getString(R.string.campus_custom_name);
+        } else {
+            suggestedName = getString(R.string.campus_route_name_default, customRoutes.size() + 1);
+        }
+        CampusRoute candidate = CampusRoute.custom(id, suggestedName, new ArrayList<>(draftPoints));
+        if (candidate.lapMeters() < CUSTOM_MIN_METERS) {
             toast(getString(R.string.campus_draw_too_short));
             return;
         }
-        if (custom.lapMeters() > CUSTOM_MAX_METERS) {
+        if (candidate.lapMeters() > CUSTOM_MAX_METERS) {
             toast(getString(R.string.campus_draw_too_long));
             return;
         }
-        customRoute = custom;
-        saveCustomRoute(custom);
-        exitDrawMode();
-        applyRoute(custom);
-        showSetupScreen();
-        toast(getString(R.string.campus_draw_saved, CampusFormat.lapMeters(custom.lapMeters())));
+        promptRouteName(candidate, suggestedName);
+    }
+
+    /** 绘制完成后先命名再保存；取消命名则留在绘制状态，可以继续调整。 */
+    private void promptRouteName(CampusRoute candidate, String suggestedName) {
+        EditText input = routeNameInput(suggestedName);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.campus_route_name_title)
+                .setView(input)
+                .setPositiveButton(R.string.campus_save, null)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        toast(getString(R.string.campus_route_name_empty));
+                        return;
+                    }
+                    CampusRoute saved = CampusRoute.custom(
+                            candidate.id(), name, candidate.waypointsForSave());
+                    int index = indexOfRoute(saved.id());
+                    if (index >= 0) {
+                        customRoutes.set(index, saved);
+                    } else {
+                        customRoutes.add(saved);
+                    }
+                    saveRoutes();
+                    dialog.dismiss();
+                    exitDrawMode();
+                    applyRoute(saved);
+                    showSetupScreen();
+                    toast(getString(R.string.campus_route_name_saved,
+                            saved.name(), CampusFormat.lapMeters(saved.lapMeters())));
+                }));
+        dialog.show();
     }
 
     // ---------------------------------------------------------------- 收尾

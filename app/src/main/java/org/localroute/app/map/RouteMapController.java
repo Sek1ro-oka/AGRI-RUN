@@ -483,10 +483,13 @@ public final class RouteMapController implements RouteMapHost {
                         PropertyFactory.lineWidth(5f),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND)));
+        // 选点阶段每个航点都画成与起点相同的橙色圆点，用户能一眼看到自己点下的每一处；
+        // 路线完成后由界面传 showVertices=false，只保留起点。起点与节点同色同大小，
+        // 不再出现「起点橙色、其余蓝色」的割裂感。
         loaded.addLayer(new CircleLayer(LAYER_VERTICES, SOURCE_VERTICES)
                 .withProperties(
-                        PropertyFactory.circleColor(0xFF0D47A1),
-                        PropertyFactory.circleRadius(5f),
+                        PropertyFactory.circleColor(0xFFE65100),
+                        PropertyFactory.circleRadius(8f),
                         PropertyFactory.circleStrokeWidth(2f),
                         PropertyFactory.circleStrokeColor(0xFFFFFFFF)));
         // 起点用独立单点源：早期版本让它复用整条顶点源且没有过滤条件，
@@ -494,7 +497,9 @@ public final class RouteMapController implements RouteMapHost {
         loaded.addLayer(new CircleLayer(LAYER_START, SOURCE_START)
                 .withProperties(
                         PropertyFactory.circleColor(0xFFE65100),
-                        PropertyFactory.circleRadius(8f)));
+                        PropertyFactory.circleRadius(8f),
+                        PropertyFactory.circleStrokeWidth(2f),
+                        PropertyFactory.circleStrokeColor(0xFFFFFFFF)));
         loaded.addLayer(new CircleLayer(LAYER_RUNNER, SOURCE_RUNNER)
                 .withProperties(
                         PropertyFactory.circleColor(0xFFD32F2F),

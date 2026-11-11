@@ -8,6 +8,7 @@ import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -21,8 +22,9 @@ import org.localroute.app.R;
  * {@link Listener#onRelease()}。摇杆只负责输入，不直接改模拟位置；移动节奏由
  * {@link OverlayPanel} 按固定间隔推进。
  *
- * <p>默认处于锁定状态：画一枚锁标识，点击会回调 {@link Listener#onLockedTap()}，
- * 由面板决定能否解锁。跑圈任务执行期间面板会强制锁定。
+ * <p>默认处于锁定状态：画闭锁标识；解锁后中心改画开口锁，再点一下又回到闭锁。
+ * 每次点按都回调 {@link Listener#onTap()}，由面板决定能否切换。判断点按时使用了触摸
+ * 阈值：按住拖动仍按摇杆输入处理，不会因为松手被误当成点按。跑圈任务执行期间面板会强制锁定。
  */
 public final class JoystickView extends View {
 
@@ -32,8 +34,8 @@ public final class JoystickView extends View {
 
         void onRelease();
 
-        /** 锁定状态下点了摇杆：面板据此提示或解锁。 */
-        void onLockedTap();
+        /** 点了一下摇杆（没有拖动）：面板据此切换锁定 / 解锁。 */
+        void onTap();
     }
 
     private final Paint basePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -54,8 +56,14 @@ public final class JoystickView extends View {
     private float knobY;
 
     private boolean engaged;
+    private boolean dragging;
     private boolean inputEnabled = true;
     private boolean locked;
+    private float downX;
+    private float downY;
+    private long downTime;
+    private final int touchSlop;
+    private final int longPressTimeout;
     @Nullable
     private Listener listener;
 
@@ -94,6 +102,8 @@ public final class JoystickView extends View {
         lockPaint.setStrokeJoin(Paint.Join.ROUND);
         lockPaint.setColor(ContextCompat.getColor(context, R.color.overlay_mint));
 
+        touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        longPressTimeout = ViewConfiguration.getLongPressTimeout();
         setClickable(true);
     }
 
@@ -157,10 +167,15 @@ public final class JoystickView extends View {
         canvas.drawCircle(centerX, centerY, baseRadius - dp(0.5f), baseRingPaint);
         canvas.drawCircle(centerX, centerY, baseRadius * 0.72f, baseRingPaint);
         if (locked) {
-            drawLockGlyph(canvas);
+            drawLockGlyph(canvas, false);
             return;
         }
         canvas.drawPath(chevrons, chevronPaint);
+        if (!engaged) {
+            // 解锁但还没拖动：中心画开口锁，提示「再点一下就锁上」。
+            drawLockGlyph(canvas, true);
+            return;
+        }
 
         float x = centerX + knobX;
         float y = centerY + knobY;
@@ -169,8 +184,13 @@ public final class JoystickView extends View {
         canvas.drawCircle(x, y, dp(3f), knobDotPaint);
     }
 
-    /** 锁标识：上方半圆锁梁 + 下方圆角锁体。 */
-    private void drawLockGlyph(Canvas canvas) {
+    /**
+     * 锁标识：上方半圆锁梁 + 下方圆角锁体。
+     *
+     * <p>{@code open == true} 时把锁梁向左旋转，右端离开锁体，形成开口锁图形；
+     * 锁定状态保持正上方闭合的锁梁。
+     */
+    private void drawLockGlyph(Canvas canvas, boolean open) {
         float bodyWidth = baseRadius * 0.62f;
         float bodyHeight = bodyWidth * 0.72f;
         float top = centerY - bodyHeight * 0.30f;
@@ -181,7 +201,16 @@ public final class JoystickView extends View {
         float shackleRadius = bodyWidth * 0.30f;
         RectF shackle = new RectF(centerX - shackleRadius, top - shackleRadius * 1.55f,
                 centerX + shackleRadius, top + shackleRadius * 0.55f);
-        canvas.drawArc(shackle, 180f, 180f, false, lockPaint);
+        if (open) {
+            canvas.save();
+            canvas.rotate(-30f, centerX, top);
+            canvas.drawArc(shackle, 180f, 180f, false, lockPaint);
+            canvas.restore();
+        } else {
+            canvas.drawArc(shackle, 180f, 180f, false, lockPaint);
+        }
+        // 锁体中心的小锁孔，让两种状态在深色圆盘上都更容易辨认。
+        canvas.drawCircle(centerX, top + bodyHeight * 0.52f, dp(1.6f), lockPaint);
     }
 
     @Override
@@ -193,11 +222,16 @@ public final class JoystickView extends View {
             // 锁定状态只消费「点一下」，不产生移动；是否放行由面板决定。
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    downX = event.getX();
+                    downY = event.getY();
+                    downTime = event.getEventTime();
                     return true;
                 case MotionEvent.ACTION_UP:
-                    performClick();
-                    if (listener != null) {
-                        listener.onLockedTap();
+                    if (isTap(event)) {
+                        performClick();
+                        if (listener != null) {
+                            listener.onTap();
+                        }
                     }
                     return true;
                 case MotionEvent.ACTION_CANCEL:
@@ -211,34 +245,63 @@ public final class JoystickView extends View {
                 if (distanceToCenter(event) > baseRadius) {
                     return false;
                 }
-                engaged = true;
-                if (getParent() != null) {
-                    getParent().requestDisallowInterceptTouchEvent(true);
-                }
-                applyTouch(event);
+                downX = event.getX();
+                downY = event.getY();
+                downTime = event.getEventTime();
+                dragging = false;
+                engaged = false;
                 return true;
             case MotionEvent.ACTION_MOVE:
-                if (!engaged) {
-                    return false;
+                if (!dragging && Math.hypot(event.getX() - downX, event.getY() - downY) > touchSlop) {
+                    // 超过触摸阈值才真正接管摇杆：原地轻点用于切换锁定，不会产生位移。
+                    dragging = true;
+                    engaged = true;
+                    if (getParent() != null) {
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                    }
+                }
+                if (!dragging) {
+                    return true;
                 }
                 applyTouch(event);
                 return true;
             case MotionEvent.ACTION_UP:
-                if (!engaged) {
-                    return false;
+                if (dragging) {
+                    performClick();
+                    release();
+                } else if (isTap(event)) {
+                    performClick();
+                    resetTouch();
+                    if (listener != null) {
+                        listener.onTap();
+                    }
+                } else {
+                    resetTouch();
                 }
-                performClick();
-                release();
                 return true;
             case MotionEvent.ACTION_CANCEL:
-                if (!engaged) {
-                    return false;
+                if (dragging) {
+                    release();
+                } else {
+                    resetTouch();
                 }
-                release();
                 return true;
             default:
                 return super.onTouchEvent(event);
         }
+    }
+
+    private boolean isTap(MotionEvent event) {
+        return event.getEventTime() - downTime <= longPressTimeout
+                && Math.hypot(event.getX() - downX, event.getY() - downY) <= touchSlop;
+    }
+
+    private void resetTouch() {
+        dragging = false;
+        engaged = false;
+        knobX = 0f;
+        knobY = 0f;
+        invalidate();
     }
 
     @Override
@@ -270,6 +333,7 @@ public final class JoystickView extends View {
     }
 
     private void release() {
+        dragging = false;
         engaged = false;
         knobX = 0f;
         knobY = 0f;
