@@ -89,6 +89,20 @@ public final class OverlayHost {
         applyEnabled(enabled);
     }
 
+    /**
+     * 按当前开关重新渲染一次（权限可能刚在系统设置里变化）。
+     *
+     * <p>已开启但未授权时面板自己会收起；授权后调用这个方法就能立刻出现。
+     */
+    public void refresh() {
+        if (enabled) {
+            session.attach();
+            render(lastSnapshot == null ? RunSnapshot.idle() : lastSnapshot);
+        } else {
+            panel.hide();
+        }
+    }
+
     private void applyEnabled(boolean on) {
         if (on) {
             session.attach();

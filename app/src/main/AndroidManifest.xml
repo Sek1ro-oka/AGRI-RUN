@@ -44,7 +44,8 @@
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.RouteWorkshop.Home">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -52,9 +53,17 @@
         </activity>
 
         <activity
+            android:name=".ui.CampusRunActivity"
+            android:exported="false"
+            android:label="@string/campus_title"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.RouteWorkshop.CampusRun" />
+
+        <activity
             android:name=".ui.SettingsCheckActivity"
             android:exported="false"
-            android:label="@string/settings_title" />
+            android:label="@string/settings_title"
+            android:theme="@style/Theme.RouteWorkshop.Home" />
 
         <activity
             android:name=".ui.DiagnosticsActivity"

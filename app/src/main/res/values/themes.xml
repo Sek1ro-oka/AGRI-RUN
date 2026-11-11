@@ -7,6 +7,33 @@
         <item name="colorPrimaryContainer">@color/brand_primary_container</item>
         <item name="colorSecondary">@color/brand_secondary</item>
         <item name="android:statusBarColor" tools:targetApi="21">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <!-- 主页固定浅色：与校园快跑的水绿色设计保持一致，不跟随系统深色模式变暗。 -->
+    <style name="Theme.RouteWorkshop.Home" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/campus_mint</item>
+        <item name="colorOnPrimary">@color/brand_on_primary</item>
+        <item name="colorPrimaryContainer">@color/campus_mint_pale</item>
+        <item name="colorOnPrimaryContainer">@color/campus_mint_dark</item>
+        <item name="colorSecondary">@color/campus_mint_dark</item>
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:statusBarColor">@android:color/white</item>
+        <item name="android:navigationBarColor">@android:color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <!-- 校园快跑固定浅色：原型是白底 + 水绿色，深色模式下也要保持同一套观感。 -->
+    <style name="Theme.RouteWorkshop.CampusRun" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/campus_mint</item>
+        <item name="colorOnPrimary">@color/brand_on_primary</item>
+        <item name="colorPrimaryContainer">@color/campus_mint_pale</item>
+        <item name="colorOnPrimaryContainer">@color/campus_mint_dark</item>
+        <item name="colorSecondary">@color/campus_mint_dark</item>
+        <item name="android:windowBackground">@color/campus_setup_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 
 </resources>

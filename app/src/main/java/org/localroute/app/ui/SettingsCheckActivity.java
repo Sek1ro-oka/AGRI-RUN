@@ -2,10 +2,15 @@ package org.localroute.app.ui;
 
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.Gravity;
 import android.view.MenuItem;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -15,27 +20,46 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivitySettingsCheckBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.app.overlay.OverlayHost;
+import org.localroute.app.overlay.OverlayPanel;
 import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.settings.SettingsInspector;
 
 import java.util.List;
 
 /**
- * 设置检查页：只做只读体检与用户主动触发的权限探测，不修改任何系统设置。
+ * 设置页：主页同款白底 + 薄荷绿卡片。
+ *
+ * <p>上半部分是只读环境体检（与用户主动触发的权限探测），不修改任何系统设置；
+ * 下半部分管理跨应用悬浮摇杆：需要系统「显示在其他应用上层」权限，授权后开关才真正生效。
  */
 public class SettingsCheckActivity extends AppCompatActivity {
 
     private ActivitySettingsCheckBinding binding;
+    /** 程序化勾选开关时避免再次触发监听。 */
+    private boolean overlaySwitchGuard;
+    /** 用户想打开悬浮窗但还在等系统授权页返回。 */
+    private boolean pendingOverlayEnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         binding = ActivitySettingsCheckBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return insets;
+        });
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -46,7 +70,45 @@ public class SettingsCheckActivity extends AppCompatActivity {
         binding.buttonDevOptions.setOnClickListener(v -> openDeveloperOptions());
         binding.buttonAppDetails.setOnClickListener(v -> openAppDetails());
 
+        binding.switchOverlay.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (overlaySwitchGuard) {
+                return;
+            }
+            if (isChecked) {
+                requestEnableOverlay();
+            } else {
+                pendingOverlayEnable = false;
+                OverlayHost.get(this).setEnabled(false);
+                toast(getString(R.string.settings_overlay_disable_toast));
+                refreshOverlaySection();
+            }
+        });
+        binding.buttonOverlayPermission.setOnClickListener(v -> {
+            if (OverlayPanel.canDrawOverlays(this)) {
+                pendingOverlayEnable = true;
+                enableOverlayNow();
+            } else {
+                pendingOverlayEnable = true;
+                OverlayPanel.requestPermission(this);
+            }
+        });
+
         renderChecks();
+        refreshOverlaySection();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (pendingOverlayEnable) {
+            if (OverlayPanel.canDrawOverlays(this)) {
+                enableOverlayNow();
+            } else {
+                pendingOverlayEnable = false;
+                toast(getString(R.string.settings_overlay_denied_toast));
+            }
+        }
+        refreshOverlaySection();
     }
 
     @Override
@@ -58,61 +120,107 @@ public class SettingsCheckActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    // ---------------------------------------------------------------- 悬浮控制台
+
+    private void requestEnableOverlay() {
+        if (!OverlayPanel.canDrawOverlays(this)) {
+            pendingOverlayEnable = true;
+            setOverlaySwitch(false);
+            OverlayPanel.requestPermission(this);
+            toast(getString(R.string.settings_overlay_need_permission_toast));
+            return;
+        }
+        OverlayHost.get(this).setEnabled(true);
+        toast(getString(R.string.settings_overlay_enable_toast));
+        refreshOverlaySection();
+    }
+
+    private void enableOverlayNow() {
+        pendingOverlayEnable = false;
+        OverlayHost.get(this).setEnabled(true);
+        toast(getString(R.string.settings_overlay_enable_toast));
+        refreshOverlaySection();
+    }
+
+    private void refreshOverlaySection() {
+        boolean enabled = OverlayHost.get(this).isEnabled();
+        boolean allowed = OverlayPanel.canDrawOverlays(this);
+        setOverlaySwitch(enabled);
+        int statusRes;
+        if (!enabled) {
+            statusRes = R.string.settings_overlay_status_off;
+        } else if (allowed) {
+            statusRes = R.string.settings_overlay_status_on;
+        } else {
+            statusRes = R.string.settings_overlay_status_on_missing;
+        }
+        binding.textOverlayStatus.setText(statusRes);
+        binding.buttonOverlayPermission.setVisibility(allowed ? View.GONE : View.VISIBLE);
+        if (enabled) {
+            // 权限可能刚在系统页里授予：让面板按当前开关重新渲染一次。
+            OverlayHost.get(this).refresh();
+        }
+    }
+
+    private void setOverlaySwitch(boolean checked) {
+        overlaySwitchGuard = true;
+        binding.switchOverlay.setChecked(checked);
+        overlaySwitchGuard = false;
+    }
+
+    // ---------------------------------------------------------------- 环境检查
+
     private void renderChecks() {
         binding.checkContainer.removeAllViews();
-        TextView intro = new TextView(this);
-        intro.setText("按下面顺序准备环境。任一项是「失败」时，模拟位置不会被系统接受。");
-        intro.setTextSize(12f);
-        intro.setAlpha(0.8f);
-        intro.setPadding(0, 0, 0, dp(12));
-        binding.checkContainer.addView(intro);
-
         List<SettingsInspector.Check> checks = SettingsInspector.inspect(this);
-        for (SettingsInspector.Check check : checks) {
-            binding.checkContainer.addView(row(check));
+        for (int i = 0; i < checks.size(); i++) {
+            binding.checkContainer.addView(row(checks.get(i)));
+            if (i < checks.size() - 1) {
+                View divider = new View(this);
+                divider.setBackgroundColor(Color.parseColor("#EFF5F2"));
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
+                binding.checkContainer.addView(divider, params);
+            }
         }
-
-        TextView footer = new TextView(this);
-        footer.setText(R.string.settings_probe_hint);
-        footer.setTextSize(12f);
-        footer.setAlpha(0.8f);
-        footer.setPadding(0, dp(16), 0, 0);
-        binding.checkContainer.addView(footer);
     }
 
     private LinearLayout row(SettingsInspector.Check check) {
         LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.bottomMargin = dp(12);
-        row.setLayoutParams(params);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, dp(9), 0, dp(9));
 
-        TextView dot = new TextView(this);
-        dot.setText("●");
-        dot.setTextSize(14f);
-        dot.setTextColor(ContextCompat.getColor(this, colorFor(check.status())));
-        dot.setPadding(0, 0, dp(10), 0);
-        row.addView(dot);
-
-        LinearLayout text = new LinearLayout(this);
-        text.setOrientation(LinearLayout.VERTICAL);
-        text.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText(check.title() + "  " + statusLabel(check.status()));
-        title.setTextSize(14f);
-        title.setTextColor(ContextCompat.getColor(this, colorFor(check.status())));
-        text.addView(title);
+        title.setText(check.title());
+        title.setTextSize(13f);
+        title.setTextColor(ContextCompat.getColor(this, R.color.campus_ink));
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        head.addView(title, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView chip = new TextView(this);
+        chip.setText(statusLabel(check.status()));
+        chip.setTextSize(11f);
+        chip.setTextColor(Color.parseColor(textColorFor(check.status())));
+        chip.setPadding(dp(8), dp(2), dp(8), dp(3));
+        GradientDrawable chipBackground = new GradientDrawable();
+        chipBackground.setCornerRadius(dp(8));
+        chipBackground.setColor(Color.parseColor(backgroundFor(check.status())));
+        chip.setBackground(chipBackground);
+        head.addView(chip);
+        row.addView(head);
 
         TextView detail = new TextView(this);
         detail.setText(check.detail());
-        detail.setTextSize(12f);
-        detail.setAlpha(0.85f);
-        detail.setPadding(0, dp(2), 0, 0);
-        text.addView(detail);
-
-        row.addView(text);
+        detail.setTextSize(11f);
+        detail.setTextColor(ContextCompat.getColor(this, R.color.campus_muted));
+        detail.setLineSpacing(dp(1), 1f);
+        detail.setPadding(0, dp(3), 0, 0);
+        row.addView(detail);
         return row;
     }
 
@@ -129,17 +237,31 @@ public class SettingsCheckActivity extends AppCompatActivity {
         }
     }
 
-    private int colorFor(SettingsInspector.Status status) {
+    private String textColorFor(SettingsInspector.Status status) {
         switch (status) {
             case OK:
-                return R.color.state_running;
+                return "#1B7A52";
             case FAIL:
-                return R.color.state_error;
+                return "#B3261E";
             case WARN:
             default:
-                return R.color.state_paused;
+                return "#8D6E00";
         }
     }
+
+    private String backgroundFor(SettingsInspector.Status status) {
+        switch (status) {
+            case OK:
+                return "#E7F7EF";
+            case FAIL:
+                return "#FCE9E7";
+            case WARN:
+            default:
+                return "#FFF6E0";
+        }
+    }
+
+    // ---------------------------------------------------------------- 探测与跳转
 
     private void runProbe() {
         if (SimulationStateRepo.get().current().isActive()) {
