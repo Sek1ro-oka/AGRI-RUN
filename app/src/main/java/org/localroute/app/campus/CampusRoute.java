@@ -36,11 +36,16 @@ public final class CampusRoute {
         this.lapMeters = lapMeters;
     }
 
-    /** 自定义路线：把航点平滑成闭合环并计算实际长度，沿用默认校园基准点。 */
+    /**
+     * 自定义路线：先自动修正航点（去掉重合点、手抖尖刺和共线冗余点），
+     * 再平滑成闭合环并计算实际长度，沿用默认校园基准点。
+     * 修正后的航点会被保存，重新绘制时不会把已修正的异常点又带回来。
+     */
     public static CampusRoute custom(String id, String name, List<CampusPoint> waypoints) {
-        List<CampusPoint> loop = CampusGeo.smoothClosed(waypoints);
+        List<CampusPoint> corrected = CampusGeo.autoCorrectClosed(waypoints);
+        List<CampusPoint> loop = CampusGeo.smoothClosed(corrected);
         double meters = CampusGeo.perimeterMeters(loop, CUSTOM_METERS_PER_UNIT);
-        return new CampusRoute(id, name, loop, waypoints, CUSTOM_METERS_PER_UNIT, meters);
+        return new CampusRoute(id, name, loop, corrected, CUSTOM_METERS_PER_UNIT, meters);
     }
 
     public String id() {

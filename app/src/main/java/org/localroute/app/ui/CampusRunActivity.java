@@ -1,6 +1,9 @@
 package org.localroute.app.ui;
 
 import android.Manifest;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -20,6 +23,7 @@ import android.view.Gravity;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.LinearInterpolator;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -66,6 +70,7 @@ import org.localroute.app.settings.SettingsInspector;
 import org.localroute.app.storage.RouteRepository;
 import org.localroute.core.CompiledRoute;
 import org.localroute.core.EndBehavior;
+import org.localroute.core.GeoMath;
 import org.localroute.core.GeoPoint;
 import org.localroute.core.InvalidRouteException;
 import org.localroute.core.RouteCompiler;
@@ -86,6 +91,13 @@ import java.util.List;
  * 所有实际定位提交都走 {@link SimulationService}，本页面不自行伪造位置。
  */
 public final class CampusRunActivity extends AppCompatActivity {
+
+    /**
+     * 悬浮窗长按结束时带上的标记：直接把本次运动结果显示在跑圈地图上，
+     * 不再弹「再来一次 / 返回校园快跑页」。
+     */
+    public static final String EXTRA_SHOW_RUN_RESULT =
+            "org.localroute.app.extra.SHOW_RUN_RESULT";
 
     private static final String PREFS = "campus_run";
     private static final String KEY_SPORT = "sport";
@@ -114,6 +126,11 @@ public final class CampusRunActivity extends AppCompatActivity {
     private static final double CUSTOM_MIN_METERS = 120d;
     private static final double CUSTOM_MAX_METERS = 800d;
     private static final long NATURAL_INTERVAL_MS = 2500L;
+
+    /** 跑者标记在两次快照之间的滑动时长；略小于 500ms 的 tick 间隔，形成连续运动。 */
+    private static final long RUNNER_ANIM_MS = 480L;
+    /** 单次位置跳变超过该距离时不再滑动，直接落点（传送、回前台、自动暂停恢复等）。 */
+    private static final double RUNNER_SNAP_METERS = 30d;
 
     /** 旧版单路线存储的迁移 ID；新路线使用 {@link RouteRepository#newRouteId()}。 */
     private static final String ROUTE_CUSTOM_ID = "custom";
@@ -181,6 +198,16 @@ public final class CampusRunActivity extends AppCompatActivity {
     private boolean stopRequested;
     private String autoPauseNotifiedRunId = "";
 
+    /** 跑者标记的滑动动画与当前显示位置。 */
+    @Nullable
+    private ValueAnimator runnerAnimator;
+    @Nullable
+    private GeoPoint runnerShown;
+    /** 从悬浮窗长按结束进入：本次终止结果直接显示在地图上，不弹完成弹窗。 */
+    private boolean resultRequested;
+    /** 当前跑圈页正在展示刚结束的本次结果（即使会话所有权已经释放）。 */
+    private boolean showResult;
+
     private final Runnable naturalTicker = new Runnable() {
         @Override
         public void run() {
@@ -234,10 +261,16 @@ public final class CampusRunActivity extends AppCompatActivity {
 
         RunSnapshot current = SimulationStateRepo.get().current();
         snapshot = current;
+        resultRequested = getIntent().getBooleanExtra(EXTRA_SHOW_RUN_RESULT, false);
+        // 用掉即清：之后重建或再次进入本页时不再重复按「结束结果」处理。
+        getIntent().removeExtra(EXTRA_SHOW_RUN_RESULT);
         boolean resumed = restoreActiveSession(current);
         if (resumed) {
             showRunScreen();
+        } else if (resultRequested && isTerminal(current.state())) {
+            applyResultSnapshot(current);
         } else {
+            resultRequested = false;
             showSetupScreen();
         }
         SimulationStateRepo.get().snapshot().observe(this, this::onSnapshot);
@@ -247,6 +280,45 @@ public final class CampusRunActivity extends AppCompatActivity {
                 handleBack();
             }
         });
+    }
+
+    /**
+     * 悬浮窗长按结束会直接打开本页：把已终止的快照当作「本次结果」显示在地图上，
+     * 不再弹「再来一次 / 返回校园快跑页」。
+     */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (!intent.getBooleanExtra(EXTRA_SHOW_RUN_RESULT, false)) {
+            return;
+        }
+        intent.removeExtra(EXTRA_SHOW_RUN_RESULT);
+        resultRequested = true;
+        RunSnapshot current = SimulationStateRepo.get().current();
+        snapshot = current;
+        if (isTerminal(current.state())) {
+            applyResultSnapshot(current);
+        } else if (current.isActive()) {
+            // 停止命令还在服务队列里：先显示跑圈页，终止快照到达后按结果处理。
+            showRunScreen();
+        } else {
+            resultRequested = false;
+            showSetupScreen();
+        }
+    }
+
+    /** 把刚结束的本次结果留在跑圈地图上，释放会话所有权但保留数字显示。 */
+    private void applyResultSnapshot(RunSnapshot result) {
+        claimOwnSession = false;
+        activeRunId = "";
+        showResult = true;
+        resultRequested = false;
+        prefs.edit()
+                .putBoolean(KEY_OWNED, false)
+                .remove(KEY_ACTIVE_RUN_ID)
+                .apply();
+        showRunScreen();
     }
 
     // ---------------------------------------------------------------- 设置与恢复
@@ -672,6 +744,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         editingRouteId = null;
         teleportArmed = false;
         draftPoints.clear();
+        showResult = false;
+        resultRequested = false;
         binding.setupScreen.setVisibility(View.VISIBLE);
         binding.runScreen.setVisibility(View.GONE);
         binding.doneOverlay.setVisibility(View.GONE);
@@ -682,9 +756,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         deviceLocation = null;
         renderedRoute = null;
         pendingFit = false;
-        if (mapHost != null) {
-            mapHost.renderRunner(null);
-        }
+        showRunnerNow(null);
         renderSetupValues();
     }
 
@@ -832,6 +904,8 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         route = planRoute;
+        showResult = false;
+        resultRequested = false;
 
         CompiledRoute compiled;
         try {
@@ -863,9 +937,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
         SimulationService.start(this, request);
         showRunScreen();
-        if (mapHost != null) {
-            mapHost.renderRunner(null);
-        }
+        showRunnerNow(null);
         binding.buttonRunMain.setText(getString(R.string.campus_starting));
         binding.buttonRunMain.setEnabled(false);
         toast(getString(R.string.campus_toast_starting));
@@ -1011,7 +1083,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         deviceLocation = point;
-        mapHost.renderRunner(point);
+        showRunnerNow(point);
         mapHost.focusOn(point);
         binding.textCoordinates.setText(CampusFormat.coordinates(point.latitude(), point.longitude()));
         toast(getString(R.string.campus_locate_device));
@@ -1054,7 +1126,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.textTeleportHint.setVisibility(View.GONE);
         teleportTarget = target;
         if (mapHost != null) {
-            mapHost.renderRunner(target);
+            showRunnerNow(target);
             mapHost.focusOn(target);
         }
 
@@ -1088,6 +1160,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         RunRequest request = RunRequest.createSinglePoint(target);
         teleportTarget = target;
         deviceLocation = null;
+        showResult = false;
+        resultRequested = false;
         activeLapMeters = 0d;
         activeRunId = request.runId();
         claimOwnSession = true;
@@ -1101,7 +1175,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         SimulationService.start(this, request);
         showRunScreen();
         if (mapHost != null) {
-            mapHost.renderRunner(target);
+            showRunnerNow(target);
             mapHost.focusOn(target);
         }
         toast(getString(R.string.campus_teleport_hold_started));
@@ -1223,6 +1297,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
         boolean wasSinglePoint = next.singlePoint() || previous.singlePoint();
+        boolean showResultNow = resultRequested;
         claimOwnSession = false;
         activeRunId = "";
         prefs.edit()
@@ -1235,6 +1310,19 @@ public final class CampusRunActivity extends AppCompatActivity {
             pendingRouteSwitch = null;
             applyRoute(target);
             showSetupScreen();
+            return;
+        }
+
+        if (showResultNow) {
+            showResult = true;
+            resultRequested = false;
+            showRunScreen();
+            int messageRes = next.state() == RunState.COMPLETED
+                    ? R.string.campus_done_completed
+                    : next.state() == RunState.ERROR
+                    ? R.string.campus_done_error
+                    : R.string.campus_done_stopped;
+            toast(getString(messageRes));
             return;
         }
 
@@ -1273,7 +1361,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     // ---------------------------------------------------------------- 跑圈页 UI
 
     private void updateRunUi() {
-        boolean ours = claimOwnSession;
+        boolean ours = claimOwnSession || showResult;
         boolean active = ours && snapshot.isActive();
         boolean single = active && snapshot.singlePoint();
         double lapMeters = ours && activeLapMeters > 0d ? activeLapMeters
@@ -1282,7 +1370,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         // 只有本页面的任务才显示已有数据，避免上一次跑完的数字残留到下一次 GO 的预览里。
         double distance = (ours && !single) ? snapshot.distanceMeters() : 0d;
         binding.textDistance.setText(CampusFormat.kilometers(distance));
-        boolean showElapsed = active || (ours && snapshot.state() == RunState.COMPLETED);
+        boolean showElapsed = active || (ours && isTerminal(snapshot.state()));
         binding.textRunTime.setText(CampusFormat.time(showElapsed ? snapshot.activeElapsedMs() : 0L));
 
         double pace = 0d;
@@ -1340,9 +1428,10 @@ public final class CampusRunActivity extends AppCompatActivity {
                 // STARTING 阶段的快照还没有经纬度（NaN），必须先检查有限性再换算。
                 if (ours && snapshot.hasPosition()
                         && Double.isFinite(snapshot.latitude()) && Double.isFinite(snapshot.longitude())) {
-                    mapHost.renderRunner(new GeoPoint(snapshot.latitude(), snapshot.longitude()));
+                    animateRunnerTo(new GeoPoint(snapshot.latitude(), snapshot.longitude()),
+                            snapshot.state() == RunState.RUNNING);
                 } else if (!active) {
-                    mapHost.renderRunner(teleportTarget != null ? teleportTarget : deviceLocation);
+                    showRunnerNow(teleportTarget != null ? teleportTarget : deviceLocation);
                 }
             }
         }
@@ -1378,6 +1467,71 @@ public final class CampusRunActivity extends AppCompatActivity {
     private void tintMainButton(int colorRes) {
         binding.buttonRunMain.setBackgroundTintList(
                 ColorStateList.valueOf(getColor(colorRes)));
+    }
+
+    /**
+     * 把跑者标记滑到新位置：500ms 一次的快照之间用球面插值补帧，
+     * 地图上的跑者就会连续前进，而不是每半秒跳一下。
+     *
+     * @param smooth 只在 RUNNING 时补帧；暂停、结束、传送等场景直接落点
+     */
+    private void animateRunnerTo(@NonNull GeoPoint target, boolean smooth) {
+        if (mapHost == null) {
+            return;
+        }
+        GeoPoint from = runnerShown;
+        if (!smooth || from == null
+                || GeoMath.distanceMeters(from, target) > RUNNER_SNAP_METERS) {
+            showRunnerNow(target);
+            return;
+        }
+        if (GeoMath.distanceMeters(from, target) < 0.05d) {
+            return;
+        }
+        cancelRunnerAnimation();
+        ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(RUNNER_ANIM_MS);
+        animator.setInterpolator(new LinearInterpolator());
+        animator.addUpdateListener(animation -> {
+            float fraction = (float) animation.getAnimatedValue();
+            GeoPoint point = GeoMath.interpolate(from, target, fraction);
+            runnerShown = point;
+            if (mapHost != null) {
+                mapHost.renderRunner(point);
+            }
+        });
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (runnerAnimator != animation) {
+                    return;
+                }
+                runnerAnimator = null;
+                runnerShown = target;
+                if (mapHost != null) {
+                    mapHost.renderRunner(target);
+                }
+            }
+        });
+        runnerAnimator = animator;
+        animator.start();
+    }
+
+    /** 立即显示跑者位置（或清除），并停止正在进行的滑动动画。 */
+    private void showRunnerNow(@Nullable GeoPoint point) {
+        cancelRunnerAnimation();
+        runnerShown = point;
+        if (mapHost != null) {
+            mapHost.renderRunner(point);
+        }
+    }
+
+    private void cancelRunnerAnimation() {
+        if (runnerAnimator != null) {
+            ValueAnimator animator = runnerAnimator;
+            runnerAnimator = null;
+            animator.cancel();
+        }
     }
 
     private void showDoneOverlay(RunSnapshot result, int titleRes, @Nullable String message) {
@@ -1624,8 +1778,9 @@ public final class CampusRunActivity extends AppCompatActivity {
         teleportTarget = null;
         activeLapMeters = candidate == null ? 0d : candidate.lapMeters();
         renderedRoute = null;
+        showResult = false;
         if (mapHost != null) {
-            mapHost.renderRunner(null);
+            showRunnerNow(null);
             if (drawMode) {
                 renderMapDraft();
             } else {
@@ -1652,6 +1807,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         editingRouteId = editTarget == null ? null : editTarget.id();
         drawMode = true;
+        showResult = false;
+        resultRequested = false;
         teleportArmed = false;
         draftPoints.clear();
         if (editTarget != null) {
@@ -1662,9 +1819,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         updateDrawBanner();
         renderedRoute = null;
         renderMapDraft();
-        if (mapHost != null) {
-            mapHost.renderRunner(null);
-        }
+        showRunnerNow(null);
         requestMapFit();
         updateRunUi();
     }
@@ -1810,6 +1965,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     protected void onDestroy() {
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
+        cancelRunnerAnimation();
         if (mapHost != null) {
             mapHost.onDestroy();
             mapHost = null;

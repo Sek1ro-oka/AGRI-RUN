@@ -30,7 +30,9 @@ public class CampusRouteTest {
                 new CampusPoint(260, 500),
                 new CampusPoint(100, 500)));
         CampusRoute route = CampusRoute.custom("custom-1", "自定义 1", waypoints);
-        assertEquals(4 * 14, route.points().size());
+        // 长边按约 2 个设计单位一点自适应采样，4 个航点应远多于旧的固定 14 点/段。
+        assertTrue("采样点太少：" + route.points().size(), route.points().size() >= 100);
+        assertTrue("采样点异常过多：" + route.points().size(), route.points().size() <= 20000);
         assertTrue("自定义路线太短：" + route.lapMeters(), route.lapMeters() > 120d);
         assertTrue(route.lapMeters() < 800d);
         assertEquals(route.lapMeters(),
@@ -44,13 +46,46 @@ public class CampusRouteTest {
             }
             assertTrue("航点偏离平滑曲线：" + nearest, nearest < 12d);
         }
+
+        // 相邻线段方向不能突变：自动修正 + 向心平滑后不应再有折线拐角。
+        double maxTurnDegrees = maxTurnDegrees(route.points());
+        assertTrue("轨迹存在急拐：" + maxTurnDegrees, maxTurnDegrees < 30d);
+    }
+
+    @Test
+    public void autoCorrectionRemovesDuplicateAndSpikePoints() {
+        List<CampusPoint> waypoints = new ArrayList<>(Arrays.asList(
+                new CampusPoint(120, 400),
+                new CampusPoint(200, 400),
+                new CampusPoint(204, 400),   // 手抖：走出去又立刻折回
+                new CampusPoint(200, 400),
+                new CampusPoint(260, 500),
+                new CampusPoint(260, 500),   // 重合点
+                new CampusPoint(100, 500),
+                new CampusPoint(120, 400))); // 首尾重复
+        List<CampusPoint> corrected = CampusGeo.autoCorrectClosed(waypoints);
+        assertEquals(4, corrected.size());
+        assertEquals(120d, corrected.get(0).x, 1e-9d);
+        assertEquals(400d, corrected.get(0).y, 1e-9d);
+    }
+
+    @Test
+    public void autoCorrectionKeepsDeliberateCorners() {
+        List<CampusPoint> waypoints = new ArrayList<>(Arrays.asList(
+                new CampusPoint(120, 400),
+                new CampusPoint(240, 400),
+                new CampusPoint(260, 500),
+                new CampusPoint(100, 500)));
+        List<CampusPoint> corrected = CampusGeo.autoCorrectClosed(waypoints);
+        assertEquals(waypoints.size(), corrected.size());
     }
 
     @Test
     public void startPointIsFirstWaypoint() {
         CampusRoute route = sampleRoute();
-        assertEquals(120d, route.startPoint().x, 1e-9d);
-        assertEquals(400d, route.startPoint().y, 1e-9d);
+        // 环形低通会让起点沿切线挪动不到 1 个设计单位，仍应视为同一位置。
+        assertEquals(120d, route.startPoint().x, 1d);
+        assertEquals(400d, route.startPoint().y, 1d);
     }
 
     @Test
@@ -139,5 +174,27 @@ public class CampusRouteTest {
         List<CampusPoint> full = CampusGeo.partialLoop(points, 1d);
         assertEquals(161, full.size());
         assertEquals(points.get(0).x, full.get(full.size() - 1).x, 1e-9d);
+    }
+
+    /** 闭合环上相邻线段的最大转角（度）。 */
+    private static double maxTurnDegrees(List<CampusPoint> points) {
+        int n = points.size();
+        double maxTurn = 0d;
+        for (int i = 0; i < n; i++) {
+            CampusPoint prev = points.get((i - 1 + n) % n);
+            CampusPoint current = points.get(i);
+            CampusPoint next = points.get((i + 1) % n);
+            double ax = current.x - prev.x;
+            double ay = current.y - prev.y;
+            double bx = next.x - current.x;
+            double by = next.y - current.y;
+            double cross = ax * by - ay * bx;
+            double dot = ax * bx + ay * by;
+            if (Math.hypot(ax, ay) < 1e-9d || Math.hypot(bx, by) < 1e-9d) {
+                continue;
+            }
+            maxTurn = Math.max(maxTurn, Math.abs(Math.toDegrees(Math.atan2(cross, dot))));
+        }
+        return maxTurn;
     }
 }

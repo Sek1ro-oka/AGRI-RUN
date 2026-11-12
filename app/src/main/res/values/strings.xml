@@ -90,7 +90,6 @@
     <string name="settings_probe_hint">「检测模拟位置权限」会创建并立刻移除一个测试 provider，用来判断系统是否允许本应用提交模拟位置；运行中请勿使用。</string>
     <string name="settings_section_environment">环境检查</string>
     <string name="settings_intro">按下面顺序准备环境。任一项是「失败」时，模拟位置不会被系统接受。</string>
-    <string name="settings_section_overlay">悬浮控制台</string>
 
     <!-- 诊断页 -->
     <string name="diagnostics_title">诊断信息</string>
@@ -143,11 +142,6 @@
     <string name="menu_overlay_no_permission">需要先授予「显示在其他应用上层」权限</string>
     <string name="menu_overlay_on">悬浮控制条已开启：运行中切到别的应用也能暂停/停止</string>
     <string name="menu_overlay_off">悬浮控制条已关闭</string>
-    <string name="settings_overlay_title">摇杆悬浮窗</string>
-    <string name="settings_overlay_hint">开启后只在 Legion 切到后台时显示；摇杆默认锁定，点一下解锁、再点一下锁定</string>
-    <string name="settings_overlay_grant">去授权</string>
-    <string name="settings_overlay_ok">已授权</string>
-    <string name="settings_overlay_missing">未授权</string>
     <string name="settings_overlay_status_on">已开启 · 切到后台时显示</string>
     <string name="settings_overlay_status_on_missing">已开启 · 未授权</string>
     <string name="settings_overlay_status_off">未开启</string>
@@ -158,8 +152,9 @@
 
     <!-- 悬浮摇杆控制台 -->
     <string name="overlay_home">返回主界面</string>
-    <string name="overlay_pause_run">暂停跑圈</string>
-    <string name="overlay_resume_run">继续跑圈</string>
+    <string name="overlay_pause_run">暂停跑圈（长按结束）</string>
+    <string name="overlay_resume_run">继续跑圈（长按结束）</string>
+    <string name="overlay_end_toast">已结束本次运动，正在返回跑圈地图</string>
     <string name="overlay_joystick">摇杆已解锁：拖动控制人物移动，点一下锁定</string>
     <string name="overlay_joystick_locked">摇杆已锁定，点一下解锁</string>
     <string name="overlay_unlock_toast">摇杆已解锁，拖动即可控制人物移动</string>

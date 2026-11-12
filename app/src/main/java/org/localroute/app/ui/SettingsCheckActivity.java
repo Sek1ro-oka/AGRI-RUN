@@ -28,8 +28,6 @@ import androidx.core.view.WindowInsetsCompat;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivitySettingsCheckBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
-import org.localroute.app.overlay.OverlayHost;
-import org.localroute.app.overlay.OverlayPanel;
 import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.settings.SettingsInspector;
 
@@ -38,16 +36,12 @@ import java.util.List;
 /**
  * 设置页：主页同款白底 + 薄荷绿卡片。
  *
- * <p>上半部分是只读环境体检（与用户主动触发的权限探测），不修改任何系统设置；
- * 下半部分管理跨应用悬浮摇杆：需要系统「显示在其他应用上层」权限，授权后开关才真正生效。
+ * <p>本页只做只读环境体检与用户主动触发的权限探测，不修改任何系统设置；
+ * 悬浮窗开关统一放在「校园快跑」页，避免两处入口状态不一致。
  */
 public class SettingsCheckActivity extends AppCompatActivity {
 
     private ActivitySettingsCheckBinding binding;
-    /** 程序化勾选开关时避免再次触发监听。 */
-    private boolean overlaySwitchGuard;
-    /** 用户想打开悬浮窗但还在等系统授权页返回。 */
-    private boolean pendingOverlayEnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,45 +64,7 @@ public class SettingsCheckActivity extends AppCompatActivity {
         binding.buttonDevOptions.setOnClickListener(v -> openDeveloperOptions());
         binding.buttonAppDetails.setOnClickListener(v -> openAppDetails());
 
-        binding.switchOverlay.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (overlaySwitchGuard) {
-                return;
-            }
-            if (isChecked) {
-                requestEnableOverlay();
-            } else {
-                pendingOverlayEnable = false;
-                OverlayHost.get(this).setEnabled(false);
-                toast(getString(R.string.settings_overlay_disable_toast));
-                refreshOverlaySection();
-            }
-        });
-        binding.buttonOverlayPermission.setOnClickListener(v -> {
-            if (OverlayPanel.canDrawOverlays(this)) {
-                pendingOverlayEnable = true;
-                enableOverlayNow();
-            } else {
-                pendingOverlayEnable = true;
-                OverlayPanel.requestPermission(this);
-            }
-        });
-
         renderChecks();
-        refreshOverlaySection();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (pendingOverlayEnable) {
-            if (OverlayPanel.canDrawOverlays(this)) {
-                enableOverlayNow();
-            } else {
-                pendingOverlayEnable = false;
-                toast(getString(R.string.settings_overlay_denied_toast));
-            }
-        }
-        refreshOverlaySection();
     }
 
     @Override
@@ -118,54 +74,6 @@ public class SettingsCheckActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
-    }
-
-    // ---------------------------------------------------------------- 悬浮控制台
-
-    private void requestEnableOverlay() {
-        if (!OverlayPanel.canDrawOverlays(this)) {
-            pendingOverlayEnable = true;
-            setOverlaySwitch(false);
-            OverlayPanel.requestPermission(this);
-            toast(getString(R.string.settings_overlay_need_permission_toast));
-            return;
-        }
-        OverlayHost.get(this).setEnabled(true);
-        toast(getString(R.string.settings_overlay_enable_toast));
-        refreshOverlaySection();
-    }
-
-    private void enableOverlayNow() {
-        pendingOverlayEnable = false;
-        OverlayHost.get(this).setEnabled(true);
-        toast(getString(R.string.settings_overlay_enable_toast));
-        refreshOverlaySection();
-    }
-
-    private void refreshOverlaySection() {
-        boolean enabled = OverlayHost.get(this).isEnabled();
-        boolean allowed = OverlayPanel.canDrawOverlays(this);
-        setOverlaySwitch(enabled);
-        int statusRes;
-        if (!enabled) {
-            statusRes = R.string.settings_overlay_status_off;
-        } else if (allowed) {
-            statusRes = R.string.settings_overlay_status_on;
-        } else {
-            statusRes = R.string.settings_overlay_status_on_missing;
-        }
-        binding.textOverlayStatus.setText(statusRes);
-        binding.buttonOverlayPermission.setVisibility(allowed ? View.GONE : View.VISIBLE);
-        if (enabled) {
-            // 权限可能刚在系统页里授予：让面板按当前开关重新渲染一次。
-            OverlayHost.get(this).refresh();
-        }
-    }
-
-    private void setOverlaySwitch(boolean checked) {
-        overlaySwitchGuard = true;
-        binding.switchOverlay.setChecked(checked);
-        overlaySwitchGuard = false;
     }
 
     // ---------------------------------------------------------------- 环境检查
