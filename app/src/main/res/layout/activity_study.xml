@@ -110,6 +110,7 @@
                     android:id="@+id/homeworkScroll"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:descendantFocusability="blocksDescendants"
                     android:fillViewport="true"
                     android:scrollbars="none">
 
@@ -202,6 +203,7 @@
             android:id="@+id/timetableScreen"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:descendantFocusability="blocksDescendants"
             android:fillViewport="true"
             android:scrollbars="none"
             android:visibility="gone">
@@ -309,25 +311,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
+                    android:lineSpacingExtra="2dp"
                     android:textColor="@color/campus_muted"
                     android:textSize="11sp" />
-
-                <TextView
-                    android:id="@+id/textCourseListTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:text="@string/study_timetable_course_list"
-                    android:textColor="@color/campus_ink"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:id="@+id/timetableCourseList"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:orientation="vertical" />
             </LinearLayout>
         </ScrollView>
     </FrameLayout>

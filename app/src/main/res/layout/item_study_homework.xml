@@ -31,8 +31,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
+                android:breakStrategy="simple"
                 android:textColor="@color/campus_muted"
                 android:textSize="11sp" />
 
@@ -54,8 +53,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="5dp"
-            android:ellipsize="end"
-            android:maxLines="2"
+            android:breakStrategy="simple"
             android:textColor="@color/campus_ink"
             android:textSize="15sp"
             android:textStyle="bold" />

@@ -9,19 +9,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 课表与上课时间的本机存储。课表是用户手动录入的数据，不依赖学习通接口。
+ * 课表与作息时间的本机存储。课表是用户手动录入的数据，不依赖学习通接口。
+ *
+ * <p>作息按冬令时/夏令时各存一套；旧版本的「每节课时长」会在首次读取时
+ * 迁移为默认起点的作息，保留用户原来的节长。
  */
 public final class StudyTimetableStore {
 
     private static final String PREFS = "study_timetable";
     private static final String KEY_COURSES = "courses";
-    private static final String KEY_PERIOD_MINUTES = "period_minutes";
-
-    public static final int DEFAULT_PERIOD_MINUTES = 45;
-    public static final int MIN_PERIOD_MINUTES = 30;
-    public static final int MAX_PERIOD_MINUTES = 120;
-    /** 第一节固定 08:00 开始；每节课时长可在设置里调整。 */
-    public static final int FIRST_CLASS_MINUTES = 8 * 60;
+    private static final String KEY_SEASON = "season";
+    private static final String KEY_SCHEDULE_WINTER = "schedule_winter";
+    private static final String KEY_SCHEDULE_SUMMER = "schedule_summer";
+    /** 旧版本只保存了每节课分钟数，读取时迁移后删除。 */
+    private static final String KEY_LEGACY_PERIOD_MINUTES = "period_minutes";
 
     private StudyTimetableStore() {
     }
@@ -39,29 +40,70 @@ public final class StudyTimetableStore {
         prefs(context).edit().remove(KEY_COURSES).apply();
     }
 
-    public static int loadPeriodMinutes(Context context) {
-        int value = prefs(context).getInt(KEY_PERIOD_MINUTES, DEFAULT_PERIOD_MINUTES);
-        return Math.max(MIN_PERIOD_MINUTES, Math.min(MAX_PERIOD_MINUTES, value));
+    /** 未手动选择时按当前月份推断：5-10 月夏令时，其余冬令时。 */
+    public static int loadSeason(Context context) {
+        int stored = prefs(context).getInt(KEY_SEASON, -1);
+        if (stored == StudySchedule.SEASON_WINTER || stored == StudySchedule.SEASON_SUMMER) {
+            return stored;
+        }
+        return StudySchedule.currentSeason();
     }
 
-    public static void savePeriodMinutes(Context context, int minutes) {
-        int value = Math.max(MIN_PERIOD_MINUTES, Math.min(MAX_PERIOD_MINUTES, minutes));
-        prefs(context).edit().putInt(KEY_PERIOD_MINUTES, value).apply();
-    }
-
-    /** 第 period 节课的开始时间，例如第 1 节 08:00、第 3 节 09:30（45 分钟课时）。 */
-    @NonNull
-    public static String periodStartLabel(int period, int periodMinutes) {
-        int minutes = FIRST_CLASS_MINUTES + Math.max(0, period - 1) * periodMinutes;
-        return String.format(java.util.Locale.CHINA, "%02d:%02d",
-                (minutes / 60) % 24, minutes % 60);
+    public static void saveSeason(Context context, int season) {
+        int value = season == StudySchedule.SEASON_SUMMER
+                ? StudySchedule.SEASON_SUMMER : StudySchedule.SEASON_WINTER;
+        prefs(context).edit().putInt(KEY_SEASON, value).apply();
     }
 
     @NonNull
-    public static String periodEndLabel(int period, int periodMinutes) {
-        int minutes = FIRST_CLASS_MINUTES + Math.max(0, period) * periodMinutes;
-        return String.format(java.util.Locale.CHINA, "%02d:%02d",
-                (minutes / 60) % 24, minutes % 60);
+    public static StudySchedule loadSchedule(Context context) {
+        return loadSchedule(context, loadSeason(context));
+    }
+
+    @NonNull
+    public static StudySchedule loadSchedule(Context context, int season) {
+        SharedPreferences preferences = prefs(context);
+        StudySchedule stored = StudySchedule.decode(
+                preferences.getString(keyForSeason(season), null));
+        if (stored != null) {
+            return stored;
+        }
+        int legacyMinutes = preferences.getInt(KEY_LEGACY_PERIOD_MINUTES, -1);
+        StudySchedule schedule = migrateLegacy(season, legacyMinutes);
+        if (legacyMinutes >= StudySchedule.MIN_PERIOD_MINUTES
+                && legacyMinutes <= StudySchedule.MAX_PERIOD_MINUTES) {
+            // 迁移结果即使非法（旧节长过大）也要落盘，避免每次读取都重试。
+            preferences.edit()
+                    .putString(keyForSeason(season), schedule.encode())
+                    .remove(KEY_LEGACY_PERIOD_MINUTES)
+                    .apply();
+        }
+        return schedule;
+    }
+
+    /**
+     * 旧版只存了每节课分钟数：套用该季默认起点，保留原节长；若节长过大导致时段
+     * 重叠（如 120 分钟撑爆上午），回退到该季默认作息，至少保证课表可用。
+     */
+    @NonNull
+    static StudySchedule migrateLegacy(int season, int legacyMinutes) {
+        StudySchedule defaults = StudySchedule.defaultsForSeason(season);
+        if (legacyMinutes < StudySchedule.MIN_PERIOD_MINUTES
+                || legacyMinutes > StudySchedule.MAX_PERIOD_MINUTES) {
+            return defaults;
+        }
+        StudySchedule migrated = defaults.withPeriodMinutes(legacyMinutes);
+        return migrated.isValid() ? migrated : defaults;
+    }
+
+    public static void saveSchedule(Context context, int season, @NonNull StudySchedule schedule) {
+        if (!schedule.isValid()) {
+            return;
+        }
+        prefs(context).edit()
+                .putString(keyForSeason(season), schedule.encode())
+                .remove(KEY_LEGACY_PERIOD_MINUTES)
+                .apply();
     }
 
     /** 新导入的课程按星期与节次排序，避免列表随输入顺序跳动。 */
@@ -80,6 +122,12 @@ public final class StudyTimetableStore {
             return left.name().compareTo(right.name());
         });
         return copy;
+    }
+
+    @NonNull
+    private static String keyForSeason(int season) {
+        return season == StudySchedule.SEASON_SUMMER
+                ? KEY_SCHEDULE_SUMMER : KEY_SCHEDULE_WINTER;
     }
 
     private static SharedPreferences prefs(Context context) {

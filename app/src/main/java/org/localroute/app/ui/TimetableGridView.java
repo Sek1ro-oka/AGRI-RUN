@@ -19,7 +19,7 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import org.localroute.app.R;
-import org.localroute.app.study.StudyTimetableStore;
+import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.TimetableCourse;
 
 import java.util.ArrayList;
@@ -62,9 +62,10 @@ public class TimetableGridView extends View {
     private final List<Block> blocks = new ArrayList<>();
     private final int touchSlop;
 
-    private int periodMinutes = StudyTimetableStore.DEFAULT_PERIOD_MINUTES;
+    private StudySchedule schedule = StudySchedule.winterDefault();
     private int displayPeriods = 10;
     private OnEmptySlotClickListener emptySlotListener;
+    private OnCourseClickListener courseListener;
     private float downX;
     private float downY;
     private boolean trackingTap;
@@ -72,6 +73,11 @@ public class TimetableGridView extends View {
     /** 点击没有课程的格子时回调，用于在空白处自定义课程或事件。 */
     public interface OnEmptySlotClickListener {
         void onEmptySlot(int weekday, int period);
+    }
+
+    /** 点击课程块时回调，用于直接修改或删除这门课。 */
+    public interface OnCourseClickListener {
+        void onCourse(@NonNull TimetableCourse course);
     }
 
     public TimetableGridView(Context context) {
@@ -120,11 +126,16 @@ public class TimetableGridView extends View {
 
     public void setOnEmptySlotClickListener(@Nullable OnEmptySlotClickListener listener) {
         emptySlotListener = listener;
-        setClickable(listener != null);
+        setClickable(listener != null || courseListener != null);
     }
 
-    public void setData(@NonNull List<TimetableCourse> courses, int periodMinutes) {
-        this.periodMinutes = periodMinutes;
+    public void setOnCourseClickListener(@Nullable OnCourseClickListener listener) {
+        courseListener = listener;
+        setClickable(emptySlotListener != null || listener != null);
+    }
+
+    public void setData(@NonNull List<TimetableCourse> courses, @NonNull StudySchedule schedule) {
+        this.schedule = schedule;
         int maxEnd = 0;
         for (TimetableCourse course : courses) {
             maxEnd = Math.max(maxEnd, course.endPeriod());
@@ -241,7 +252,7 @@ public class TimetableGridView extends View {
             labelPaint.setFakeBoldText(false);
             labelPaint.setColor(colorMuted);
             labelPaint.setTextSize(sp(8));
-            canvas.drawText(StudyTimetableStore.periodStartLabel(period, periodMinutes),
+            canvas.drawText(schedule.startLabel(period),
                     timeColumnWidth / 2f, top + rowHeight * 0.7f, labelPaint);
         }
 
@@ -287,7 +298,7 @@ public class TimetableGridView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (emptySlotListener == null) {
+        if (emptySlotListener == null && courseListener == null) {
             return super.onTouchEvent(event);
         }
         switch (event.getActionMasked()) {
@@ -305,7 +316,7 @@ public class TimetableGridView extends View {
             case MotionEvent.ACTION_UP:
                 if (trackingTap) {
                     performClick();
-                    handleEmptySlotTap(event.getX(), event.getY());
+                    handleTap(event.getX(), event.getY());
                 }
                 trackingTap = false;
                 return true;
@@ -323,10 +334,7 @@ public class TimetableGridView extends View {
         return true;
     }
 
-    private void handleEmptySlotTap(float touchX, float touchY) {
-        if (emptySlotListener == null) {
-            return;
-        }
+    private void handleTap(float touchX, float touchY) {
         float x = touchX - getPaddingLeft();
         float y = touchY - getPaddingTop();
         if (x < timeColumnWidth || y < headerHeight) {
@@ -341,10 +349,15 @@ public class TimetableGridView extends View {
             TimetableCourse course = block.course;
             if (course.weekday() == weekday
                     && period >= course.startPeriod() && period <= course.endPeriod()) {
+                if (courseListener != null) {
+                    courseListener.onCourse(course);
+                }
                 return;
             }
         }
-        emptySlotListener.onEmptySlot(weekday, period);
+        if (emptySlotListener != null) {
+            emptySlotListener.onEmptySlot(weekday, period);
+        }
     }
 
     private static int todayIndex() {

@@ -9,15 +9,18 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 
 import org.localroute.app.R;
 import org.localroute.app.databinding.DialogStudyCourseBinding;
 import org.localroute.app.databinding.DialogStudyImportBinding;
+import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
 import org.localroute.app.study.TimetableLayoutParser;
@@ -206,16 +209,33 @@ public final class StudyDialogs {
     public static void showCourseEditor(@NonNull Activity activity,
                                         @Nullable TimetableCourse existing,
                                         @NonNull Consumer<TimetableCourse> onSaved) {
-        showCourseEditor(activity, existing, 0, 0, 0, onSaved);
+        showCourseEditor(activity, existing, 0, 0, 0, onSaved, null);
+    }
+
+    public static void showCourseEditor(@NonNull Activity activity,
+                                        @Nullable TimetableCourse existing,
+                                        @NonNull Consumer<TimetableCourse> onSaved,
+                                        @Nullable Runnable onDeleted) {
+        showCourseEditor(activity, existing, 0, 0, 0, onSaved, onDeleted);
     }
 
     /**
-     * 打开课程编辑器。新建时可预填星期与节次，用于点击课表空白格添加事件。
+     * 打开课程编辑器。新建时可预填星期与节次，用于点击课表空白格添加事件；
+     * 修改已有课程时提供删除入口，删除成功后回调 onDeleted。
      */
     public static void showCourseEditor(@NonNull Activity activity,
                                         @Nullable TimetableCourse existing,
                                         int presetWeekday, int presetStart, int presetEnd,
                                         @NonNull Consumer<TimetableCourse> onSaved) {
+        showCourseEditor(activity, existing, presetWeekday, presetStart, presetEnd,
+                onSaved, null);
+    }
+
+    public static void showCourseEditor(@NonNull Activity activity,
+                                        @Nullable TimetableCourse existing,
+                                        int presetWeekday, int presetStart, int presetEnd,
+                                        @NonNull Consumer<TimetableCourse> onSaved,
+                                        @Nullable Runnable onDeleted) {
         DialogStudyCourseBinding binding =
                 DialogStudyCourseBinding.inflate(LayoutInflater.from(activity));
         ArrayAdapter<String> adapter = new ArrayAdapter<>(activity,
@@ -248,7 +268,7 @@ public final class StudyDialogs {
             binding.inputCourseWeeks.setText("1-16");
         }
 
-        // 显示节次对应的实际时间，方便边改边核对；时长跟随设置页的「每节课分钟数」。
+        // 显示节次对应的实际时间，方便边改边核对；时间跟随设置页的冬/夏令时作息。
         updateCourseTimeHint(activity, binding);
         binding.inputCoursePeriod.addTextChangedListener(new TextWatcher() {
             @Override
@@ -265,58 +285,74 @@ public final class StudyDialogs {
             }
         });
 
-        AlertDialog dialog = new AlertDialog.Builder(activity)
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity)
                 .setTitle(existing == null ? R.string.study_course_add_title
                         : R.string.study_course_edit_title)
                 .setView(binding.getRoot())
                 .setNegativeButton(R.string.campus_cancel, null)
-                .setPositiveButton(R.string.campus_save, null)
-                .create();
-        dialog.setOnShowListener(ignored ->
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-                    String name = binding.inputCourseName.getText().toString().trim();
-                    int[] periods = TimetableText.parsePeriods(
-                            binding.inputCoursePeriod.getText().toString());
-                    String weeksRaw = binding.inputCourseWeeks.getText().toString().trim();
-                    String weeks = weeksRaw.isEmpty() ? "1-16"
-                            : TimetableText.normalizeWeeks(weeksRaw);
-                    if (name.isEmpty() || periods == null || weeks == null) {
-                        Toast.makeText(activity, R.string.study_course_invalid,
-                                Toast.LENGTH_LONG).show();
-                        return;
+                .setPositiveButton(R.string.campus_save, null);
+        if (existing != null && onDeleted != null) {
+            builder.setNeutralButton(R.string.study_course_delete, null);
+        }
+        AlertDialog dialog = builder.create();
+        dialog.setOnShowListener(ignored -> {
+            if (existing != null && onDeleted != null) {
+                Button delete = dialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+                if (delete != null) {
+                    delete.setTextColor(ContextCompat.getColor(activity,
+                            R.color.campus_danger));
+                    delete.setOnClickListener(view ->
+                            confirmDeleteCourse(activity, existing, () -> {
+                                dialog.dismiss();
+                                onDeleted.run();
+                            }));
+                }
+            }
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                String name = binding.inputCourseName.getText().toString().trim();
+                int[] periods = TimetableText.parsePeriods(
+                        binding.inputCoursePeriod.getText().toString());
+                String weeksRaw = binding.inputCourseWeeks.getText().toString().trim();
+                String weeks = weeksRaw.isEmpty() ? "1-16"
+                        : TimetableText.normalizeWeeks(weeksRaw);
+                if (name.isEmpty() || periods == null || weeks == null) {
+                    Toast.makeText(activity, R.string.study_course_invalid,
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                int weekday = binding.spinnerCourseWeekday.getSelectedItemPosition() + 1;
+                String location = binding.inputCourseLocation.getText().toString().trim();
+                String teacher = binding.inputCourseTeacher.getText().toString().trim();
+                TimetableCourse course = existing == null
+                        ? TimetableCourse.create(name, teacher, location,
+                        weekday, periods[0], periods[1], weeks)
+                        : new TimetableCourse(existing.id(), name, teacher, location,
+                        weekday, periods[0], periods[1], weeks);
+                List<TimetableCourse> courses =
+                        new ArrayList<>(StudyTimetableStore.loadCourses(activity));
+                boolean replaced = false;
+                for (int i = 0; i < courses.size(); i++) {
+                    if (courses.get(i).id().equals(course.id())) {
+                        courses.set(i, course);
+                        replaced = true;
+                        break;
                     }
-                    int weekday = binding.spinnerCourseWeekday.getSelectedItemPosition() + 1;
-                    String location = binding.inputCourseLocation.getText().toString().trim();
-                    String teacher = binding.inputCourseTeacher.getText().toString().trim();
-                    TimetableCourse course = existing == null
-                            ? TimetableCourse.create(name, teacher, location,
-                            weekday, periods[0], periods[1], weeks)
-                            : new TimetableCourse(existing.id(), name, teacher, location,
-                            weekday, periods[0], periods[1], weeks);
-                    List<TimetableCourse> courses =
-                            new ArrayList<>(StudyTimetableStore.loadCourses(activity));
-                    boolean replaced = false;
-                    for (int i = 0; i < courses.size(); i++) {
-                        if (courses.get(i).id().equals(course.id())) {
-                            courses.set(i, course);
-                            replaced = true;
-                            break;
-                        }
-                    }
-                    if (!replaced) {
-                        courses.add(course);
-                    }
-                    StudyTimetableStore.saveCourses(activity,
-                            StudyTimetableStore.sorted(courses));
-                    Toast.makeText(activity, R.string.study_course_saved,
-                            Toast.LENGTH_SHORT).show();
-                    dialog.dismiss();
-                    onSaved.accept(course);
-                }));
+                }
+                if (!replaced) {
+                    courses.add(course);
+                }
+                StudyTimetableStore.saveCourses(activity,
+                        StudyTimetableStore.sorted(courses));
+                Toast.makeText(activity, R.string.study_course_saved,
+                        Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+                onSaved.accept(course);
+            });
+        });
         dialog.show();
     }
 
-    /** 节次变化时刷新「第 X-Y 节 · HH:MM–HH:MM」提示；节次非法时隐藏。 */
+    /** 节次变化时刷新「第 X-Y 节 · HH:MM–HH:MM（时令，每节 N 分钟）」提示；节次非法时隐藏。 */
     private static void updateCourseTimeHint(Activity activity,
                                              DialogStudyCourseBinding binding) {
         int[] periods = TimetableText.parsePeriods(
@@ -325,13 +361,16 @@ public final class StudyDialogs {
             binding.textCourseTimeRange.setVisibility(View.GONE);
             return;
         }
-        int minutes = StudyTimetableStore.loadPeriodMinutes(activity);
+        StudySchedule schedule = StudyTimetableStore.loadSchedule(activity);
+        int season = StudyTimetableStore.loadSeason(activity);
         binding.textCourseTimeRange.setText(activity.getString(
                 R.string.study_course_time_range,
                 TimetableText.formatPeriods(periods[0], periods[1]),
-                StudyTimetableStore.periodStartLabel(periods[0], minutes),
-                StudyTimetableStore.periodEndLabel(periods[1], minutes),
-                minutes));
+                schedule.startLabel(periods[0]),
+                schedule.endLabel(periods[1]),
+                activity.getString(season == StudySchedule.SEASON_SUMMER
+                        ? R.string.study_season_summer : R.string.study_season_winter),
+                schedule.periodMinutes()));
         binding.textCourseTimeRange.setVisibility(View.VISIBLE);
     }
 

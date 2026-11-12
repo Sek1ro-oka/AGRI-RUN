@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -24,11 +25,11 @@ import androidx.core.view.WindowInsetsCompat;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityStudyBinding;
 import org.localroute.app.databinding.ItemStudyHomeworkBinding;
-import org.localroute.app.databinding.ItemTimetableCourseBinding;
 import org.localroute.app.study.ChaoxingClient;
 import org.localroute.app.study.HomeworkFilter;
 import org.localroute.app.study.HomeworkItem;
 import org.localroute.app.study.StudyHomeworkCache;
+import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
 import org.localroute.app.study.StudyTimetableStore;
@@ -167,6 +168,9 @@ public class StudyActivity extends AppCompatActivity {
         binding.timetableGrid.setOnEmptySlotClickListener((weekday, period) ->
                 StudyDialogs.showCourseEditor(this, null, weekday, period, period,
                         course -> renderTimetable()));
+        binding.timetableGrid.setOnCourseClickListener(course ->
+                StudyDialogs.showCourseEditor(this, course,
+                        updated -> renderTimetable(), this::renderTimetable));
 
         session = StudySessionStore.load(this);
         renderAccount();
@@ -451,6 +455,9 @@ public class StudyActivity extends AppCompatActivity {
     }
 
     private void renderHomeworkList() {
+        // 刷新时整表重建会把 ScrollView 的滚动位置清零；先记下再在布局后恢复，
+        // 避免用户正在看下半部分时突然回到顶部。
+        int scrollY = binding.homeworkScroll.getScrollY();
         binding.homeworkList.removeAllViews();
         LayoutInflater inflater = getLayoutInflater();
         for (HomeworkItem item : homework) {
@@ -458,6 +465,21 @@ public class StudyActivity extends AppCompatActivity {
                     inflater, binding.homeworkList, false);
             bindHomework(itemBinding, item);
             binding.homeworkList.addView(itemBinding.getRoot());
+        }
+        if (scrollY > 0) {
+            ViewTreeObserver observer = binding.homeworkScroll.getViewTreeObserver();
+            observer.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    ViewTreeObserver current = binding.homeworkScroll.getViewTreeObserver();
+                    if (current.isAlive()) {
+                        current.removeOnGlobalLayoutListener(this);
+                    }
+                    int max = Math.max(0, binding.homeworkList.getHeight()
+                            - binding.homeworkScroll.getHeight());
+                    binding.homeworkScroll.scrollTo(0, Math.min(scrollY, max));
+                }
+            });
         }
     }
 
@@ -572,48 +594,27 @@ public class StudyActivity extends AppCompatActivity {
         }
         List<TimetableCourse> courses =
                 StudyTimetableStore.sorted(StudyTimetableStore.loadCourses(this));
-        int minutes = StudyTimetableStore.loadPeriodMinutes(this);
+        StudySchedule schedule = StudyTimetableStore.loadSchedule(this);
+        int season = StudyTimetableStore.loadSeason(this);
         binding.textTimetableSummary.setText(
                 getString(R.string.study_timetable_summary, courses.size()));
-        binding.textTimetableNote.setText(
-                getString(R.string.study_timetable_note, minutes));
-        binding.timetableGrid.setData(courses, minutes);
+        binding.textTimetableNote.setText(getString(R.string.study_timetable_note,
+                getString(season == StudySchedule.SEASON_SUMMER
+                        ? R.string.study_season_summer : R.string.study_season_winter),
+                schedule.startLabel(StudySchedule.MORNING_FIRST_PERIOD),
+                schedule.endLabel(StudySchedule.MORNING_FIRST_PERIOD
+                        + StudySchedule.SEGMENT_PERIODS - 1),
+                schedule.startLabel(StudySchedule.AFTERNOON_FIRST_PERIOD),
+                schedule.endLabel(StudySchedule.AFTERNOON_FIRST_PERIOD
+                        + StudySchedule.SEGMENT_PERIODS - 1),
+                schedule.startLabel(StudySchedule.EVENING_FIRST_PERIOD),
+                schedule.endLabel(StudySchedule.EVENING_FIRST_PERIOD
+                        + StudySchedule.SEGMENT_PERIODS - 1)));
+        binding.timetableGrid.setData(courses, schedule);
 
         boolean empty = courses.isEmpty();
         binding.scrollTimetable.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.textTimetableEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-        binding.textCourseListTitle.setVisibility(empty ? View.GONE : View.VISIBLE);
-        binding.timetableCourseList.setVisibility(empty ? View.GONE : View.VISIBLE);
-        renderCourseRows(courses);
-    }
-
-    private void renderCourseRows(List<TimetableCourse> courses) {
-        binding.timetableCourseList.removeAllViews();
-        LayoutInflater inflater = getLayoutInflater();
-        for (TimetableCourse course : courses) {
-            ItemTimetableCourseBinding row = ItemTimetableCourseBinding.inflate(
-                    inflater, binding.timetableCourseList, false);
-            row.textCourseName.setText(course.name());
-            StringBuilder meta = new StringBuilder()
-                    .append(course.weekdayLabel())
-                    .append(' ')
-                    .append(course.periodLabel())
-                    .append(" · ")
-                    .append(course.weeks())
-                    .append("周");
-            if (!course.location().isEmpty()) {
-                meta.append(" · ").append(course.location());
-            } else if (!course.teacher().isEmpty()) {
-                meta.append(" · ").append(course.teacher());
-            }
-            row.textCourseMeta.setText(meta.toString());
-            row.getRoot().setOnClickListener(view ->
-                    StudyDialogs.showCourseEditor(this, course,
-                            updated -> renderTimetable()));
-            row.buttonCourseDelete.setOnClickListener(view ->
-                    StudyDialogs.confirmDeleteCourse(this, course, this::renderTimetable));
-            binding.timetableCourseList.addView(row.getRoot());
-        }
     }
 
     private void selectTab(boolean timetable) {

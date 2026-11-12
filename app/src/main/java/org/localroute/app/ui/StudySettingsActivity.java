@@ -1,32 +1,41 @@
 package org.localroute.app.ui;
 
 import android.content.Intent;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+
+import com.google.android.material.timepicker.MaterialTimePicker;
+import com.google.android.material.timepicker.TimeFormat;
 
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityStudySettingsBinding;
+import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
 import org.localroute.app.study.StudyTimetableStore;
-import org.localroute.app.study.TimetableCourse;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-/** 作业查询的独立设置页：学习通账户、课表导入与每节课时长。 */
+/** 作业查询的独立设置页：学习通账户、课表导入与冬夏令时作息。 */
 public class StudySettingsActivity extends AppCompatActivity {
 
     private ActivityStudySettingsBinding binding;
     private StudySession session;
+    private int season = StudySchedule.SEASON_WINTER;
+    private StudySchedule schedule = StudySchedule.winterDefault();
 
     private final ActivityResultLauncher<Intent> loginLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
@@ -64,13 +73,24 @@ public class StudySettingsActivity extends AppCompatActivity {
                 StudyDialogs.showCourseEditor(this, null, course -> onTimetableChanged()));
         binding.rowClearTimetable.setOnClickListener(view -> confirmClearTimetable());
 
-        int minutes = StudyTimetableStore.loadPeriodMinutes(this);
-        binding.seekPeriod.setProgress(minutes - StudyTimetableStore.MIN_PERIOD_MINUTES);
-        updatePeriodLabel(minutes);
+        binding.chipSeasonWinter.setOnClickListener(view ->
+                selectSeason(StudySchedule.SEASON_WINTER));
+        binding.chipSeasonSummer.setOnClickListener(view ->
+                selectSeason(StudySchedule.SEASON_SUMMER));
+        binding.rowMorningStart.setOnClickListener(view ->
+                pickStartTime(StudySchedule.SEGMENT_MORNING));
+        binding.rowAfternoonStart.setOnClickListener(view ->
+                pickStartTime(StudySchedule.SEGMENT_AFTERNOON));
+        binding.rowEveningStart.setOnClickListener(view ->
+                pickStartTime(StudySchedule.SEGMENT_EVENING));
+
+        binding.seekPeriod.setMax(StudySchedule.MAX_PERIOD_MINUTES
+                - StudySchedule.MIN_PERIOD_MINUTES);
         binding.seekPeriod.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                updatePeriodLabel(StudyTimetableStore.MIN_PERIOD_MINUTES + progress);
+                binding.textPeriodValue.setText(getString(R.string.study_schedule_minutes,
+                        StudySchedule.MIN_PERIOD_MINUTES + progress));
             }
 
             @Override
@@ -79,25 +99,35 @@ public class StudySettingsActivity extends AppCompatActivity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                int value = StudyTimetableStore.MIN_PERIOD_MINUTES + seekBar.getProgress();
-                StudyTimetableStore.savePeriodMinutes(StudySettingsActivity.this, value);
-                setResult(RESULT_OK);
-                Toast.makeText(StudySettingsActivity.this,
-                        getString(R.string.study_period_saved, value),
-                        Toast.LENGTH_SHORT).show();
+                applySchedule(schedule.withPeriodMinutes(
+                        StudySchedule.MIN_PERIOD_MINUTES + seekBar.getProgress()));
+            }
+        });
+        binding.seekBreak.setMax(StudySchedule.MAX_BREAK_MINUTES);
+        binding.seekBreak.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                binding.textBreakValue.setText(getString(R.string.study_schedule_minutes,
+                        progress));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                applySchedule(schedule.withBreakMinutes(seekBar.getProgress()));
             }
         });
         binding.buttonResetPeriod.setOnClickListener(view -> {
-            int value = StudyTimetableStore.DEFAULT_PERIOD_MINUTES;
-            binding.seekPeriod.setProgress(value - StudyTimetableStore.MIN_PERIOD_MINUTES);
-            StudyTimetableStore.savePeriodMinutes(this, value);
-            setResult(RESULT_OK);
-            Toast.makeText(this, getString(R.string.study_period_saved, value),
-                    Toast.LENGTH_SHORT).show();
+            applySchedule(StudySchedule.defaultsForSeason(season));
+            Toast.makeText(this, R.string.study_schedule_reset_done, Toast.LENGTH_SHORT).show();
         });
 
         renderAccount();
         renderTimetableCount();
+        renderSchedule();
     }
 
     @Override
@@ -105,6 +135,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         super.onResume();
         renderAccount();
         renderTimetableCount();
+        renderSchedule();
     }
 
     private void onSwitchAccount() {
@@ -167,10 +198,144 @@ public class StudySettingsActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void updatePeriodLabel(int minutes) {
-        binding.textPeriodValue.setText(getString(R.string.study_period_value, minutes));
-        binding.textPeriodNote.setText(getString(R.string.study_period_note,
-                TimetableCourse.MAX_PERIOD,
-                StudyTimetableStore.periodEndLabel(TimetableCourse.MAX_PERIOD, minutes)));
+    // ------------------------------------------------------------------ 作息
+
+    private void renderSchedule() {
+        season = StudyTimetableStore.loadSeason(this);
+        schedule = StudyTimetableStore.loadSchedule(this);
+        fillScheduleValues();
+        binding.textScheduleWarning.setVisibility(View.GONE);
+    }
+
+    private void fillScheduleValues() {
+        binding.textMorningValue.setText(
+                schedule.startLabel(StudySchedule.MORNING_FIRST_PERIOD));
+        binding.textAfternoonValue.setText(
+                schedule.startLabel(StudySchedule.AFTERNOON_FIRST_PERIOD));
+        binding.textEveningValue.setText(
+                schedule.startLabel(StudySchedule.EVENING_FIRST_PERIOD));
+
+        binding.seekPeriod.setProgress(schedule.periodMinutes()
+                - StudySchedule.MIN_PERIOD_MINUTES);
+        binding.textPeriodValue.setText(getString(R.string.study_schedule_minutes,
+                schedule.periodMinutes()));
+        binding.seekBreak.setProgress(schedule.breakMinutes());
+        binding.textBreakValue.setText(getString(R.string.study_schedule_minutes,
+                schedule.breakMinutes()));
+
+        binding.textScheduleSummary.setText(getString(R.string.study_schedule_summary,
+                schedule.startLabel(StudySchedule.MORNING_FIRST_PERIOD),
+                schedule.endLabel(StudySchedule.MORNING_FIRST_PERIOD
+                        + StudySchedule.SEGMENT_PERIODS - 1),
+                schedule.startLabel(StudySchedule.AFTERNOON_FIRST_PERIOD),
+                schedule.endLabel(StudySchedule.AFTERNOON_FIRST_PERIOD
+                        + StudySchedule.SEGMENT_PERIODS - 1),
+                schedule.startLabel(StudySchedule.EVENING_FIRST_PERIOD),
+                schedule.endLabel(StudySchedule.EVENING_FIRST_PERIOD
+                        + StudySchedule.SEGMENT_PERIODS - 1)));
+
+        boolean winter = season == StudySchedule.SEASON_WINTER;
+        styleSeasonChip(binding.chipSeasonWinter, winter);
+        styleSeasonChip(binding.chipSeasonSummer, !winter);
+    }
+
+    private void styleSeasonChip(@NonNull android.widget.TextView chip, boolean selected) {
+        GradientDrawable background = new GradientDrawable();
+        background.setCornerRadius(dp(20));
+        background.setColor(ContextCompat.getColor(this, selected
+                ? R.color.campus_mint : R.color.campus_mint_pale));
+        chip.setBackground(background);
+        chip.setTextColor(ContextCompat.getColor(this, selected
+                ? R.color.brand_on_primary : R.color.campus_mint_dark));
+        chip.setSelected(selected);
+    }
+
+    private void selectSeason(int target) {
+        if (season == target) {
+            return;
+        }
+        season = target;
+        StudyTimetableStore.saveSeason(this, target);
+        schedule = StudyTimetableStore.loadSchedule(this, target);
+        fillScheduleValues();
+        binding.textScheduleWarning.setVisibility(View.GONE);
+        setResult(RESULT_OK);
+    }
+
+    private void pickStartTime(int segment) {
+        int titleRes;
+        switch (segment) {
+            case StudySchedule.SEGMENT_AFTERNOON:
+                titleRes = R.string.study_schedule_pick_afternoon;
+                break;
+            case StudySchedule.SEGMENT_EVENING:
+                titleRes = R.string.study_schedule_pick_evening;
+                break;
+            default:
+                titleRes = R.string.study_schedule_pick_morning;
+                break;
+        }
+        int current = schedule.segmentStartMinutes(segment);
+        MaterialTimePicker picker = new MaterialTimePicker.Builder()
+                .setTimeFormat(TimeFormat.CLOCK_24H)
+                .setHour(current / 60)
+                .setMinute(current % 60)
+                .setTitleText(titleRes)
+                .build();
+        picker.addOnPositiveButtonClickListener(view -> {
+            int minutes = StudySchedule.snapToFiveMinutes(
+                    picker.getHour() * 60 + picker.getMinute());
+            applySchedule(schedule.withSegmentStart(segment, minutes));
+        });
+        picker.show(getSupportFragmentManager(), "study-schedule-" + segment);
+    }
+
+    /** 保存一套作息；不合理的组合回退到当前值，并在卡片内说明原因。 */
+    private void applySchedule(@NonNull StudySchedule candidate) {
+        String error = scheduleError(candidate);
+        if (error != null) {
+            fillScheduleValues();
+            binding.textScheduleWarning.setText(error);
+            binding.textScheduleWarning.setVisibility(View.VISIBLE);
+            return;
+        }
+        StudyTimetableStore.saveSchedule(this, season, candidate);
+        schedule = candidate;
+        fillScheduleValues();
+        binding.textScheduleWarning.setVisibility(View.GONE);
+        setResult(RESULT_OK);
+    }
+
+    @Nullable
+    private String scheduleError(@NonNull StudySchedule candidate) {
+        if (candidate.morningStart() >= candidate.afternoonStart()
+                || candidate.afternoonStart() >= candidate.eveningStart()
+                || candidate.eveningStart() >= 24 * 60) {
+            return getString(R.string.study_schedule_error_order);
+        }
+        if (candidate.segmentEndMinutes(StudySchedule.SEGMENT_MORNING)
+                > candidate.afternoonStart()) {
+            return getString(R.string.study_schedule_error_morning,
+                    candidate.endLabel(StudySchedule.MORNING_FIRST_PERIOD
+                            + StudySchedule.SEGMENT_PERIODS - 1),
+                    candidate.startLabel(StudySchedule.AFTERNOON_FIRST_PERIOD));
+        }
+        if (candidate.segmentEndMinutes(StudySchedule.SEGMENT_AFTERNOON)
+                > candidate.eveningStart()) {
+            return getString(R.string.study_schedule_error_afternoon,
+                    candidate.endLabel(StudySchedule.AFTERNOON_FIRST_PERIOD
+                            + StudySchedule.SEGMENT_PERIODS - 1),
+                    candidate.startLabel(StudySchedule.EVENING_FIRST_PERIOD));
+        }
+        if (candidate.segmentEndMinutes(StudySchedule.SEGMENT_EVENING) > 24 * 60) {
+            return getString(R.string.study_schedule_error_evening,
+                    candidate.endLabel(StudySchedule.EVENING_FIRST_PERIOD
+                            + StudySchedule.SEGMENT_PERIODS - 1));
+        }
+        return candidate.isValid() ? null : getString(R.string.study_schedule_invalid);
+    }
+
+    private float dp(float value) {
+        return value * getResources().getDisplayMetrics().density;
     }
 }
