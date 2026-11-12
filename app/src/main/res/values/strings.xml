@@ -211,7 +211,7 @@
     <string name="app_settings_activation_wrong">激活码不正确</string>
     <string name="app_settings_activation_success">激活成功，A操 / B操 已加入跑圈路线</string>
     <string name="app_settings_activation_already">已经激活过了</string>
-    <string name="app_settings_activation_note">激活后可在「校园快跑」的「目标」里选择 A操 / B操。</string>
+    <string name="app_settings_activation_note">激活码仅能使用一次；激活后在「校园快跑」的「目标」里选择 A操 / B操，删除后不会自动恢复。</string>
 
     <!-- 校园快跑 -->
     <string name="campus_entry_title">校园快跑</string>
@@ -328,7 +328,6 @@
     <string name="campus_route_delete">删除</string>
     <string name="campus_route_deleted">已删除路线「%1$s」</string>
     <string name="campus_route_delete_running">跑圈进行中，不能删除当前路线</string>
-    <string name="campus_route_preset_fixed">A操 / B操 是内置预设路线，不能删除</string>
     <string name="campus_done_completed">跑圈完成</string>
     <string name="campus_done_stopped">已结束</string>
     <string name="campus_done_error">跑圈出错</string>

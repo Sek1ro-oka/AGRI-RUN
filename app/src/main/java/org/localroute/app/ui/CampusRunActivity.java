@@ -398,7 +398,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 prefs.edit().remove(KEY_CUSTOM_POINTS).apply();
             }
         }
-        syncPresetRoutes();
+        applyPresetActivation();
         String selectedId = prefs.getString(KEY_SELECTED_ROUTE, "");
         route = null;
         for (CampusRoute candidate : customRoutes) {
@@ -413,22 +413,25 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     /**
-     * 按激活状态同步内置预设：已激活时把缺失的 A操 / B操 放回列表，
-     * 未激活时移除（兼容早期调试版自动写入的预设）。预设不可删除，
-     * 避免删除操作与这里的自动补齐互相覆盖。
+     * 落实激活码效果：激活码只生效一次，首次把 A操 / B操 当作普通路线加入列表，
+     * 随后写入一次性标记。用户之后删除预设与删除普通路线一样持久生效，
+     * 不会因为重新进入页面被自动补回。未激活时移除早期调试版自动写入的预设。
      *
      * @return 路线列表是否发生变化
      */
-    private boolean syncPresetRoutes() {
+    private boolean applyPresetActivation() {
         boolean changed = false;
         if (prefs.getBoolean(PresetUnlock.KEY_UNLOCKED, false)) {
-            List<CampusRoute> presets = Arrays.asList(CampusPresets.routeA(), CampusPresets.routeB());
-            for (int i = presets.size() - 1; i >= 0; i--) {
-                CampusRoute preset = presets.get(i);
-                if (indexOfRoute(preset.id()) < 0) {
-                    customRoutes.add(0, preset);
-                    changed = true;
+            if (!prefs.getBoolean(PresetUnlock.KEY_PRESETS_ADDED, false)) {
+                List<CampusRoute> presets = Arrays.asList(CampusPresets.routeA(), CampusPresets.routeB());
+                for (int i = presets.size() - 1; i >= 0; i--) {
+                    CampusRoute preset = presets.get(i);
+                    if (indexOfRoute(preset.id()) < 0) {
+                        customRoutes.add(0, preset);
+                        changed = true;
+                    }
                 }
+                prefs.edit().putBoolean(PresetUnlock.KEY_PRESETS_ADDED, true).apply();
             }
         } else {
             for (int i = customRoutes.size() - 1; i >= 0; i--) {
@@ -452,7 +455,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (runScreenVisible || snapshot.isActive()) {
             return;
         }
-        if (!syncPresetRoutes()) {
+        if (!applyPresetActivation()) {
             return;
         }
         if (route == null || indexOfRoute(route.id()) < 0) {
@@ -1747,11 +1750,9 @@ public final class CampusRunActivity extends AppCompatActivity {
         swipe.addAction(getString(R.string.campus_route_edit),
                 getColor(R.color.campus_mint_dark),
                 () -> showRouteEditDialog(candidate, dialog));
-        if (!candidate.isPreset()) {
-            swipe.addAction(getString(R.string.campus_route_delete),
-                    getColor(R.color.campus_danger),
-                    () -> deleteRoute(candidate, dialog));
-        }
+        swipe.addAction(getString(R.string.campus_route_delete),
+                getColor(R.color.campus_danger),
+                () -> deleteRoute(candidate, dialog));
 
         LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1824,11 +1825,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     private void deleteRoute(CampusRoute candidate, BottomSheetDialog dialog) {
-        if (candidate.isPreset()) {
-            toast(getString(R.string.campus_route_preset_fixed));
-            dialog.dismiss();
-            return;
-        }
         boolean selected = route != null && route.id().equals(candidate.id());
         if (selected && claimOwnSession && snapshot.isActive() && !snapshot.singlePoint()) {
             toast(getString(R.string.campus_route_delete_running));
