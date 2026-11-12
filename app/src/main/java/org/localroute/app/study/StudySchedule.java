@@ -13,9 +13,9 @@ import java.util.Locale;
  * 一套作息时间：上午、下午、晚课三个上课起点、每段节数，加上每节课时长与课间休息。
  *
  * <p>节次按上午、下午、晚课顺序连续编号：上午从第 1 节开始，下午接在上午之后，
- * 晚课再接在下午之后。每段可单独设置 1-6 节，合计不超过 15 节；同一段内按
- * 「每节时长 + 课间休息」逐节推进。午休与晚餐是相邻两段之间的空档，由下午/晚课
- * 起点自然决定，不单独存储。
+ * 晚课再接在下午之后。每段可单独设置 1-6 节，合计不超过 15 节。课间有两种：
+ * 普通课间用于所有相邻节次；大课间用于上午、下午第 2 节之后（晚课不适用）。
+ * 午休与晚餐是相邻两段之间的空档，由下午/晚课起点自然决定，不单独存储。
  *
  * <p>冬令时与夏令时各存一套，用户可在设置页切换；两套独立生效，互不覆盖。
  */
@@ -39,7 +39,9 @@ public final class StudySchedule {
     public static final int MAX_BREAK_MINUTES = 30;
 
     public static final int DEFAULT_PERIOD_MINUTES = 45;
-    public static final int DEFAULT_BREAK_MINUTES = 10;
+    public static final int DEFAULT_BREAK_MINUTES = 5;
+    /** 上午、下午第 2 节后的大课间；晚课始终用普通课间。 */
+    public static final int DEFAULT_LONG_BREAK_MINUTES = 15;
     private static final int DEFAULT_PERIODS_PER_SEGMENT = 4;
 
     private static final int MORNING_START = 8 * 60;
@@ -50,37 +52,42 @@ public final class StudySchedule {
     private final int eveningStart;
     private final int periodMinutes;
     private final int breakMinutes;
+    private final int longBreakMinutes;
     private final int morningPeriods;
     private final int afternoonPeriods;
     private final int eveningPeriods;
 
     public StudySchedule(int morningStart, int afternoonStart, int eveningStart,
-                         int periodMinutes, int breakMinutes,
+                         int periodMinutes, int breakMinutes, int longBreakMinutes,
                          int morningPeriods, int afternoonPeriods, int eveningPeriods) {
         this.morningStart = morningStart;
         this.afternoonStart = afternoonStart;
         this.eveningStart = eveningStart;
         this.periodMinutes = periodMinutes;
         this.breakMinutes = breakMinutes;
+        this.longBreakMinutes = longBreakMinutes;
         this.morningPeriods = morningPeriods;
         this.afternoonPeriods = afternoonPeriods;
         this.eveningPeriods = eveningPeriods;
     }
 
-    /** 冬令时默认：08:00 / 14:00 / 18:30，上午、下午、晚课各 4 节，45 分钟一节。 */
+    /**
+     * 冬令时默认：上午 08:00、下午 13:30、晚课 18:30，各 4 节，45 分钟一节；
+     * 普通课间 5 分钟，上午/下午第 2 节后大课间 15 分钟。
+     */
     @NonNull
     public static StudySchedule winterDefault() {
-        return new StudySchedule(MORNING_START, 14 * 60, 18 * 60 + 30,
-                DEFAULT_PERIOD_MINUTES, DEFAULT_BREAK_MINUTES,
+        return new StudySchedule(MORNING_START, 13 * 60 + 30, 18 * 60 + 30,
+                DEFAULT_PERIOD_MINUTES, DEFAULT_BREAK_MINUTES, DEFAULT_LONG_BREAK_MINUTES,
                 DEFAULT_PERIODS_PER_SEGMENT, DEFAULT_PERIODS_PER_SEGMENT,
                 DEFAULT_PERIODS_PER_SEGMENT);
     }
 
-    /** 夏令时默认：08:00 / 14:30 / 19:00，其余与冬令时一致。 */
+    /** 夏令时默认：上午 08:00、下午 14:00、晚课 19:00，其余与冬令时一致。 */
     @NonNull
     public static StudySchedule summerDefault() {
-        return new StudySchedule(MORNING_START, 14 * 60 + 30, 19 * 60,
-                DEFAULT_PERIOD_MINUTES, DEFAULT_BREAK_MINUTES,
+        return new StudySchedule(MORNING_START, 14 * 60, 19 * 60,
+                DEFAULT_PERIOD_MINUTES, DEFAULT_BREAK_MINUTES, DEFAULT_LONG_BREAK_MINUTES,
                 DEFAULT_PERIODS_PER_SEGMENT, DEFAULT_PERIODS_PER_SEGMENT,
                 DEFAULT_PERIODS_PER_SEGMENT);
     }
@@ -117,6 +124,10 @@ public final class StudySchedule {
 
     public int breakMinutes() {
         return breakMinutes;
+    }
+
+    public int longBreakMinutes() {
+        return longBreakMinutes;
     }
 
     /** 某一段的节数：0 上午、1 下午、2 晚课。 */
@@ -157,29 +168,38 @@ public final class StudySchedule {
         switch (segment) {
             case SEGMENT_AFTERNOON:
                 return new StudySchedule(morningStart, minutes, eveningStart,
-                        periodMinutes, breakMinutes, morningPeriods, afternoonPeriods,
-                        eveningPeriods);
+                        periodMinutes, breakMinutes, longBreakMinutes, morningPeriods,
+                        afternoonPeriods, eveningPeriods);
             case SEGMENT_EVENING:
                 return new StudySchedule(morningStart, afternoonStart, minutes,
-                        periodMinutes, breakMinutes, morningPeriods, afternoonPeriods,
-                        eveningPeriods);
+                        periodMinutes, breakMinutes, longBreakMinutes, morningPeriods,
+                        afternoonPeriods, eveningPeriods);
             default:
                 return new StudySchedule(minutes, afternoonStart, eveningStart,
-                        periodMinutes, breakMinutes, morningPeriods, afternoonPeriods,
-                        eveningPeriods);
+                        periodMinutes, breakMinutes, longBreakMinutes, morningPeriods,
+                        afternoonPeriods, eveningPeriods);
         }
     }
 
     @NonNull
     public StudySchedule withPeriodMinutes(int minutes) {
         return new StudySchedule(morningStart, afternoonStart, eveningStart,
-                minutes, breakMinutes, morningPeriods, afternoonPeriods, eveningPeriods);
+                minutes, breakMinutes, longBreakMinutes, morningPeriods,
+                afternoonPeriods, eveningPeriods);
     }
 
     @NonNull
     public StudySchedule withBreakMinutes(int minutes) {
         return new StudySchedule(morningStart, afternoonStart, eveningStart,
-                periodMinutes, minutes, morningPeriods, afternoonPeriods, eveningPeriods);
+                periodMinutes, minutes, longBreakMinutes, morningPeriods,
+                afternoonPeriods, eveningPeriods);
+    }
+
+    @NonNull
+    public StudySchedule withLongBreakMinutes(int minutes) {
+        return new StudySchedule(morningStart, afternoonStart, eveningStart,
+                periodMinutes, breakMinutes, minutes, morningPeriods,
+                afternoonPeriods, eveningPeriods);
     }
 
     /** 修改某一段的节数；后续段的节次编号随之顺延。 */
@@ -188,13 +208,16 @@ public final class StudySchedule {
         switch (segment) {
             case SEGMENT_AFTERNOON:
                 return new StudySchedule(morningStart, afternoonStart, eveningStart,
-                        periodMinutes, breakMinutes, morningPeriods, count, eveningPeriods);
+                        periodMinutes, breakMinutes, longBreakMinutes, morningPeriods,
+                        count, eveningPeriods);
             case SEGMENT_EVENING:
                 return new StudySchedule(morningStart, afternoonStart, eveningStart,
-                        periodMinutes, breakMinutes, morningPeriods, afternoonPeriods, count);
+                        periodMinutes, breakMinutes, longBreakMinutes, morningPeriods,
+                        afternoonPeriods, count);
             default:
                 return new StudySchedule(morningStart, afternoonStart, eveningStart,
-                        periodMinutes, breakMinutes, count, afternoonPeriods, eveningPeriods);
+                        periodMinutes, breakMinutes, longBreakMinutes, count,
+                        afternoonPeriods, eveningPeriods);
         }
     }
 
@@ -220,12 +243,28 @@ public final class StudySchedule {
         return SEGMENT_EVENING;
     }
 
+    /**
+     * 第 period 节之前的课间分钟数：上午、下午的第 3 节前用大课间，
+     * 其余（含晚课全部）用普通课间。
+     */
+    public int breakBeforePeriod(int period) {
+        int segment = segmentOfPeriod(period);
+        int index = period - firstPeriod(segment);
+        if (index == 2 && segment != SEGMENT_EVENING) {
+            return longBreakMinutes;
+        }
+        return breakMinutes;
+    }
+
     /** 第 period 节的开始时间（从 0 点起的分钟数）。 */
     public int periodStartMinutes(int period) {
         int segment = segmentOfPeriod(period);
         int first = firstPeriod(segment);
-        int offset = Math.max(0, period - first) * (periodMinutes + breakMinutes);
-        return segmentStartMinutes(segment) + offset;
+        int minutes = segmentStartMinutes(segment);
+        for (int current = first + 1; current <= period; current++) {
+            minutes += periodMinutes + breakBeforePeriod(current);
+        }
+        return minutes;
     }
 
     public int periodEndMinutes(int period) {
@@ -268,7 +307,9 @@ public final class StudySchedule {
             return false;
         }
         if (periodMinutes < MIN_PERIOD_MINUTES || periodMinutes > MAX_PERIOD_MINUTES
-                || breakMinutes < MIN_BREAK_MINUTES || breakMinutes > MAX_BREAK_MINUTES) {
+                || breakMinutes < MIN_BREAK_MINUTES || breakMinutes > MAX_BREAK_MINUTES
+                || longBreakMinutes < MIN_BREAK_MINUTES
+                || longBreakMinutes > MAX_BREAK_MINUTES) {
             return false;
         }
         if (segmentEndMinutes(SEGMENT_MORNING) > afternoonStart) {
@@ -289,6 +330,7 @@ public final class StudySchedule {
             json.put("evening", eveningStart);
             json.put("period", periodMinutes);
             json.put("break", breakMinutes);
+            json.put("breakLong", longBreakMinutes);
             json.put("morningCount", morningPeriods);
             json.put("afternoonCount", afternoonPeriods);
             json.put("eveningCount", eveningPeriods);
@@ -298,28 +340,60 @@ public final class StudySchedule {
         return json.toString();
     }
 
-    /** 解析存储的作息；字段缺失按默认值补齐，非法值返回 null 由调用方回退。 */
     @Nullable
     public static StudySchedule decode(@Nullable String raw) {
+        return decode(raw, SEASON_WINTER);
+    }
+
+    /**
+     * 解析存储的作息；字段缺失按对应季节的默认值补齐，非法值返回 null 由调用方回退。
+     *
+     * <p>旧数据没有 {@code breakLong}：普通课间与大课间改用当季默认（5/15），
+     * 并把仍是旧默认值的下午起点更新为新默认；用户自定义过的起点保留。
+     * 晚课起点没有变化，直接沿用。
+     */
+    @Nullable
+    public static StudySchedule decode(@Nullable String raw, int season) {
         if (raw == null || raw.isEmpty()) {
             return null;
         }
         try {
             JSONObject json = new JSONObject(raw);
-            StudySchedule defaults = winterDefault();
+            StudySchedule defaults = defaultsForSeason(season);
+            boolean legacy = !json.has("breakLong");
+            int afternoon = json.optInt("afternoon", defaults.afternoonStart);
+            int evening = json.optInt("evening", defaults.eveningStart);
+            if (legacy && afternoon == oldAfternoonStart(season)) {
+                afternoon = defaults.afternoonStart;
+            }
+            int morning = json.optInt("morning", defaults.morningStart);
+            int period = json.optInt("period", defaults.periodMinutes);
+            int morningCount = json.optInt("morningCount", defaults.morningPeriods);
+            int afternoonCount = json.optInt("afternoonCount", defaults.afternoonPeriods);
+            int eveningCount = json.optInt("eveningCount", defaults.eveningPeriods);
             StudySchedule schedule = new StudySchedule(
-                    json.optInt("morning", defaults.morningStart),
-                    json.optInt("afternoon", defaults.afternoonStart),
-                    json.optInt("evening", defaults.eveningStart),
-                    json.optInt("period", defaults.periodMinutes),
-                    json.optInt("break", defaults.breakMinutes),
-                    json.optInt("morningCount", defaults.morningPeriods),
-                    json.optInt("afternoonCount", defaults.afternoonPeriods),
-                    json.optInt("eveningCount", defaults.eveningPeriods));
+                    morning, afternoon, evening, period,
+                    legacy ? defaults.breakMinutes
+                            : json.optInt("break", defaults.breakMinutes),
+                    legacy ? defaults.longBreakMinutes
+                            : json.optInt("breakLong", defaults.longBreakMinutes),
+                    morningCount, afternoonCount, eveningCount);
+            if (legacy && !schedule.isValid()) {
+                // 旧作息课间很短且时段贴得很紧时，新默认课间可能撑出下一段；
+                // 这时保留旧课间，避免整份作息被回退成默认值。
+                int oldBreak = json.optInt("break", defaults.breakMinutes);
+                schedule = new StudySchedule(morning, afternoon, evening, period,
+                        oldBreak, oldBreak, morningCount, afternoonCount, eveningCount);
+            }
             return schedule.isValid() ? schedule : null;
         } catch (JSONException error) {
             return null;
         }
+    }
+
+    /** 0.6.1 及更早版本的下午起点，用于区分用户自定义值与旧默认值。 */
+    private static int oldAfternoonStart(int season) {
+        return season == SEASON_SUMMER ? 14 * 60 + 30 : 14 * 60;
     }
 
     @NonNull

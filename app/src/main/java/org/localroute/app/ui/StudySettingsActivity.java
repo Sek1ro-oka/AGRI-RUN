@@ -132,6 +132,23 @@ public class StudySettingsActivity extends AppCompatActivity {
                 applySchedule(schedule.withBreakMinutes(seekBar.getProgress()));
             }
         });
+        binding.seekLongBreak.setMax(StudySchedule.MAX_BREAK_MINUTES);
+        binding.seekLongBreak.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                binding.textLongBreakValue.setText(getString(R.string.study_schedule_minutes,
+                        progress));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                applySchedule(schedule.withLongBreakMinutes(seekBar.getProgress()));
+            }
+        });
         binding.buttonResetPeriod.setOnClickListener(view -> {
             applySchedule(StudySchedule.defaultsForSeason(season));
             Toast.makeText(this, R.string.study_schedule_reset_done, Toast.LENGTH_SHORT).show();
@@ -259,6 +276,9 @@ public class StudySettingsActivity extends AppCompatActivity {
         binding.seekBreak.setProgress(schedule.breakMinutes());
         binding.textBreakValue.setText(getString(R.string.study_schedule_minutes,
                 schedule.breakMinutes()));
+        binding.seekLongBreak.setProgress(schedule.longBreakMinutes());
+        binding.textLongBreakValue.setText(getString(R.string.study_schedule_minutes,
+                schedule.longBreakMinutes()));
 
         binding.textScheduleSummary.setText(getString(R.string.study_schedule_summary,
                 schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_MORNING)),
@@ -266,7 +286,9 @@ public class StudySettingsActivity extends AppCompatActivity {
                 schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_AFTERNOON)),
                 schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_AFTERNOON)),
                 schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_EVENING)),
-                schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_EVENING))));
+                schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_EVENING)),
+                schedule.breakMinutes(),
+                schedule.longBreakMinutes()));
 
         boolean winter = season == StudySchedule.SEASON_WINTER;
         styleSeasonChip(binding.chipSeasonWinter, winter);

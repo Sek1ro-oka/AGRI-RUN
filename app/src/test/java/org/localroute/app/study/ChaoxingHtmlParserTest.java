@@ -44,6 +44,25 @@ public class ChaoxingHtmlParserTest {
     }
 
     @Test
+    public void collectsCourseNamesIncludingArchived() throws Exception {
+        String json = "{"
+                + "\"result\":1,"
+                + "\"channelList\":["
+                + "{\"content\":{\"id\":\"class-1\",\"cpi\":\"cpi-1\",\"isretire\":1,"
+                + "\"course\":{\"data\":[{\"id\":\"227917214\",\"name\":\" 计算机组成原理 \"}]}}},"
+                + "{\"content\":{\"id\":\"class-2\",\"cpi\":\"cpi-2\",\"isretire\":0,"
+                + "\"course\":{\"data\":[{\"id\":\"course-2\",\"name\":\"高等数学\"},"
+                + "{\"id\":\"\",\"name\":\"缺少课程号\"}]}}}"
+                + "]}";
+        java.util.Map<String, String> names = ChaoxingHtmlParser.parseCourseNames(
+                new JSONObject(json));
+        assertEquals(2, names.size());
+        assertEquals("计算机组成原理", names.get("227917214"));
+        assertEquals("高等数学", names.get("course-2"));
+        assertTrue(ChaoxingHtmlParser.parseCourseNames(null).isEmpty());
+    }
+
+    @Test
     public void extractsWorkEncFromInputOrUrl() {
         assertEquals("0123456789abcdef0123456789abcdef",
                 ChaoxingHtmlParser.extractWorkEnc(

@@ -118,6 +118,7 @@ public final class ChaoxingClient {
             // 聚合页不可用时退回逐课程读取，兼容旧版页面。
         }
         if (aggregate != null) {
+            aggregate = fillAggregateCourseNames(aggregate);
             if (listener != null) {
                 listener.onProgress(1, 1, "");
             }
@@ -172,6 +173,40 @@ public final class ChaoxingClient {
                 response.body, System.currentTimeMillis());
         // 识别到聚合页却一条都没读出来时退回逐课程，避免结构变化被误报成「没有作业」。
         return items == null || items.isEmpty() ? null : items;
+    }
+
+    /**
+     * 聚合页把课程名截断成「《计算机组成原...》」，用课程列表的完整名称补全。
+     * 作业链接带 courseId，可以直接精确匹配；课程列表请求失败时保留页面原文。
+     */
+    @NonNull
+    private List<HomeworkItem> fillAggregateCourseNames(@NonNull List<HomeworkItem> items) {
+        boolean truncated = false;
+        for (HomeworkItem item : items) {
+            if (CourseNameResolver.mayBeTruncated(item.courseName())) {
+                truncated = true;
+                break;
+            }
+        }
+        if (!truncated) {
+            return items;
+        }
+        Map<String, String> namesById;
+        try {
+            namesById = ChaoxingHtmlParser.parseCourseNames(requestCourseListJson());
+        } catch (IOException | RuntimeException ignored) {
+            return items;
+        }
+        if (namesById.isEmpty()) {
+            return items;
+        }
+        List<HomeworkItem> resolved = new ArrayList<>(items.size());
+        for (HomeworkItem item : items) {
+            String name = CourseNameResolver.resolve(
+                    item.courseName(), item.url(), namesById);
+            resolved.add(name == null ? item : item.withCourseName(name));
+        }
+        return resolved;
     }
 
     @NonNull
@@ -236,6 +271,11 @@ public final class ChaoxingClient {
 
     @NonNull
     private List<ChaoxingCourse> requestCourses() throws IOException {
+        return ChaoxingHtmlParser.parseCourseList(requestCourseListJson());
+    }
+
+    @NonNull
+    private JSONObject requestCourseListJson() throws IOException {
         Response response = get(COURSE_LIST_URL, "https://i.chaoxing.com/");
         ensureUsable(response);
         try {
@@ -243,7 +283,7 @@ public final class ChaoxingClient {
             if (root.optInt("result", 0) != 1) {
                 throw new SessionExpiredException();
             }
-            return ChaoxingHtmlParser.parseCourseList(root);
+            return root;
         } catch (JSONException error) {
             throw new IOException("课程列表返回格式异常", error);
         }

@@ -63,9 +63,15 @@ public final class StudyTimetableStore {
     @NonNull
     public static StudySchedule loadSchedule(Context context, int season) {
         SharedPreferences preferences = prefs(context);
-        StudySchedule stored = StudySchedule.decode(
-                preferences.getString(keyForSeason(season), null));
+        String raw = preferences.getString(keyForSeason(season), null);
+        StudySchedule stored = StudySchedule.decode(raw, season);
         if (stored != null) {
+            // 旧版本没有大课间字段，解析时已按新规则迁移；把结果写回避免每次重复迁移。
+            if (!stored.encode().equals(raw)) {
+                preferences.edit()
+                        .putString(keyForSeason(season), stored.encode())
+                        .apply();
+            }
             return stored;
         }
         int legacyMinutes = preferences.getInt(KEY_LEGACY_PERIOD_MINUTES, -1);

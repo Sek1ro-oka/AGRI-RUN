@@ -684,6 +684,42 @@
                     android:splitTrack="false"
                     android:thumbTint="@color/campus_mint" />
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/study_schedule_long_break_title"
+                        android:textColor="@color/campus_ink"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/textLongBreakValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <SeekBar
+                    android:id="@+id/seekLongBreak"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:max="30"
+                    android:progress="15"
+                    android:progressBackgroundTint="@color/campus_track"
+                    android:progressTint="@color/campus_mint"
+                    android:splitTrack="false"
+                    android:thumbTint="@color/campus_mint" />
+
                 <TextView
                     android:id="@+id/textScheduleSummary"
                     android:layout_width="match_parent"
