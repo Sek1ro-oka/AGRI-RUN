@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- DownloadManager 的目标目录：外部私有存储 files/Download -->
+    <external-files-path
+        name="updates"
+        path="Download/" />
+</paths>

@@ -323,9 +323,9 @@
                     android:layout_marginTop="12dp"
                     android:background="@color/campus_card_stroke" />
 
-                <!-- 路线 -->
+                <!-- 设置：路线目标统一在跑圈地图里选择，这里只保留环境检查入口。 -->
                 <LinearLayout
-                    android:id="@+id/rowRoute"
+                    android:id="@+id/rowAppSettings"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
@@ -339,10 +339,10 @@
                     <ImageView
                         android:layout_width="38dp"
                         android:layout_height="38dp"
-                        android:background="@drawable/bg_campus_soft_pill"
-                        android:contentDescription="@string/campus_goal"
-                        android:padding="7dp"
-                        android:src="@drawable/ic_campus_flag" />
+                        android:background="@drawable/bg_campus_settings_icon"
+                        android:contentDescription="@string/home_settings_title"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_campus_settings" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -354,17 +354,16 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/campus_route_title"
+                            android:text="@string/home_settings_title"
                             android:textColor="@color/campus_ink"
                             android:textSize="16sp"
                             android:textStyle="bold" />
 
                         <TextView
-                            android:id="@+id/textRouteSummary"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="@string/campus_route_none"
+                            android:text="@string/home_settings_subtitle"
                             android:textColor="@color/campus_muted"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -372,7 +371,7 @@
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
-                        android:contentDescription="@string/campus_route_hint"
+                        android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
             </LinearLayout>

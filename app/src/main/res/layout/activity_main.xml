@@ -36,7 +36,7 @@
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
-            <!-- 校园快跑入口：与设置项同宽的全宽卡片，独立页面（设置与地图）都在 CampusRunActivity。 -->
+            <!-- 校园快跑入口：独立页面（设置与地图）都在 CampusRunActivity。 -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardCampusRun"
                 android:layout_width="match_parent"
@@ -103,9 +103,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 设置入口：打开「设置检查」，准备模拟定位权限与系统开关。 -->
+            <!-- 作业查询：学习通作业与手动课表，独立页面（含绑定与设置）。 -->
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardSettings"
+                android:id="@+id/cardStudy"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
@@ -132,10 +132,10 @@
                     <ImageView
                         android:layout_width="36dp"
                         android:layout_height="36dp"
-                        android:background="@drawable/bg_campus_settings_icon"
-                        android:contentDescription="@string/home_settings_title"
+                        android:background="@drawable/bg_campus_entry_icon"
+                        android:contentDescription="@string/study_title"
                         android:padding="8dp"
-                        android:src="@drawable/ic_campus_settings" />
+                        android:src="@drawable/ic_study_homework" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -147,7 +147,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/home_settings_title"
+                            android:text="@string/study_title"
                             android:textColor="@color/campus_ink"
                             android:textSize="14sp"
                             android:textStyle="bold" />
@@ -156,7 +156,74 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="1dp"
-                            android:text="@string/home_settings_subtitle"
+                            android:text="@string/study_entry_subtitle_short"
+                            android:textColor="@color/campus_muted"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_campus_chevron_right" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 检查更新：从 GitHub Releases 读取版本并下载 APK。 -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardUpdate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginEnd="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:minHeight="68dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/campus_card_stroke"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_campus_entry_icon"
+                        android:contentDescription="@string/home_update_title"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_campus_update" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/home_update_title"
+                            android:textColor="@color/campus_ink"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/textUpdateSubtitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:text="@string/home_update_idle"
                             android:textColor="@color/campus_muted"
                             android:textSize="11sp" />
                     </LinearLayout>

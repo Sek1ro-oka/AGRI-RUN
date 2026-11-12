@@ -393,7 +393,8 @@ public final class CampusRunActivity extends AppCompatActivity {
             varyEnabled = checked;
             prefs.edit().putBoolean(KEY_VARY, checked).apply();
         });
-        binding.rowRoute.setOnClickListener(v -> showRouteSheet());
+        binding.rowAppSettings.setOnClickListener(v ->
+                startActivity(new Intent(this, SettingsCheckActivity.class)));
         binding.buttonGoal.setOnClickListener(v -> showRouteSheet());
         binding.buttonGo.setOnClickListener(v -> onGoClicked());
         binding.buttonRunMain.setOnClickListener(v -> onMainControl());
@@ -630,15 +631,6 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.textLaps.setText(String.valueOf(laps));
         binding.switchNatural.setChecked(naturalEnabled);
         binding.switchVary.setChecked(varyEnabled);
-        binding.textRouteSummary.setText(routeSummary(route));
-    }
-
-    private String routeSummary(@Nullable CampusRoute value) {
-        if (value == null) {
-            return getString(R.string.campus_route_none);
-        }
-        return getString(R.string.campus_route_summary,
-                value.name(), CampusFormat.lapMeters(value.lapMeters()));
     }
 
     private int defaultPaceSeconds(String sport) {
@@ -1610,7 +1602,6 @@ public final class CampusRunActivity extends AppCompatActivity {
         persistSelectedRoute(candidate);
         teleportTarget = null;
         activeLapMeters = candidate == null ? 0d : candidate.lapMeters();
-        binding.textRouteSummary.setText(routeSummary(candidate));
         renderedRoute = null;
         if (mapHost != null) {
             mapHost.renderRunner(null);

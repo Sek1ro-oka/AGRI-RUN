@@ -37,6 +37,23 @@
     <color name="overlay_chevron">#66C3D0CA</color>
     <color name="overlay_close">#FF9A93</color>
 
+    <!-- 作业查询：课表色块与状态底色，延续薄荷绿主色 -->
+    <color name="study_block_mint_fill">#DFF7EF</color>
+    <color name="study_block_mint_text">#0E7C66</color>
+    <color name="study_block_blue_fill">#E4EEFC</color>
+    <color name="study_block_blue_text">#2A62B8</color>
+    <color name="study_block_orange_fill">#FDEEE1</color>
+    <color name="study_block_orange_text">#B4681F</color>
+    <color name="study_block_violet_fill">#ECE9FB</color>
+    <color name="study_block_violet_text">#5B4BC4</color>
+    <color name="study_block_rose_fill">#FBE8EE</color>
+    <color name="study_block_rose_text">#B03A60</color>
+    <color name="study_weekend_bg">#F7FAF8</color>
+    <color name="study_today_bg">#EEFBF6</color>
+    <color name="study_state_pending_fill">#FDF0E6</color>
+    <color name="study_state_expired_fill">#EEF2F0</color>
+    <color name="study_state_other_fill">#EAF1FC</color>
+
     <!-- 应用图标：暖米色底 + 薄荷绿主色 -->
     <color name="ic_launcher_background">#FCF8E9</color>
 </resources>
