@@ -610,7 +610,7 @@ public class StudyActivity extends AppCompatActivity {
         binding.timetableGrid.setData(courses, schedule);
 
         boolean empty = courses.isEmpty();
-        binding.scrollTimetable.setVisibility(empty ? View.GONE : View.VISIBLE);
+        binding.timetableGrid.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.textTimetableEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
     }
 

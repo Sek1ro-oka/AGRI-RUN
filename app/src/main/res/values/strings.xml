@@ -221,6 +221,7 @@
     <string name="campus_natural_hint">配速在设定值附近小幅波动，每次不同</string>
     <string name="campus_vary_title">路径浮动</string>
     <string name="campus_vary_hint">轨迹在路线两侧自然漂移，每次跑圈略有差异</string>
+    <string name="campus_overlay_title">悬浮窗</string>
     <string name="campus_route_none">未选择路线</string>
     <string name="campus_route_required">还没有路线，请先点「目标」绘制一条</string>
     <string name="campus_route_info">%1$s · 单圈 %2$s</string>
