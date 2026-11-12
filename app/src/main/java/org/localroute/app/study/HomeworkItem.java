@@ -99,6 +99,13 @@ public final class HomeworkItem {
                 deadlineEpochMillis, deadlineRaw, url, peerReview);
     }
 
+    /** 聚合页把课程名截断成「《计算机组成原...》」时，换成课程列表里的完整名称。 */
+    @NonNull
+    public HomeworkItem withCourseName(@NonNull String courseName) {
+        return new HomeworkItem(courseName, title, statusText, status,
+                deadlineEpochMillis, deadlineRaw, url, peerReview);
+    }
+
     public int statusRank() {
         switch (status) {
             case PENDING:

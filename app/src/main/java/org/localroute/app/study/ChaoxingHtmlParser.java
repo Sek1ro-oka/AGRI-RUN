@@ -10,8 +10,10 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -129,6 +131,43 @@ public final class ChaoxingHtmlParser {
             }
         }
         return courses;
+    }
+
+    /** 课程列表 JSON 里所有课程的完整名称（含已结课课程）；聚合作业页只显示截断名。 */
+    @NonNull
+    public static Map<String, String> parseCourseNames(@Nullable JSONObject root) {
+        Map<String, String> names = new LinkedHashMap<>();
+        if (root == null) {
+            return names;
+        }
+        JSONArray channels = root.optJSONArray("channelList");
+        if (channels == null) {
+            return names;
+        }
+        for (int i = 0; i < channels.length(); i++) {
+            JSONObject channel = channels.optJSONObject(i);
+            JSONObject content = channel == null ? null : channel.optJSONObject("content");
+            if (content == null) {
+                continue;
+            }
+            JSONObject courseBlock = content.optJSONObject("course");
+            JSONArray data = courseBlock == null ? null : courseBlock.optJSONArray("data");
+            if (data == null) {
+                continue;
+            }
+            for (int j = 0; j < data.length(); j++) {
+                JSONObject item = data.optJSONObject(j);
+                if (item == null) {
+                    continue;
+                }
+                String courseId = item.optString("id", "");
+                String name = item.optString("name", "").trim();
+                if (!courseId.isEmpty() && !name.isEmpty()) {
+                    names.put(courseId, name);
+                }
+            }
+        }
+        return names;
     }
 
     /** 从课程中间页提取 workEnc；先找隐藏 input，再从任意 enc= 兜底。 */
