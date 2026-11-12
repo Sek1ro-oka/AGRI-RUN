@@ -29,6 +29,7 @@ import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.overlay.OverlayHost;
 import org.localroute.app.update.UpdateChecker;
 import org.localroute.app.update.UpdateManager;
+import org.localroute.app.update.UpdateVerifier;
 
 import java.io.File;
 import java.io.IOException;
@@ -60,6 +61,9 @@ public class MainActivity extends AppCompatActivity {
             updateUpdateCard();
             if (UpdateManager.downloadedFile(MainActivity.this) != null) {
                 promptInstall(UpdateManager.pendingVersion(MainActivity.this));
+            } else if (!UpdateManager.isDownloadActive(MainActivity.this)) {
+                Toast.makeText(MainActivity.this, R.string.home_update_download_failed,
+                        Toast.LENGTH_LONG).show();
             }
         }
     };
@@ -211,8 +215,14 @@ public class MainActivity extends AppCompatActivity {
                     Toast.LENGTH_LONG).show();
             return;
         }
-        if (release != null && UpdateChecker.isNewer(release.versionName(),
-                BuildConfig.VERSION_NAME)) {
+        if (release == null) {
+            updateUpdateCard();
+            Toast.makeText(this, getString(R.string.home_update_check_network),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        DiagnosticLog.info("检查更新线路：" + UpdateChecker.sourceLabel(release.source()));
+        if (UpdateChecker.isNewer(release.versionName(), BuildConfig.VERSION_NAME)) {
             binding.textUpdateSubtitle.setText(getString(
                     R.string.home_update_found, release.versionName()));
             showUpdateDialog(release);
@@ -248,20 +258,35 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startDownload(@NonNull UpdateChecker.Release release) {
-        try {
-            UpdateManager.startDownload(this, release);
-            updateUpdateCard();
-            Toast.makeText(this, R.string.home_update_started, Toast.LENGTH_LONG).show();
-        } catch (IOException | RuntimeException error) {
-            updateUpdateCard();
-            String detail = error.getMessage();
-            if (detail == null || detail.isEmpty()) {
-                detail = getString(R.string.home_update_start_failed, "—");
-            } else {
-                detail = getString(R.string.home_update_start_failed, detail);
+        binding.textUpdateSubtitle.setText(R.string.home_update_preparing);
+        binding.cardUpdate.setEnabled(false);
+        executor.execute(() -> {
+            try {
+                UpdateManager.startDownload(this, release);
+                mainHandler.post(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    updateUpdateCard();
+                    Toast.makeText(this, R.string.home_update_started,
+                            Toast.LENGTH_LONG).show();
+                });
+            } catch (IOException | RuntimeException error) {
+                mainHandler.post(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    updateUpdateCard();
+                    String detail = error.getMessage();
+                    if (detail == null || detail.isEmpty()) {
+                        detail = getString(R.string.home_update_start_failed, "—");
+                    } else {
+                        detail = getString(R.string.home_update_start_failed, detail);
+                    }
+                    Toast.makeText(this, detail, Toast.LENGTH_LONG).show();
+                });
             }
-            Toast.makeText(this, detail, Toast.LENGTH_LONG).show();
-        }
+        });
     }
 
     private void promptInstall(@NonNull String version) {
@@ -293,9 +318,48 @@ public class MainActivity extends AppCompatActivity {
                     .show();
             return;
         }
-        if (!UpdateManager.launchInstaller(this, apk)) {
-            Toast.makeText(this, R.string.home_update_install_failed,
-                    Toast.LENGTH_LONG).show();
+        binding.textUpdateSubtitle.setText(R.string.home_update_verifying);
+        executor.execute(() -> {
+            UpdateVerifier.Issue issue = UpdateManager.verifyDownload(this, apk);
+            mainHandler.post(() -> onInstallVerified(issue, apk));
+        });
+    }
+
+    private void onInstallVerified(@NonNull UpdateVerifier.Issue issue, @NonNull File apk) {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        if (issue == UpdateVerifier.Issue.OK) {
+            updateUpdateCard();
+            if (!UpdateManager.launchInstaller(this, apk)) {
+                Toast.makeText(this, R.string.home_update_install_failed,
+                        Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+        UpdateManager.discardDownload(this);
+        updateUpdateCard();
+        DiagnosticLog.warn("更新包校验未通过：" + issue.name());
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.home_update_verify_failed_title)
+                .setMessage(getString(R.string.home_update_verify_failed_message,
+                        verifyIssueText(issue)))
+                .setPositiveButton(R.string.home_update_verify_dismiss, null)
+                .show();
+    }
+
+    @NonNull
+    private String verifyIssueText(@NonNull UpdateVerifier.Issue issue) {
+        switch (issue) {
+            case PACKAGE_MISMATCH:
+                return getString(R.string.home_update_verify_package);
+            case SIGNATURE_MISMATCH:
+                return getString(R.string.home_update_verify_signature);
+            case CHECKSUM_MISMATCH:
+                return getString(R.string.home_update_verify_checksum);
+            case UNREADABLE:
+            default:
+                return getString(R.string.home_update_verify_unreadable);
         }
     }
 

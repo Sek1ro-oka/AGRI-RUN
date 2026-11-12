@@ -26,6 +26,7 @@ public class UpdateCheckerTest {
             + "    {\"name\": \"route-workshop-0.7.0-release.apk\","
             + "     \"content_type\": \"application/vnd.android.package-archive\","
             + "     \"browser_download_url\": \"https://example.com/app.apk\","
+            + "     \"digest\": \"sha256:2c305d0cc54a68abf216100f56afd3ae10c3d11c9cca957cf0327d7c35dbbf98\","
             + "     \"size\": 123456},\n"
             + "    {\"name\": \"source.zip\", \"content_type\": \"application/zip\","
             + "     \"browser_download_url\": \"https://example.com/source.zip\","
@@ -41,7 +42,49 @@ public class UpdateCheckerTest {
         assertEquals("https://example.com/release", release.pageUrl());
         assertEquals("https://example.com/app.apk", release.apkUrl());
         assertEquals("route-workshop-0.7.0-release.apk", release.apkName());
+        assertEquals("2c305d0cc54a68abf216100f56afd3ae10c3d11c9cca957cf0327d7c35dbbf98",
+                release.apkSha256());
         assertEquals(123456, release.apkSize());
+    }
+
+    @Test
+    public void releaseWithoutDigestHasNoChecksum() throws JSONException {
+        UpdateChecker.Release release = UpdateChecker.parseRelease(
+                "{\"tag_name\":\"v0.7.0\",\"assets\":[{\"name\":"
+                        + "\"route-workshop-0.7.0-release.apk\","
+                        + "\"browser_download_url\":\"https://example.com/app.apk\"}]}");
+        assertNull(release.apkSha256());
+    }
+
+    @Test
+    public void mirrorMetadataRewritesPageUrl() throws JSONException {
+        String mirrored = "https://gh-proxy.com/" + UpdateChecker.RELEASES_API;
+        UpdateChecker.Release release = UpdateChecker.parseRelease(
+                "{\"tag_name\":\"v0.7.0\",\"html_url\":"
+                        + "\"https://github.com/o/r/releases/tag/v0.7.0\"}", mirrored);
+        assertEquals("https://gh-proxy.com/https://github.com/o/r/releases/tag/v0.7.0",
+                release.pageUrl());
+        assertEquals(mirrored, release.source());
+    }
+
+    @Test
+    public void apkSourcesAddMirrorsForGitHubOnly() throws JSONException {
+        UpdateChecker.Release local = UpdateChecker.parseRelease(RELEASE_JSON);
+        assertEquals(1, UpdateChecker.apkSources(local).size());
+
+        UpdateChecker.Release github = UpdateChecker.parseRelease(
+                "{\"tag_name\":\"v0.7.0\",\"assets\":[{\"name\":"
+                        + "\"route-workshop-0.7.0-release.apk\","
+                        + "\"browser_download_url\":\"https://github.com/o/r/releases/"
+                        + "download/v0.7.0/route-workshop-0.7.0-release.apk\"}]}");
+        java.util.List<String> sources = UpdateChecker.apkSources(github);
+        assertTrue(sources.size() > 1);
+        assertEquals("https://github.com/o/r/releases/download/v0.7.0/"
+                + "route-workshop-0.7.0-release.apk", sources.get(0));
+        for (int i = 1; i < sources.size(); i++) {
+            assertTrue(sources.get(i).startsWith("https://"));
+            assertTrue(sources.get(i).endsWith(sources.get(0)));
+        }
     }
 
     @Test
