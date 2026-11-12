@@ -28,6 +28,7 @@ import org.localroute.app.R;
 import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.diagnostics.SystemLocationReader;
 import org.localroute.app.run.PendingRunRegistry;
+import org.localroute.app.run.RouteVary;
 import org.localroute.app.run.RunRequest;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
@@ -137,6 +138,8 @@ public class SimulationService extends Service {
     private float restoreAccuracyMeters = 5f;
     private long restoreTimeMillis;
     private org.localroute.core.ActiveElapsedClock clock;
+    /** 本次跑圈的路线扰动模型；单点模式或扰动关闭时为 null。 */
+    private RouteVary vary;
     private RouteEngine.Progress lastProgress;
     /** 单点模式要固定发送的坐标；路线模式为 null。 */
     private org.localroute.core.GeoPoint singlePoint;
@@ -582,6 +585,12 @@ public class SimulationService extends Service {
         singlePoint = pending.singlePoint();
         runId = pending.runId();
         routeName = pending.routeName();
+        vary = route == null ? null : RouteVary.create(route.vertices(),
+                route.lapLengthMeters(), pending.varyStrength(), pending.varySeed());
+        if (vary != null && vary.enabled()) {
+            DiagnosticLog.info(String.format(Locale.US, "路线扰动已启用：程度=%.2f 种子=%d",
+                    pending.varyStrength(), pending.varySeed()));
+        }
         clock = new org.localroute.core.ActiveElapsedClock();
         lastProgress = null;
         lastElapsedMs = 0L;
@@ -621,7 +630,7 @@ public class SimulationService extends Service {
             return;
         }
 
-        RouteEngine.Progress first = RouteEngine.progressAt(route, config, 0L);
+        RouteEngine.Progress first = applyVary(RouteEngine.progressAt(route, config, 0L));
         try {
             startGmsBackendIfEnabled();
             publishFix(fixFor(first, 0d, SystemClock.elapsedRealtimeNanos()));
@@ -782,8 +791,8 @@ public class SimulationService extends Service {
         // 改速时只换段，不重算历史（R-009）。
         double speedMps = phase.speedMetersPerSecond();
         double distance = phase.distanceAt(elapsed);
-        RouteEngine.Progress progress = RouteEngine.progressForDistance(
-                route, config.loopCount(), distance, speedMps);
+        RouteEngine.Progress progress = applyVary(RouteEngine.progressForDistance(
+                route, config.loopCount(), distance, speedMps));
         double speed = paused ? 0d : speedMps;
 
         try {
@@ -899,8 +908,8 @@ public class SimulationService extends Service {
                 previous, speedKmh, travelled));
         // 立刻刷新一次快照与通知，让界面上的速度不用等下一个 tick。
         // 新分段刚起步（本段用时为 0），位置仍停在冻结点，不跳变。
-        RouteEngine.Progress progress = RouteEngine.progressForDistance(
-                route, config.loopCount(), phase.distanceAt(elapsed), phase.speedMetersPerSecond());
+        RouteEngine.Progress progress = applyVary(RouteEngine.progressForDistance(
+                route, config.loopCount(), phase.distanceAt(elapsed), phase.speedMetersPerSecond()));
         lastProgress = progress;
         publishSnapshot(state, progress);
         updateNotification(state, progress, false);
@@ -1099,6 +1108,7 @@ public class SimulationService extends Service {
         route = null;
         config = null;
         singlePoint = null;
+        vary = null;
         clearDrive();
     }
 
@@ -1163,6 +1173,24 @@ public class SimulationService extends Service {
         } else if (state != RunState.READY) {
             stateMachine.backToReady();
         }
+    }
+
+    /**
+     * 给进度叠加本次跑圈的横向扰动；位置在模拟定位与界面快照中保持一致。
+     * 已到终点的进度不再扰动，保证收尾精确回到起点。
+     */
+    private RouteEngine.Progress applyVary(RouteEngine.Progress progress) {
+        if (vary == null || progress == null || progress.finished()) {
+            return progress;
+        }
+        org.localroute.core.GeoPoint base =
+                new org.localroute.core.GeoPoint(progress.latitude(), progress.longitude());
+        org.localroute.core.GeoPoint shifted =
+                vary.apply(base, progress.bearingDegrees(), progress.distanceMeters());
+        if (shifted == base) {
+            return progress;
+        }
+        return progress.withPosition(shifted.latitude(), shifted.longitude());
     }
 
     private MockFix fixFor(RouteEngine.Progress progress, double speedMps, long elapsedRealtimeNanos) {

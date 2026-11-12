@@ -25,22 +25,33 @@ public final class RunRequest {
     private final CompiledRoute route;
     private final RunConfig config;
     private final GeoPoint singlePoint;
+    private final double varyStrength;
+    private final long varySeed;
 
     public RunRequest(String runId, String routeName, CompiledRoute route, RunConfig config) {
-        this(runId, routeName, route, config, null);
+        this(runId, routeName, route, config, 0d, 0L, null);
     }
 
     private RunRequest(String runId, String routeName, CompiledRoute route, RunConfig config,
-                       @Nullable GeoPoint singlePoint) {
+                       double varyStrength, long varySeed, @Nullable GeoPoint singlePoint) {
         this.runId = runId;
         this.routeName = routeName == null ? "" : routeName;
         this.route = route;
         this.config = config;
+        this.varyStrength = Math.max(0d, Math.min(1d, varyStrength));
+        this.varySeed = varySeed;
         this.singlePoint = singlePoint;
     }
 
     public static RunRequest create(String routeName, CompiledRoute route, RunConfig config) {
         return new RunRequest(UUID.randomUUID().toString(), routeName, route, config);
+    }
+
+    /** 带路线扰动的跑圈请求；{@code varyStrength} 为 0 时等价于不扰动。 */
+    public static RunRequest create(String routeName, CompiledRoute route, RunConfig config,
+                                    double varyStrength, long varySeed) {
+        return new RunRequest(UUID.randomUUID().toString(), routeName, route, config,
+                varyStrength, varySeed, null);
     }
 
     /** 单点位置请求：路线为空，服务只反复提交这一个坐标。 */
@@ -49,7 +60,7 @@ public final class RunRequest {
             throw new IllegalArgumentException("单点位置不能为空");
         }
         return new RunRequest(UUID.randomUUID().toString(), "单点位置", null,
-                new RunConfig(RunConfig.DEFAULT_SPEED_KMH, 1), point);
+                new RunConfig(RunConfig.DEFAULT_SPEED_KMH, 1), 0d, 0L, point);
     }
 
     public String runId() {
@@ -66,6 +77,16 @@ public final class RunRequest {
 
     public RunConfig config() {
         return config;
+    }
+
+    /** 路线扰动程度 0..1；单点模式恒为 0。 */
+    public double varyStrength() {
+        return varyStrength;
+    }
+
+    /** 本次跑圈的扰动种子。 */
+    public long varySeed() {
+        return varySeed;
     }
 
     /** 单点模式下要固定发送的坐标；路线模式为 null。 */

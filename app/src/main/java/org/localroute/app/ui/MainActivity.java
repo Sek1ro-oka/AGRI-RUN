@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 主页：校园快跑、作业查询与检查更新三个入口。
+ * 主页：校园快跑、作业查询、检查更新与应用设置四个入口。
  *
  * <p>更新从项目的 GitHub Releases 读取：有新版本时显示说明，下载交给系统
  * DownloadManager，完成后通过 FileProvider 拉起安装器。
@@ -82,6 +82,8 @@ public class MainActivity extends AppCompatActivity {
         binding.cardStudy.setOnClickListener(v ->
                 startActivity(new Intent(this, StudyActivity.class)));
         binding.cardUpdate.setOnClickListener(v -> onUpdateCardTapped());
+        binding.cardSettings.setOnClickListener(v ->
+                startActivity(new Intent(this, AppSettingsActivity.class)));
         updateUpdateCard();
 
         // 用户上次打开过悬浮控制台：进程一启动就按保存的开关和位置恢复。

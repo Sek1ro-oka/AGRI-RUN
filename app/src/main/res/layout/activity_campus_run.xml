@@ -279,7 +279,7 @@
                         android:checked="true" />
                 </LinearLayout>
 
-                <!-- 路径浮动 -->
+                <!-- 路线扰动：滑条控制程度，越大每圈越不重合 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -287,35 +287,44 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:text="@string/campus_vary_title"
+                        android:textColor="@color/campus_ink"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/campus_vary_title"
-                            android:textColor="@color/campus_ink"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/campus_vary_hint"
-                            android:textColor="@color/campus_muted"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchVary"
+                    <TextView
+                        android:id="@+id/textVaryValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:checked="true" />
+                        android:text="@string/campus_vary_value_placeholder"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/campus_vary_hint"
+                    android:textColor="@color/campus_muted"
+                    android:textSize="11sp" />
+
+                <SeekBar
+                    android:id="@+id/seekVary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:max="100"
+                    android:progress="50"
+                    android:progressBackgroundTint="@color/campus_track"
+                    android:progressTint="@color/campus_mint"
+                    android:splitTrack="false"
+                    android:thumbTint="@color/campus_mint" />
 
                 <!-- 悬浮窗：默认关闭，开启后只在 Legion 切到后台时显示 -->
                 <LinearLayout

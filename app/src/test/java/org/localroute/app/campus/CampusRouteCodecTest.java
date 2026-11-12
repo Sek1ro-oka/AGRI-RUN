@@ -46,6 +46,33 @@ public class CampusRouteCodecTest {
     }
 
     @Test
+    public void presetFlagAndCalibratedLengthSurviveRoundTrip() {
+        List<CampusRoute> routes = new ArrayList<>();
+        routes.add(CampusPresets.routeA());
+        routes.add(CampusPresets.routeB());
+
+        List<CampusRoute> decoded = CampusRouteCodec.decode(CampusRouteCodec.encode(routes));
+
+        assertEquals(2, decoded.size());
+        assertEquals(CampusPresets.routeA().lapMeters(), decoded.get(0).lapMeters(), 1e-6d);
+        assertEquals(CampusPresets.routeB().lapMeters(), decoded.get(1).lapMeters(), 1e-6d);
+        assertTrue("预设路线重新解码后仍应保持预设标记，避免被再次平滑",
+                decoded.get(0).isPreset());
+        assertTrue(decoded.get(1).isPreset());
+    }
+
+    @Test
+    public void legacyEntriesDecodeAsCustomRoutes() {
+        String raw = "{\"version\":1,\"routes\":["
+                + "{\"id\":\"legacy\",\"name\":\"旧路线\",\"waypoints\":["
+                + "{\"x\":120,\"y\":400},{\"x\":240,\"y\":400},{\"x\":260,\"y\":500}]}"
+                + "]}";
+        List<CampusRoute> decoded = CampusRouteCodec.decode(raw);
+        assertEquals(1, decoded.size());
+        assertTrue("v1 数据没有 preset 字段，应按自定义路线处理", !decoded.get(0).isPreset());
+    }
+
+    @Test
     public void emptyListRoundTripsToEmpty() {
         String encoded = CampusRouteCodec.encode(new ArrayList<>());
         assertTrue(encoded.contains("\"version\""));
