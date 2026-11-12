@@ -193,7 +193,6 @@
     <string name="home_settings_subtitle">模拟定位与权限检查</string>
     <string name="home_first_use_hint">首次使用请进入「校园快跑」，在「设置」完成模拟定位检查后再开始跑圈。</string>
     <string name="home_app_settings_title">设置</string>
-    <string name="home_app_settings_subtitle">语言 · 激活码</string>
 
     <!-- 应用设置 -->
     <string name="app_settings_title">设置</string>
@@ -202,16 +201,12 @@
     <string name="app_settings_language_value">简体中文</string>
     <string name="app_settings_language_badge">暂未开放</string>
     <string name="app_settings_activation_title">激活码</string>
-    <string name="app_settings_activation_hint">输入激活码解锁 A操 / B操 预设路线</string>
-    <string name="app_settings_activation_done">已激活 · A操 / B操 已解锁</string>
     <string name="app_settings_activation_dialog_title">输入激活码</string>
-    <string name="app_settings_activation_dialog_hint">请输入激活码</string>
     <string name="app_settings_activation_confirm">激活</string>
     <string name="app_settings_activation_cancel">取消</string>
     <string name="app_settings_activation_wrong">激活码不正确</string>
-    <string name="app_settings_activation_success">激活成功，A操 / B操 已加入跑圈路线</string>
+    <string name="app_settings_activation_success">激活成功</string>
     <string name="app_settings_activation_already">已经激活过了</string>
-    <string name="app_settings_activation_note">激活码仅能使用一次；激活后在「校园快跑」的「目标」里选择 A操 / B操，删除后不会自动恢复。</string>
 
     <!-- 校园快跑 -->
     <string name="campus_entry_title">校园快跑</string>
