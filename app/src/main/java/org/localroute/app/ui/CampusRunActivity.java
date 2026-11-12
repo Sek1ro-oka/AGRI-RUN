@@ -112,6 +112,9 @@ public final class CampusRunActivity extends AppCompatActivity {
     private static final String KEY_CUSTOM_POINTS = "custom_points";
     private static final String KEY_CUSTOM_ROUTES = "custom_routes";
     private static final String KEY_SELECTED_ROUTE = "selected_route_id";
+    /** 预设路线几何版本：1 = 0.7.0 初版；2 = 弯道平滑并统一方向。 */
+    private static final String KEY_PRESET_REVISION = "preset_revision";
+    private static final int PRESET_REVISION = 2;
     private static final String KEY_ACTIVE_RUN_ID = "active_run_id";
     private static final String KEY_ACTIVE_LAP = "active_lap_meters";
     private static final String KEY_OWNED = "campus_owned";
@@ -441,9 +444,43 @@ public final class CampusRunActivity extends AppCompatActivity {
                 }
             }
         }
+        changed |= refreshPresetGeometryIfNeeded();
         if (changed) {
             saveRoutes();
         }
+        return changed;
+    }
+
+    /**
+     * 升级已保存的预设路线几何：0.7.0 的预设点是初版采样，0.7.1 平滑了弯道并统一了方向。
+     * 只替换仍标记为预设的条目并保留用户改过的名称；重绘过的预设已变成自定义路线，
+     * 不会被覆盖，删除过的预设也不会被补回。
+     */
+    private boolean refreshPresetGeometryIfNeeded() {
+        if (prefs.getInt(KEY_PRESET_REVISION, 1) >= PRESET_REVISION
+                || !prefs.getBoolean(PresetUnlock.KEY_UNLOCKED, false)
+                || !prefs.getBoolean(PresetUnlock.KEY_PRESETS_ADDED, false)) {
+            return false;
+        }
+        boolean changed = false;
+        for (int i = 0; i < customRoutes.size(); i++) {
+            CampusRoute existing = customRoutes.get(i);
+            if (!existing.isPreset()) {
+                continue;
+            }
+            CampusRoute updated = null;
+            if (CampusPresets.ID_A.equals(existing.id())) {
+                updated = CampusPresets.routeA();
+            } else if (CampusPresets.ID_B.equals(existing.id())) {
+                updated = CampusPresets.routeB();
+            }
+            if (updated != null) {
+                customRoutes.set(i,
+                        CampusRoute.preset(updated.id(), existing.name(), updated.points()));
+                changed = true;
+            }
+        }
+        prefs.edit().putInt(KEY_PRESET_REVISION, PRESET_REVISION).apply();
         return changed;
     }
 
