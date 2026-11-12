@@ -33,6 +33,7 @@ import org.localroute.app.campus.CampusGeo;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.SpeedPresets;
+import org.localroute.app.ui.CampusRunActivity;
 import org.localroute.app.ui.MainActivity;
 import org.localroute.core.GeoPoint;
 import org.localroute.core.RunState;
@@ -261,6 +262,11 @@ public final class OverlayPanel {
         pauseButton = circleIcon(R.drawable.ic_overlay_pause, BUTTON_DP, 9,
                 R.color.overlay_mint, R.string.overlay_pause_run);
         pauseButton.setOnClickListener(v -> togglePause());
+        // 长按结束本次运动并直接回到跑圈地图，不再弹「再来一次 / 返回」确认。
+        pauseButton.setOnLongClickListener(v -> {
+            endRunFromOverlay();
+            return true;
+        });
 
         FrameLayout rightCell = new FrameLayout(context);
         scaleControl = new ScaleControlView(context);
@@ -497,6 +503,33 @@ public final class OverlayPanel {
             default:
                 toast(context.getString(R.string.overlay_idle_toast));
                 break;
+        }
+    }
+
+    /**
+     * 长按顶部中间的暂停键：结束当前运动，并把跑圈地图调到前台显示本次结果。
+     *
+     * <p>停止命令和页面跳转都是异步的：页面先显示运行中的画面，服务发布终止快照后
+     * 由 {@link CampusRunActivity} 切到「结果」模式，不弹完成确认框。
+     */
+    private void endRunFromOverlay() {
+        if (!snapshot.isActive()) {
+            toast(context.getString(R.string.overlay_idle_toast));
+            return;
+        }
+        stopMoving();
+        SimulationService.stop(context);
+        toast(context.getString(R.string.overlay_end_toast));
+        Intent intent = new Intent(context, CampusRunActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(CampusRunActivity.EXTRA_SHOW_RUN_RESULT, true);
+        try {
+            context.startActivity(intent);
+        } catch (RuntimeException e) {
+            // 个别 ROM 限制后台启动界面：停止已经发出，用户可从主界面进入查看。
+            toast(context.getString(R.string.overlay_idle_toast));
         }
     }
 

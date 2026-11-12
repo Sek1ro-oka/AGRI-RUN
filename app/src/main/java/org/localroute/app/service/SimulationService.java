@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
+import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
@@ -25,6 +26,7 @@ import androidx.core.content.ContextCompat;
 
 import org.localroute.app.R;
 import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.app.diagnostics.SystemLocationReader;
 import org.localroute.app.run.PendingRunRegistry;
 import org.localroute.app.run.RunRequest;
 import org.localroute.app.run.RunSnapshot;
@@ -127,6 +129,13 @@ public class SimulationService extends Service {
     private MockLocationSession session;
     /** GMS FLP 模拟后端；未启用或不可用时为 null。 */
     private GmsFlpBackend gmsBackend;
+    /**
+     * 开始模拟前读到的系统真实位置：结束时先回填一次再移除测试 provider，
+     * 其它应用才不会停在路线终点等待下一次真实定位。
+     */
+    private org.localroute.core.GeoPoint restorePoint;
+    private float restoreAccuracyMeters = 5f;
+    private long restoreTimeMillis;
     private org.localroute.core.ActiveElapsedClock clock;
     private RouteEngine.Progress lastProgress;
     /** 单点模式要固定发送的坐标；路线模式为 null。 */
@@ -595,9 +604,9 @@ public class SimulationService extends Service {
             return;
         }
 
+        captureRealLocationBeforeMock();
         session = new MockLocationSession(new AndroidMockProviderApi(this));
-        ProviderSetupResult result = session.start();
-        if (!result.success()) {
+        ProviderSetupResult result = session.start();        if (!result.success()) {
             failAndStop(result.errorCode() == null ? RunErrorCode.PROVIDER_SETUP_FAILED : result.errorCode(),
                     result.message() == null ? "创建测试 provider 失败" : result.message());
             return;
@@ -650,7 +659,8 @@ public class SimulationService extends Service {
         }
         // 刻意不发布 STOPPED：调用方已经把这次切换当作「同一个任务换模式」，提前发终态会让
         // 跑圈页把旧单点的结束误判成自己路线结束，从而清掉归属并弹出结束提示。
-        cleanupEverything();
+        // 同样不回填真实位置：这里只是切换模式，马上会开始新的模拟任务。
+        cleanupEverything(true);
         try {
             stateMachine.backToReady();
         } catch (RuntimeException e) {
@@ -976,7 +986,6 @@ public class SimulationService extends Service {
 
     // ---------------------------------------------------------------- 清理
 
-    /** 幂等清理：停调度、移除测试 provider、释放 WakeLock、清零计时。 */
     /** 当前是否允许启用 GMS FLP 后端（默认关闭，避免影响其它使用 FLP 的应用）。 */
     private boolean gmsFlpEnabled() {
         return getSharedPreferences("ui", MODE_PRIVATE).getBoolean("gms_flp_enabled", false);
@@ -1050,13 +1059,28 @@ public class SimulationService extends Service {
             DiagnosticLog.warn("GMS FLP 后端不可用：" + result.message());
         }
     }
+    /** 幂等清理：停调度、移除测试 provider、释放 WakeLock、清零计时。 */
     private void cleanupEverything() {
+        cleanupEverything(false);
+    }
+
+    /**
+     * @param switchingTask 为 true 表示马上还要在同一服务里启动新任务（单点→跑圈）：
+     *                      此时不回填真实位置，并保留已记录的真实位置给下一次结束使用
+     */
+    private void cleanupEverything(boolean switchingTask) {
         stopped = true;
         if (tickScheduler != null) {
             tickScheduler.cancel();
         }
         if (handler != null) {
             handler.removeCallbacks(tickRunnable);
+        }
+        if (!switchingTask) {
+            // 先回填真实位置再移除 provider：目标应用会立刻收到一次真实坐标，
+            // 不会停在线路终点等下一次真实定位。
+            restoreRealLocationIfPossible();
+            restorePoint = null;
         }
         if (session != null) {
             session.stop();
@@ -1076,6 +1100,58 @@ public class SimulationService extends Service {
         config = null;
         singlePoint = null;
         clearDrive();
+    }
+
+    /**
+     * 开始模拟前记录系统真实位置。
+     *
+     * <p>只接受未被标记为 mock 的最近位置；没有真实缓存时就不回填，由系统在移除
+     * 测试 provider 后自行恢复。若已在单点→跑圈的切换过程中保留了一份真实位置，
+     * 则沿用，避免读到刚写进去的模拟值。
+     */
+    private void captureRealLocationBeforeMock() {
+        if (restorePoint != null) {
+            return;
+        }
+        for (SystemLocationReader.Probe probe : SystemLocationReader.readAll(this)) {
+            if (!probe.hasFix() || probe.markedMock()) {
+                continue;
+            }
+            Location location = probe.location;
+            if (location == null
+                    || !Double.isFinite(location.getLatitude())
+                    || !Double.isFinite(location.getLongitude())) {
+                continue;
+            }
+            if (restorePoint == null || location.getTime() > restoreTimeMillis) {
+                restorePoint = new org.localroute.core.GeoPoint(
+                        location.getLatitude(), location.getLongitude());
+                restoreTimeMillis = location.getTime();
+                restoreAccuracyMeters = (float) Math.max(3d,
+                        Math.min(100d, location.getAccuracy()));
+            }
+        }
+        if (restorePoint != null) {
+            DiagnosticLog.info("已记录开始模拟前的真实位置 " + restorePoint.format());
+        }
+    }
+
+    /** 在移除测试 provider 之前，把模拟位置写回真实位置（速度 0，精度取真实值）。 */
+    private void restoreRealLocationIfPossible() {
+        if (session == null || !session.isStarted() || restorePoint == null) {
+            return;
+        }
+        org.localroute.simulation.FixQualityProfile quality =
+                org.localroute.simulation.FixQualityProfile.forSpeed(0d);
+        MockFix fix = new MockFix(restorePoint.latitude(), restorePoint.longitude(),
+                FIX_ALTITUDE_METERS, restoreAccuracyMeters, 0d, 0d,
+                System.currentTimeMillis(), SystemClock.elapsedRealtimeNanos(), quality);
+        try {
+            publishFix(fix);
+            DiagnosticLog.info("已把模拟位置回填到真实位置 " + restorePoint.format());
+        } catch (MockProviderException e) {
+            DiagnosticLog.warn("回填真实位置失败，继续移除测试 provider：" + e.getMessage());
+        }
     }
 
     // ---------------------------------------------------------------- 辅助
