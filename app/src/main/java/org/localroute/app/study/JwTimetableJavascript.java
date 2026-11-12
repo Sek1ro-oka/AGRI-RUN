@@ -22,10 +22,12 @@ public final class JwTimetableJavascript {
               }
               try {
                 var path = location.pathname || '';
-                if (path.indexOf('/jwglxt/') < 0) {
+                var marker = path.indexOf('/jwglxt');
+                if (marker < 0) {
                   fail('NOT_ON_JWGLXT', '当前页面不是教务系统');
                   return;
                 }
+                var prefix = path.substring(0, marker + '/jwglxt'.length);
                 var params = {};
                 location.search.substring(1).split('&').forEach(function (part) {
                   if (!part) return;
@@ -39,7 +41,6 @@ public final class JwTimetableJavascript {
                   }
                 });
                 var gnmkdm = params['gnmkdm'] || 'N2151';
-                var prefix = '/jwglxt';
 
                 function selectedOption(doc, id) {
                   var select = doc.getElementById(id);

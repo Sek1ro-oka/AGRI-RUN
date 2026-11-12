@@ -8,6 +8,8 @@ import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewTreeObserver;
+import android.widget.FrameLayout;
+import android.widget.NumberPicker;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -34,6 +36,7 @@ import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
+import org.localroute.app.study.TimetableText;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -64,6 +67,8 @@ public class StudyActivity extends AppCompatActivity {
     private StudyHomeworkCache cache;
     private boolean fetching;
     private boolean loginLaunched;
+    private int totalWeeks = StudyTimetableStore.DEFAULT_TOTAL_WEEKS;
+    private int currentWeek = 1;
 
     private ActivityResultLauncher<Intent> loginLauncher;
     private ActivityResultLauncher<Intent> settingsLauncher;
@@ -165,6 +170,9 @@ public class StudyActivity extends AppCompatActivity {
         binding.timetableGrid.setOnCourseClickListener(course ->
                 StudyDialogs.showCourseEditor(this, course,
                         updated -> renderTimetable(), this::renderTimetable));
+        binding.buttonPrevWeek.setOnClickListener(view -> selectWeek(currentWeek - 1));
+        binding.buttonNextWeek.setOnClickListener(view -> selectWeek(currentWeek + 1));
+        binding.weekPicker.setOnClickListener(view -> showWeekPicker());
 
         session = StudySessionStore.load(this);
         renderAccount();
@@ -597,8 +605,28 @@ public class StudyActivity extends AppCompatActivity {
                 StudyTimetableStore.sorted(StudyTimetableStore.loadCourses(this));
         StudySchedule schedule = StudyTimetableStore.loadSchedule(this);
         int season = StudyTimetableStore.loadSeason(this);
+
+        totalWeeks = StudyTimetableStore.loadTotalWeeks(this);
+        currentWeek = StudyTimetableStore.loadWeek(this);
+        List<TimetableCourse> weekCourses = new ArrayList<>();
+        for (TimetableCourse course : courses) {
+            if (TimetableText.activeInWeek(course.weeks(), currentWeek)) {
+                weekCourses.add(course);
+            }
+        }
+
+        binding.textWeekLabel.setText(getString(R.string.study_week_current, currentWeek));
+        binding.textWeekRange.setText(getString(R.string.study_week_total, totalWeeks));
+        boolean canPrev = currentWeek > 1;
+        boolean canNext = currentWeek < totalWeeks;
+        binding.buttonPrevWeek.setEnabled(canPrev);
+        binding.buttonPrevWeek.setAlpha(canPrev ? 1f : 0.3f);
+        binding.buttonNextWeek.setEnabled(canNext);
+        binding.buttonNextWeek.setAlpha(canNext ? 1f : 0.3f);
+
         binding.textTimetableSummary.setText(
-                getString(R.string.study_timetable_summary, courses.size()));
+                getString(R.string.study_timetable_summary,
+                        currentWeek, weekCourses.size(), courses.size()));
         binding.textTimetableNote.setText(getString(R.string.study_timetable_note,
                 getString(season == StudySchedule.SEASON_SUMMER
                         ? R.string.study_season_summer : R.string.study_season_winter),
@@ -608,11 +636,59 @@ public class StudyActivity extends AppCompatActivity {
                 schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_AFTERNOON)),
                 schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_EVENING)),
                 schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_EVENING))));
-        binding.timetableGrid.setData(courses, schedule);
+        binding.timetableGrid.setData(weekCourses, schedule);
 
         boolean empty = courses.isEmpty();
         binding.timetableGrid.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.textTimetableEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+    }
+
+    private void selectWeek(int week) {
+        currentWeek = Math.max(1, Math.min(totalWeeks, week));
+        StudyTimetableStore.saveWeek(this, currentWeek);
+        renderTimetable();
+    }
+
+    /** 选周弹窗：可直接跳到某一周，也可在这里调整学期总周数。 */
+    private void showWeekPicker() {
+        NumberPicker picker = new NumberPicker(this);
+        picker.setMinValue(1);
+        picker.setMaxValue(totalWeeks);
+        picker.setValue(currentWeek);
+        FrameLayout container = new FrameLayout(this);
+        int padding = Math.round(20 * getResources().getDisplayMetrics().density);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(picker);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.study_week_pick_title)
+                .setView(container)
+                .setPositiveButton(R.string.study_week_confirm,
+                        (dialog, which) -> selectWeek(picker.getValue()))
+                .setNeutralButton(R.string.study_week_pick_total,
+                        (dialog, which) -> showTotalWeeksPicker())
+                .setNegativeButton(R.string.campus_cancel, null)
+                .show();
+    }
+
+    private void showTotalWeeksPicker() {
+        NumberPicker picker = new NumberPicker(this);
+        picker.setMinValue(StudyTimetableStore.MIN_TOTAL_WEEKS);
+        picker.setMaxValue(StudyTimetableStore.MAX_TOTAL_WEEKS);
+        picker.setValue(totalWeeks);
+        FrameLayout container = new FrameLayout(this);
+        int padding = Math.round(20 * getResources().getDisplayMetrics().density);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(picker);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.study_week_total_title)
+                .setMessage(R.string.study_week_total_message)
+                .setView(container)
+                .setPositiveButton(R.string.study_week_confirm, (dialog, which) -> {
+                    StudyTimetableStore.saveTotalWeeks(this, picker.getValue());
+                    renderTimetable();
+                })
+                .setNegativeButton(R.string.campus_cancel, null)
+                .show();
     }
 
     private void selectTab(boolean timetable) {

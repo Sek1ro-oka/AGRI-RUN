@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- 默认禁止明文 HTTP；只对学校教务系统域名放开。 -->
-    <base-config cleartextTrafficPermitted="false" />
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">zafu.edu.cn</domain>
-        <domain includeSubdomains="false">202.107.200.222</domain>
-        <domain includeSubdomains="false">210.33.60.99</domain>
-    </domain-config>
+    <!--
+        教务系统由用户选择，部分高校（包括内置的浙江工业大学、浙江农林大学）
+        仍只提供 HTTP 登录页，因此这里允许明文请求；应用内其它联网均为 HTTPS。
+    -->
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

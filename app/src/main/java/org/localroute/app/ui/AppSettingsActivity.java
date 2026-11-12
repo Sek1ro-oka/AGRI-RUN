@@ -23,8 +23,8 @@ import org.localroute.app.databinding.ActivityAppSettingsBinding;
 /**
  * 应用设置：语言（本期只展示入口）与激活码。
  *
- * <p>激活码只保存在本机，用于解锁校园快跑里的 A操 / B操 预设路线；
- * 校验逻辑在 {@link PresetUnlock}，本页不记录用户输入。
+ * <p>激活码只保存在本机，用于补回校园快跑里的 A操 / B操 预设路线；
+ * 校验逻辑在 {@link PresetUnlock}，本页不记录用户输入，也不显示激活状态。
  */
 public class AppSettingsActivity extends AppCompatActivity {
 
@@ -48,12 +48,7 @@ public class AppSettingsActivity extends AppCompatActivity {
         }
         prefs = getSharedPreferences(PresetUnlock.PREFS_NAME, MODE_PRIVATE);
         PresetUnlock.migrate(prefs);
-        renderActivationRow();
-        binding.rowActivation.setOnClickListener(v -> {
-            if (!PresetUnlock.isActivated(prefs)) {
-                showActivationDialog();
-            }
-        });
+        binding.rowActivation.setOnClickListener(v -> showActivationDialog());
     }
 
     @Override
@@ -65,31 +60,7 @@ public class AppSettingsActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    /** 已激活时入口直接禁用并显示状态，不再弹出输入框。 */
-    private void renderActivationRow() {
-        boolean activated = PresetUnlock.isActivated(prefs);
-        binding.rowActivation.setEnabled(!activated);
-        binding.rowActivation.setClickable(!activated);
-        binding.rowActivation.setFocusable(!activated);
-        binding.rowActivation.setAlpha(activated ? 0.62f : 1f);
-        binding.imageActivationChevron.setVisibility(
-                activated ? android.view.View.GONE : android.view.View.VISIBLE);
-        if (activated) {
-            binding.textActivationState.setText(
-                    R.string.app_settings_activation_state_used);
-        } else if (PresetUnlock.hasResetPending(prefs)) {
-            binding.textActivationState.setText(
-                    R.string.app_settings_activation_state_reset);
-        } else {
-            binding.textActivationState.setText(
-                    R.string.app_settings_activation_state_unused);
-        }
-    }
-
     private void showActivationDialog() {
-        if (PresetUnlock.isActivated(prefs)) {
-            return;
-        }
         EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
@@ -112,9 +83,8 @@ public class AppSettingsActivity extends AppCompatActivity {
                         input.requestFocus();
                         return;
                     }
-                    PresetUnlock.consume(prefs);
+                    PresetUnlock.activate(prefs);
                     dialog.dismiss();
-                    renderActivationRow();
                     Toast.makeText(AppSettingsActivity.this,
                             R.string.app_settings_activation_success,
                             Toast.LENGTH_LONG).show();
