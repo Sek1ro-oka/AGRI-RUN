@@ -65,6 +65,30 @@
             android:label="@string/settings_title"
             android:theme="@style/Theme.RouteWorkshop.Home" />
 
+        <!-- 作业查询：学习通绑定、作业列表与课表 -->
+        <activity
+            android:name=".ui.StudyActivity"
+            android:exported="false"
+            android:label="@string/study_title"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.RouteWorkshop.CampusRun"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.StudyLoginActivity"
+            android:exported="false"
+            android:label="@string/study_login_title"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.RouteWorkshop.CampusRun"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.StudySettingsActivity"
+            android:exported="false"
+            android:label="@string/study_settings_title"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.RouteWorkshop.CampusRun" />
+
         <activity
             android:name=".ui.DiagnosticsActivity"
             android:exported="false"

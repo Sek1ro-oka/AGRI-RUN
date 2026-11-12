@@ -14,10 +14,10 @@ import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.overlay.OverlayHost;
 
 /**
- * 主页：只保留校园快跑与设置两个入口。
+ * 主页：只保留校园快跑与作业查询两个入口。
  *
- * <p>原来的地图选点、路线编辑和运行控制界面已移除；模拟定位引擎仍在
- * {@link org.localroute.app.service.SimulationService}，统一由
+ * <p>环境检查设置已收进校园快跑页面；原来的地图选点、路线编辑和运行控制界面已移除，
+ * 模拟定位引擎仍在 {@link org.localroute.app.service.SimulationService}，统一由
  * {@link CampusRunActivity} 调用。
  */
 public class MainActivity extends AppCompatActivity {
@@ -37,8 +37,8 @@ public class MainActivity extends AppCompatActivity {
         });
         binding.cardCampusRun.setOnClickListener(v ->
                 startActivity(new Intent(this, CampusRunActivity.class)));
-        binding.cardSettings.setOnClickListener(v ->
-                startActivity(new Intent(this, SettingsCheckActivity.class)));
+        binding.cardStudy.setOnClickListener(v ->
+                startActivity(new Intent(this, StudyActivity.class)));
 
         // 用户上次打开过悬浮控制台：进程一启动就按保存的开关和位置恢复。
         OverlayHost.get(this).restore();

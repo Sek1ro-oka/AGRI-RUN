@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/campus_mint_pale" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item>
+        <ripple android:color="#1F12CFA9">
+            <item android:id="@android:id/mask">
+                <shape android:shape="rectangle">
+                    <solid android:color="#FFFFFF" />
+                    <corners android:radius="16dp" />
+                </shape>
+            </item>
+        </ripple>
+    </item>
+</selector>
