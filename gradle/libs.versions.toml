@@ -16,8 +16,6 @@ androidxTestRules = "1.6.1"
 espresso = "3.6.1"
 # 仅用于 JVM 单元测试：与 Android 平台的 org.json 同 API 的参考实现
 jsonReference = "20240303"
-# 课表 PDF 解析（纯 Java 的 PDFBox Android 移植，读取文字坐标）
-pdfboxAndroid = "2.0.27.0"
 
 [libraries]
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
@@ -25,7 +23,6 @@ androidx-lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmode
 androidx-lifecycle-livedata = { module = "androidx.lifecycle:lifecycle-livedata", version.ref = "lifecycle" }
 google-material = { module = "com.google.android.material:material", version.ref = "material" }
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
-pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfboxAndroid" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
 org-json-reference = { module = "org.json:json", version.ref = "jsonReference" }

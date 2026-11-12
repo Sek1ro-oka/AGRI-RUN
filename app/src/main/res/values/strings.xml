@@ -206,7 +206,9 @@
     <string name="app_settings_activation_cancel">取消</string>
     <string name="app_settings_activation_wrong">激活码不正确</string>
     <string name="app_settings_activation_success">激活成功</string>
-    <string name="app_settings_activation_already">已经激活过了</string>
+    <string name="app_settings_activation_state_unused">未激活</string>
+    <string name="app_settings_activation_state_reset">可重新激活一次</string>
+    <string name="app_settings_activation_state_used">已激活 · 激活码仅可使用一次</string>
 
     <!-- 校园快跑 -->
     <string name="campus_entry_title">校园快跑</string>
@@ -411,30 +413,43 @@
     <string name="study_network_error">网络不可用，已显示上次缓存的结果。</string>
     <string name="study_login_network_error">网络不可用，请检查网络后重试。</string>
     <string name="study_timetable_summary">共 %1$d 门课 · 周一至周日</string>
-    <string name="study_timetable_empty">还没有课表。可以导入教务系统导出的 PDF，也可以点击任意空白格添加课程或事件。</string>
+    <string name="study_timetable_empty">还没有课表。可以从学校教务系统直接导入，也可以点击任意空白格添加课程或事件。</string>
     <string name="study_timetable_note">%1$s · 上午 %2$s–%3$s · 下午 %4$s–%5$s · 晚课 %6$s–%7$s\n点击课程卡片可修改或删除，点击空白格可添加事件。</string>
-    <string name="study_timetable_import">导入课表 PDF</string>
+    <string name="study_timetable_import">从教务系统导入</string>
     <string name="study_timetable_add">添加课程</string>
     <string name="study_timetable_clear">清空课表</string>
     <string name="study_timetable_clear_confirm_title">清空课表？</string>
     <string name="study_timetable_clear_confirm_message">将删除手动录入的全部课程，学习通账户与作业缓存不受影响。</string>
     <string name="study_timetable_cleared">课表已清空</string>
-    <string name="study_import_title">导入课表 PDF</string>
-    <string name="study_import_hint">选择教务系统导出的课表 PDF（如正方「我的课表」打印版），应用会读取文字坐标还原星期、节次、周次、地点与教师。文件只在本机解析，不会上传。</string>
-    <string name="study_import_pdf_file">已选择：%1$s</string>
-    <string name="study_import_pdf_parsing">正在解析 PDF…</string>
-    <string name="study_import_pdf_failed">无法解析这个 PDF，请确认文件是教务系统导出的课表。</string>
-    <string name="study_import_pdf_failed_detail">无法解析这个 PDF：%1$s</string>
-    <string name="study_import_pdf_empty_preview">没有可以导入的课程</string>
-    <string name="study_import_pdf_result">识别到 %1$d 门课程：</string>
-    <string name="study_import_pdf_more">\n…另有 %1$d 门</string>
-    <string name="study_import_pdf_no_picker">没有可用的文件选择器，请安装文档管理应用后再试。</string>
+    <string name="study_import_title">导入课表</string>
+    <string name="study_import_dialog_hint">确认后写入本机课表；导入后仍可点击课程修改或删除。</string>
+    <string name="study_import_count">识别到 %1$d 门课程：</string>
+    <string name="study_import_more">\n…另有 %1$d 门</string>
+    <string name="study_import_confirm">导入</string>
     <string name="study_import_append">追加到现有课表</string>
     <string name="study_import_replace_hint">未勾选追加时会覆盖现有 %1$d 门课程。</string>
-    <string name="study_import_empty">没有解析到可导入的课程。</string>
     <string name="study_import_result">已导入 %1$d 门课程</string>
     <string name="study_import_no_new">没有新增课程（重复课程已跳过）</string>
     <string name="study_import_append_hint">将追加到现有 %1$d 门课程，重复课程会自动跳过。</string>
+
+    <!-- 教务系统导入（正方 jwglxt） -->
+    <string name="study_jw_title">导入教务课表</string>
+    <string name="study_jw_hint">请在校内网或学校 VPN 下使用。登录只在教务系统官方页面完成，应用不读取、不保存账号密码；登录后点底部「读取课表」。</string>
+    <string name="study_jw_loading">正在加载教务系统…</string>
+    <string name="study_jw_fetch">读取课表</string>
+    <string name="study_jw_fetching">正在读取…</string>
+    <string name="study_jw_relogin">重新登录</string>
+    <string name="study_jw_relogin_done">已清除教务登录状态，请重新登录</string>
+    <string name="study_jw_page_not_ready">页面还没加载完成，请稍候再试。</string>
+    <string name="study_jw_web_error">无法打开教务系统页面。请确认已连接校园网或学校 VPN，然后重新登录。</string>
+    <string name="study_jw_timeout">读取课表超时，请检查网络后重试；校外访问需要先连接学校 VPN。</string>
+    <string name="study_jw_no_courses">教务系统没有返回当前学期的课程。请确认学期与课表已在网页中显示。</string>
+    <string name="study_jw_source">%1$s · 共 %2$d 门</string>
+    <string name="study_jw_error_session">还没有登录或登录已失效，请先在页面上完成登录，再点「读取课表」。</string>
+    <string name="study_jw_error_page">当前页面不是教务系统。请回到教务系统登录页后再读取。</string>
+    <string name="study_jw_error_term">没有识别到学年学期，请先在教务系统课表页选择学期。</string>
+    <string name="study_jw_error_network">读取课表请求失败，请检查网络或 VPN 后重试。</string>
+    <string name="study_jw_error_format">教务系统返回的课表格式无法识别，请稍后重试。</string>
     <string name="study_course_saved">课程已保存</string>
     <string name="study_course_add_title">添加课程或事件</string>
     <string name="study_course_edit_title">修改课程</string>
@@ -452,7 +467,7 @@
     <string name="study_course_delete_message">将从课表中删除「%1$s」。</string>
     <string name="study_course_deleted">已删除课程</string>
     <string name="study_course_delete">删除</string>
-    <string name="study_settings_hint">作业数据来自学习通网页，按截止时间排序并只保留近一周；课表由本地 PDF 导入或点击卡片修改，不依赖学习通。本应用不会上传账号密码。</string>
+    <string name="study_settings_hint">作业数据来自学习通网页，按截止时间排序并只保留近一周；课表可从学校教务系统导入或点击卡片修改，不依赖学习通。本应用不会上传账号密码。</string>
     <string name="study_settings_timetable_count">共 %1$d 门课程</string>
     <string name="study_settings_account_meta">UID %1$s · 绑定于 %2$s</string>
     <string name="study_schedule_title">上课时间</string>

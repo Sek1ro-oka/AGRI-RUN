@@ -46,12 +46,13 @@ public class StudySettingsActivity extends AppCompatActivity {
                         }
                     });
 
-    private final ActivityResultLauncher<String[]> pdfLauncher =
-            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
-                if (uri != null) {
-                    StudyDialogs.showImportTimetable(this, uri, this::onTimetableChanged);
-                }
-            });
+    private final ActivityResultLauncher<Intent> jwLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        if (result.getResultCode() == RESULT_OK) {
+                            onTimetableChanged();
+                        }
+                    });
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -61,14 +62,8 @@ public class StudySettingsActivity extends AppCompatActivity {
 
         binding.buttonSettingsBack.setOnClickListener(view -> finish());
         binding.buttonSwitchAccount.setOnClickListener(view -> onSwitchAccount());
-        binding.rowReimport.setOnClickListener(view -> {
-            try {
-                pdfLauncher.launch(new String[]{"application/pdf"});
-            } catch (RuntimeException error) {
-                Toast.makeText(this, R.string.study_import_pdf_no_picker,
-                        Toast.LENGTH_LONG).show();
-            }
-        });
+        binding.rowReimport.setOnClickListener(view ->
+                jwLauncher.launch(new Intent(this, JwImportActivity.class)));
         binding.rowAddCourse.setOnClickListener(view ->
                 StudyDialogs.showCourseEditor(this, null, course -> onTimetableChanged()));
         binding.rowClearTimetable.setOnClickListener(view -> confirmClearTimetable());

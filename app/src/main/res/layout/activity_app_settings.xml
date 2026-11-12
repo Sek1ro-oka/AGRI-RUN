@@ -129,9 +129,19 @@
                                 android:textColor="@color/campus_ink"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/textActivationState"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/app_settings_activation_state_unused"
+                                android:textColor="@color/campus_muted"
+                                android:textSize="11sp" />
                         </LinearLayout>
 
                         <ImageView
+                            android:id="@+id/imageActivationChevron"
                             android:layout_width="20dp"
                             android:layout_height="20dp"
                             android:contentDescription="@null"

@@ -1,9 +1,6 @@
 package org.localroute.app.ui;
 
 import android.app.Activity;
-import android.database.Cursor;
-import android.net.Uri;
-import android.provider.OpenableColumns;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
@@ -23,21 +20,15 @@ import org.localroute.app.databinding.DialogStudyImportBinding;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
-import org.localroute.app.study.TimetableLayoutParser;
-import org.localroute.app.study.TimetablePdfReader;
 import org.localroute.app.study.TimetableText;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
-/** 课表 PDF 导入与单门课程编辑对话框；课表页与设置页共用。 */
+/** 教务课表导入预览与单门课程编辑对话框；课表页与设置页共用。 */
 public final class StudyDialogs {
 
     private static final String[] WEEKDAY_LABELS = {
@@ -48,22 +39,21 @@ public final class StudyDialogs {
     }
 
     /**
-     * 选择 PDF 后解析并预览，确认后覆盖或追加到课表。
+     * 展示从教务系统读取到的课程预览，确认后覆盖或追加到课表。
      *
-     * <p>解析在后台线程完成；PDF 只读取一次，不保存文件副本。
+     * <p>只保存课程本身，不保存教务系统的登录状态；来源与学期仅用于预览说明。
      */
-    public static void showImportTimetable(@NonNull Activity activity, @NonNull Uri uri,
-                                           @Nullable Runnable onImported) {
+    public static void showImportPreview(@NonNull Activity activity,
+                                         @NonNull List<TimetableCourse> imported,
+                                         @Nullable String sourceLabel,
+                                         @Nullable Runnable onImported) {
         DialogStudyImportBinding binding =
                 DialogStudyImportBinding.inflate(LayoutInflater.from(activity));
         int existing = StudyTimetableStore.loadCourses(activity).size();
-        binding.textImportFile.setText(activity.getString(
-                R.string.study_import_pdf_file, displayName(activity, uri)));
-        binding.textImportSummary.setText(R.string.study_import_pdf_parsing);
-        binding.progressImport.setVisibility(View.VISIBLE);
-        binding.checkImportAppend.setVisibility(View.GONE);
-        binding.textImportReplaceHint.setVisibility(View.GONE);
-        binding.textImportError.setVisibility(View.GONE);
+        binding.textImportFile.setText(sourceLabel == null ? "" : sourceLabel);
+        binding.textImportSummary.setText(preview(activity, imported));
+        binding.checkImportAppend.setVisibility(existing > 0 ? View.VISIBLE : View.GONE);
+        updateImportHint(activity, binding, existing);
         binding.checkImportAppend.setOnCheckedChangeListener(
                 (button, checked) -> updateImportHint(activity, binding, existing));
 
@@ -71,114 +61,45 @@ public final class StudyDialogs {
                 .setTitle(R.string.study_import_title)
                 .setView(binding.getRoot())
                 .setNegativeButton(R.string.campus_cancel, null)
-                .setPositiveButton(R.string.study_timetable_import, null)
+                .setPositiveButton(R.string.study_import_confirm, null)
                 .create();
-        final TimetableLayoutParser.Result[] parsed = {null};
-        final boolean[] cancelled = {false};
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        dialog.setOnShowListener(ignored -> {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-                TimetableLayoutParser.Result result = parsed[0];
-                if (result == null || result.courses.isEmpty()) {
-                    return;
-                }
-                List<TimetableCourse> courses = binding.checkImportAppend.isChecked()
-                        ? new ArrayList<>(StudyTimetableStore.loadCourses(activity))
-                        : new ArrayList<>();
-                Set<String> keys = new HashSet<>();
-                for (TimetableCourse course : courses) {
-                    keys.add(courseKey(course));
-                }
-                int added = 0;
-                for (TimetableCourse course : result.courses) {
-                    if (!binding.checkImportAppend.isChecked()
-                            || keys.add(courseKey(course))) {
-                        courses.add(course);
-                        added++;
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                    boolean append = binding.checkImportAppend.isChecked();
+                    List<TimetableCourse> courses = append
+                            ? new ArrayList<>(StudyTimetableStore.loadCourses(activity))
+                            : new ArrayList<>();
+                    Set<String> keys = new HashSet<>();
+                    for (TimetableCourse course : courses) {
+                        keys.add(courseKey(course));
                     }
-                }
-                StudyTimetableStore.saveCourses(activity,
-                        StudyTimetableStore.sorted(courses));
-                Toast.makeText(activity, added == 0
-                                ? activity.getString(R.string.study_import_no_new)
-                                : activity.getString(R.string.study_import_result, added),
-                        Toast.LENGTH_LONG).show();
-                dialog.dismiss();
-                if (onImported != null) {
-                    onImported.run();
-                }
-            });
-
-            executor.execute(() -> {
-                TimetableLayoutParser.Result result = null;
-                String error = null;
-                try (InputStream input = activity.getContentResolver().openInputStream(uri)) {
-                    if (input == null) {
-                        throw new IOException("empty stream");
+                    int added = 0;
+                    for (TimetableCourse course : imported) {
+                        if (!append || keys.add(courseKey(course))) {
+                            courses.add(course);
+                            added++;
+                        }
                     }
-                    result = TimetableLayoutParser.parse(
-                            TimetablePdfReader.read(activity, input));
-                } catch (IOException | RuntimeException failure) {
-                    error = failure.getMessage();
-                }
-                final TimetableLayoutParser.Result parsedResult = result;
-                final String failureMessage = error;
-                activity.runOnUiThread(() -> {
-                    if (cancelled[0] || activity.isFinishing() || activity.isDestroyed()) {
-                        return;
+                    StudyTimetableStore.saveCourses(activity,
+                            StudyTimetableStore.sorted(courses));
+                    Toast.makeText(activity, added == 0
+                                    ? activity.getString(R.string.study_import_no_new)
+                                    : activity.getString(R.string.study_import_result, added),
+                            Toast.LENGTH_LONG).show();
+                    dialog.dismiss();
+                    if (onImported != null) {
+                        onImported.run();
                     }
-                    binding.progressImport.setVisibility(View.GONE);
-                    if (parsedResult == null) {
-                        showImportError(activity, binding, failureMessage == null
-                                ? activity.getString(R.string.study_import_pdf_failed)
-                                : activity.getString(R.string.study_import_pdf_failed_detail,
-                                failureMessage));
-                        return;
-                    }
-                    if (parsedResult.courses.isEmpty()) {
-                        showImportError(activity, binding,
-                                parsedResult.warningSummary().isEmpty()
-                                        ? activity.getString(R.string.study_import_empty)
-                                        : parsedResult.warningSummary());
-                        return;
-                    }
-                    parsed[0] = parsedResult;
-                    binding.textImportSummary.setText(preview(activity, parsedResult));
-                    binding.checkImportAppend.setVisibility(
-                            existing > 0 ? View.VISIBLE : View.GONE);
-                    updateImportHint(activity, binding, existing);
-                    if (!parsedResult.warnings.isEmpty()) {
-                        binding.textImportError.setVisibility(View.VISIBLE);
-                        binding.textImportError.setTextColor(activity.getColor(
-                                R.color.campus_muted));
-                        binding.textImportError.setText(parsedResult.warningSummary());
-                    }
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
-                });
-            });
-        });
-        dialog.setOnDismissListener(ignored -> {
-            cancelled[0] = true;
-            executor.shutdownNow();
-        });
+                }));
         dialog.show();
     }
 
-    private static void showImportError(Activity activity, DialogStudyImportBinding binding,
-                                        String message) {
-        binding.textImportSummary.setText(R.string.study_import_pdf_empty_preview);
-        binding.textImportError.setVisibility(View.VISIBLE);
-        binding.textImportError.setTextColor(activity.getColor(R.color.campus_danger));
-        binding.textImportError.setText(message);
-    }
-
-    private static String preview(Activity activity, TimetableLayoutParser.Result result) {
+    private static String preview(Activity activity, List<TimetableCourse> imported) {
         StringBuilder builder = new StringBuilder(activity.getString(
-                R.string.study_import_pdf_result, result.courses.size()));
-        int limit = Math.min(5, result.courses.size());
+                R.string.study_import_count, imported.size()));
+        int limit = Math.min(5, imported.size());
         for (int i = 0; i < limit; i++) {
-            TimetableCourse course = result.courses.get(i);
+            TimetableCourse course = imported.get(i);
             builder.append('\n')
                     .append(course.weekdayLabel()).append(' ')
                     .append(course.periodLabel()).append(' ')
@@ -187,9 +108,9 @@ public final class StudyDialogs {
                 builder.append(" · ").append(course.location());
             }
         }
-        if (result.courses.size() > limit) {
-            builder.append(activity.getString(R.string.study_import_pdf_more,
-                    result.courses.size() - limit));
+        if (imported.size() > limit) {
+            builder.append(activity.getString(R.string.study_import_more,
+                    imported.size() - limit));
         }
         return builder.toString();
     }
@@ -397,23 +318,6 @@ public final class StudyDialogs {
                     onDeleted.run();
                 })
                 .show();
-    }
-
-    @NonNull
-    private static String displayName(Activity activity, Uri uri) {
-        try (Cursor cursor = activity.getContentResolver().query(uri,
-                new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) {
-                String name = cursor.getString(0);
-                if (name != null && !name.isEmpty()) {
-                    return name;
-                }
-            }
-        } catch (RuntimeException ignored) {
-            // 某些文件提供方不支持查询，退回 URI 末段。
-        }
-        String fallback = uri.getLastPathSegment();
-        return fallback == null || fallback.isEmpty() ? "课表.pdf" : fallback;
     }
 
     @NonNull
