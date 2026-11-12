@@ -69,10 +69,6 @@ public final class ChaoxingHtmlParser {
     private static final Pattern AGG_SPAN = Pattern.compile(
             "<span\\b([^>]*)>(.*?)</span>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
-    private static final Pattern PENDING_STATUS = Pattern.compile(
-            "未交|未提交|待互評|待互评|待批閱|待批阅|待批改|待做");
-    private static final Pattern DONE_STATUS = Pattern.compile(
-            "已完成|已批改|已互評|已互评");
     private static final Pattern EXPIRED_TEXT = Pattern.compile(
             "已结束|已截止|已过期|已過期");
     private static final Pattern REMAIN_DAYS = Pattern.compile(
@@ -226,12 +222,15 @@ public final class ChaoxingHtmlParser {
                     deadline = nowMillis + remaining;
                 } else {
                     deadline = parseAbsoluteDeadline(timeRaw, nowMillis);
-                    if (deadline == 0L && (!notOver || EXPIRED_TEXT.matcher(timeRaw).find())) {
+                    if (deadline == 0L
+                            && status != HomeworkItem.Status.SUBMITTED
+                            && (!notOver || EXPIRED_TEXT.matcher(timeRaw).find())) {
                         expired = true;
                     }
                 }
                 if (deadline > 0L && deadline <= nowMillis
-                        && status != HomeworkItem.Status.DONE) {
+                        && status != HomeworkItem.Status.DONE
+                        && status != HomeworkItem.Status.SUBMITTED) {
                     expired = true;
                 }
             } else if (status == HomeworkItem.Status.PENDING) {
@@ -310,12 +309,15 @@ public final class ChaoxingHtmlParser {
                     deadline = nowMillis + remaining;
                 } else {
                     deadline = parseAbsoluteDeadline(timeRaw, nowMillis);
-                    if (deadline == 0L && EXPIRED_TEXT.matcher(timeRaw).find()) {
+                    if (deadline == 0L
+                            && status != HomeworkItem.Status.SUBMITTED
+                            && EXPIRED_TEXT.matcher(timeRaw).find()) {
                         expired = true;
                     }
                 }
                 if (deadline > 0L && deadline <= nowMillis
-                        && status != HomeworkItem.Status.DONE) {
+                        && status != HomeworkItem.Status.DONE
+                        && status != HomeworkItem.Status.SUBMITTED) {
                     expired = true;
                 }
             }
@@ -470,13 +472,7 @@ public final class ChaoxingHtmlParser {
 
     @NonNull
     private static HomeworkItem.Status statusOf(@NonNull String text) {
-        if (PENDING_STATUS.matcher(text).find()) {
-            return HomeworkItem.Status.PENDING;
-        }
-        if (DONE_STATUS.matcher(text).find()) {
-            return HomeworkItem.Status.DONE;
-        }
-        return HomeworkItem.Status.OTHER;
+        return HomeworkItem.statusOf(text);
     }
 
     @NonNull

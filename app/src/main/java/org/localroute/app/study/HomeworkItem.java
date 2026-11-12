@@ -20,9 +20,17 @@ public final class HomeworkItem {
     /** 逐课程列表用 workId，聚合作业页用 taskrefId，两者都指向同一条作业。 */
     private static final Pattern WORK_ID = Pattern.compile(
             "[?&](?:workId|taskrefId)=(\\d+)", Pattern.CASE_INSENSITIVE);
+    /** 已提交但还没出成绩的作业；学习通通常显示「待批阅」「待互评」或「已提交」。 */
+    private static final Pattern SUBMITTED_STATUS = Pattern.compile(
+            "待批阅|待批閱|待批改|待评阅|待評閱|待评分|待評分|待互评|待互評|已提交|已交卷|已交");
+    private static final Pattern PENDING_STATUS = Pattern.compile(
+            "未交|未提交|待做");
+    private static final Pattern DONE_STATUS = Pattern.compile(
+            "已完成|已批改|已批阅|已批閱|已评分|已評分|已互评|已互評");
 
     public enum Status {
         PENDING,
+        SUBMITTED,
         DONE,
         EXPIRED,
         OTHER
@@ -110,12 +118,14 @@ public final class HomeworkItem {
         switch (status) {
             case PENDING:
                 return 0;
-            case DONE:
+            case SUBMITTED:
                 return 1;
-            case EXPIRED:
+            case DONE:
                 return 2;
-            default:
+            case EXPIRED:
                 return 3;
+            default:
+                return 4;
         }
     }
 
@@ -125,6 +135,9 @@ public final class HomeworkItem {
             SimpleDateFormat format = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA);
             return format.format(new Date(deadlineEpochMillis)) + " 截止";
         }
+        if (status == Status.SUBMITTED) {
+            return statusText.isEmpty() ? "已提交" : statusText;
+        }
         if (status == Status.EXPIRED) {
             return "已截止";
         }
@@ -132,6 +145,21 @@ public final class HomeworkItem {
             return "已完成";
         }
         return "未标注截止时间";
+    }
+
+    /** 按学习通列表上的状态文字归类；「待批阅」属于已提交，不能再当成待完成。 */
+    @NonNull
+    public static Status statusOf(@NonNull String text) {
+        if (SUBMITTED_STATUS.matcher(text).find()) {
+            return Status.SUBMITTED;
+        }
+        if (DONE_STATUS.matcher(text).find()) {
+            return Status.DONE;
+        }
+        if (PENDING_STATUS.matcher(text).find()) {
+            return Status.PENDING;
+        }
+        return Status.OTHER;
     }
 
     @NonNull
@@ -163,10 +191,15 @@ public final class HomeworkItem {
         } catch (IllegalArgumentException error) {
             status = Status.OTHER;
         }
+        String statusText = json.optString("status_text", "");
+        if (status == Status.PENDING && statusOf(statusText) == Status.SUBMITTED) {
+            // 旧缓存把「待批阅」存成了 PENDING，读取时纠正为已提交。
+            status = Status.SUBMITTED;
+        }
         return new HomeworkItem(
                 json.optString("course", ""),
                 title,
-                json.optString("status_text", ""),
+                statusText,
                 status,
                 json.optLong("deadline", 0L),
                 json.optString("deadline_raw", ""),

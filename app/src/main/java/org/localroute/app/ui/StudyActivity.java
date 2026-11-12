@@ -500,6 +500,13 @@ public class StudyActivity extends AppCompatActivity {
                 fill = R.color.study_state_pending_fill;
                 textColor = R.color.campus_orange;
                 break;
+            case SUBMITTED:
+                label = item.statusText().isEmpty()
+                        ? getString(R.string.study_homework_status_submitted)
+                        : item.statusText();
+                fill = R.color.study_state_other_fill;
+                textColor = R.color.campus_blue;
+                break;
             case DONE:
                 label = getString(R.string.study_homework_status_done);
                 fill = R.color.campus_mint_pale;

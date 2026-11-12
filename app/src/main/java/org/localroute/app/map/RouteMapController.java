@@ -1,6 +1,12 @@
 package org.localroute.app.map;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,6 +24,7 @@ import org.maplibre.android.style.layers.CircleLayer;
 import org.maplibre.android.style.layers.LineLayer;
 import org.maplibre.android.style.layers.Property;
 import org.maplibre.android.style.layers.PropertyFactory;
+import org.maplibre.android.style.layers.SymbolLayer;
 import org.maplibre.android.style.sources.GeoJsonSource;
 import org.maplibre.geojson.Feature;
 import org.maplibre.geojson.FeatureCollection;
@@ -60,6 +67,8 @@ public final class RouteMapController implements RouteMapHost {
     private static final String LAYER_VERTICES = "route-vertices-layer";
     private static final String LAYER_START = "route-start-layer";
     private static final String LAYER_RUNNER = "run-position-layer";
+    /** 选点用的探针图钉位图；起点和中间节点共用。 */
+    private static final String PIN_IMAGE = "route-pin";
 
     /** 样式加载的看门狗：超过这个时间还没回调，就认为瓦片/样式加载失败。 */
     private static final long STYLE_TIMEOUT_MS = 10_000L;
@@ -438,35 +447,81 @@ public final class RouteMapController implements RouteMapHost {
         loaded.addSource(new GeoJsonSource(SOURCE_VERTICES));
         loaded.addSource(new GeoJsonSource(SOURCE_START));
         loaded.addSource(new GeoJsonSource(SOURCE_RUNNER));
+        loaded.addImage(PIN_IMAGE, createPinBitmap());
         loaded.addLayer(new LineLayer(LAYER_LINE, SOURCE_LINE)
                 .withProperties(
                         PropertyFactory.lineColor(0xFF1B5E20),
                         PropertyFactory.lineWidth(5f),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND)));
-        // 选点阶段每个航点都画成与起点相同的橙色圆点，用户能一眼看到自己点下的每一处；
-        // 路线完成后由界面传 showVertices=false，只保留起点。起点与节点同色同大小，
-        // 不再出现「起点橙色、其余蓝色」的割裂感。
-        loaded.addLayer(new CircleLayer(LAYER_VERTICES, SOURCE_VERTICES)
+        // 选点阶段每个航点都画成探针图钉，钉尖对准点击位置；路线完成后由界面传
+        // showVertices=false，只保留起点。起点与节点同色同大小，保持视觉一致。
+        loaded.addLayer(new SymbolLayer(LAYER_VERTICES, SOURCE_VERTICES)
                 .withProperties(
-                        PropertyFactory.circleColor(0xFFE65100),
-                        PropertyFactory.circleRadius(8f),
-                        PropertyFactory.circleStrokeWidth(2f),
-                        PropertyFactory.circleStrokeColor(0xFFFFFFFF)));
+                        PropertyFactory.iconImage(PIN_IMAGE),
+                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
+                        PropertyFactory.iconAllowOverlap(true),
+                        PropertyFactory.iconIgnorePlacement(true),
+                        PropertyFactory.iconSize(1f)));
         // 起点用独立单点源：早期版本让它复用整条顶点源且没有过滤条件，
         // 结果所有节点都被画成橙色起点（R-007）。
-        loaded.addLayer(new CircleLayer(LAYER_START, SOURCE_START)
+        loaded.addLayer(new SymbolLayer(LAYER_START, SOURCE_START)
                 .withProperties(
-                        PropertyFactory.circleColor(0xFFE65100),
-                        PropertyFactory.circleRadius(8f),
-                        PropertyFactory.circleStrokeWidth(2f),
-                        PropertyFactory.circleStrokeColor(0xFFFFFFFF)));
+                        PropertyFactory.iconImage(PIN_IMAGE),
+                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
+                        PropertyFactory.iconAllowOverlap(true),
+                        PropertyFactory.iconIgnorePlacement(true),
+                        PropertyFactory.iconSize(1f)));
         loaded.addLayer(new CircleLayer(LAYER_RUNNER, SOURCE_RUNNER)
                 .withProperties(
                         PropertyFactory.circleColor(0xFFD32F2F),
                         PropertyFactory.circleRadius(9f),
                         PropertyFactory.circleStrokeWidth(3f),
                         PropertyFactory.circleStrokeColor(0xFFFFFFFF)));
+    }
+
+    /** 画一枚橙色的地图探针：圆头、白色描边、白色圆孔，钉尖朝下。 */
+    @NonNull
+    private Bitmap createPinBitmap() {
+        float density = mapView.getContext().getResources().getDisplayMetrics().density;
+        int width = Math.round(28 * density);
+        int height = Math.round(40 * density);
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        float stroke = 2f * density;
+        float centerX = width / 2f;
+        float radius = width * 0.36f;
+        float centerY = radius + stroke;
+        float tipY = height - stroke;
+
+        Path pin = new Path();
+        pin.moveTo(centerX, tipY);
+        pin.cubicTo(centerX - radius * 0.55f, centerY + radius * 0.85f,
+                centerX - radius, centerY + radius * 0.15f,
+                centerX - radius, centerY);
+        pin.arcTo(new RectF(centerX - radius, centerY - radius,
+                centerX + radius, centerY + radius), 180f, 180f, false);
+        pin.cubicTo(centerX + radius, centerY + radius * 0.15f,
+                centerX + radius * 0.55f, centerY + radius * 0.85f,
+                centerX, tipY);
+        pin.close();
+
+        Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        fill.setStyle(Paint.Style.FILL);
+        fill.setColor(0xFFE65100);
+        canvas.drawPath(pin, fill);
+
+        Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
+        border.setStyle(Paint.Style.STROKE);
+        border.setStrokeJoin(Paint.Join.ROUND);
+        border.setStrokeWidth(stroke);
+        border.setColor(Color.WHITE);
+        canvas.drawPath(pin, border);
+
+        Paint hole = new Paint(Paint.ANTI_ALIAS_FLAG);
+        hole.setColor(Color.WHITE);
+        canvas.drawCircle(centerX, centerY, radius * 0.32f, hole);
+        return bitmap;
     }
 
     /**
