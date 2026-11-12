@@ -83,6 +83,18 @@ public class StudySettingsActivity extends AppCompatActivity {
                 pickStartTime(StudySchedule.SEGMENT_AFTERNOON));
         binding.rowEveningStart.setOnClickListener(view ->
                 pickStartTime(StudySchedule.SEGMENT_EVENING));
+        binding.buttonMorningMinus.setOnClickListener(view ->
+                changePeriodCount(StudySchedule.SEGMENT_MORNING, -1));
+        binding.buttonMorningPlus.setOnClickListener(view ->
+                changePeriodCount(StudySchedule.SEGMENT_MORNING, 1));
+        binding.buttonAfternoonMinus.setOnClickListener(view ->
+                changePeriodCount(StudySchedule.SEGMENT_AFTERNOON, -1));
+        binding.buttonAfternoonPlus.setOnClickListener(view ->
+                changePeriodCount(StudySchedule.SEGMENT_AFTERNOON, 1));
+        binding.buttonEveningMinus.setOnClickListener(view ->
+                changePeriodCount(StudySchedule.SEGMENT_EVENING, -1));
+        binding.buttonEveningPlus.setOnClickListener(view ->
+                changePeriodCount(StudySchedule.SEGMENT_EVENING, 1));
 
         binding.seekPeriod.setMax(StudySchedule.MAX_PERIOD_MINUTES
                 - StudySchedule.MIN_PERIOD_MINUTES);
@@ -209,11 +221,36 @@ public class StudySettingsActivity extends AppCompatActivity {
 
     private void fillScheduleValues() {
         binding.textMorningValue.setText(
-                schedule.startLabel(StudySchedule.MORNING_FIRST_PERIOD));
+                schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_MORNING)));
         binding.textAfternoonValue.setText(
-                schedule.startLabel(StudySchedule.AFTERNOON_FIRST_PERIOD));
+                schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_AFTERNOON)));
         binding.textEveningValue.setText(
-                schedule.startLabel(StudySchedule.EVENING_FIRST_PERIOD));
+                schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_EVENING)));
+
+        int morningCount = schedule.periodCount(StudySchedule.SEGMENT_MORNING);
+        int afternoonCount = schedule.periodCount(StudySchedule.SEGMENT_AFTERNOON);
+        int eveningCount = schedule.periodCount(StudySchedule.SEGMENT_EVENING);
+        binding.textMorningCount.setText(
+                getString(R.string.study_schedule_count_value, morningCount));
+        binding.textAfternoonCount.setText(
+                getString(R.string.study_schedule_count_value, afternoonCount));
+        binding.textEveningCount.setText(
+                getString(R.string.study_schedule_count_value, eveningCount));
+        binding.textTotalPeriods.setText(
+                getString(R.string.study_schedule_total, schedule.totalPeriods()));
+        boolean canAdd = schedule.totalPeriods() < StudySchedule.MAX_TOTAL_PERIODS;
+        styleCountButton(binding.buttonMorningMinus,
+                morningCount > StudySchedule.MIN_PERIODS_PER_SEGMENT);
+        styleCountButton(binding.buttonMorningPlus,
+                canAdd && morningCount < StudySchedule.MAX_PERIODS_PER_SEGMENT);
+        styleCountButton(binding.buttonAfternoonMinus,
+                afternoonCount > StudySchedule.MIN_PERIODS_PER_SEGMENT);
+        styleCountButton(binding.buttonAfternoonPlus,
+                canAdd && afternoonCount < StudySchedule.MAX_PERIODS_PER_SEGMENT);
+        styleCountButton(binding.buttonEveningMinus,
+                eveningCount > StudySchedule.MIN_PERIODS_PER_SEGMENT);
+        styleCountButton(binding.buttonEveningPlus,
+                canAdd && eveningCount < StudySchedule.MAX_PERIODS_PER_SEGMENT);
 
         binding.seekPeriod.setProgress(schedule.periodMinutes()
                 - StudySchedule.MIN_PERIOD_MINUTES);
@@ -224,19 +261,30 @@ public class StudySettingsActivity extends AppCompatActivity {
                 schedule.breakMinutes()));
 
         binding.textScheduleSummary.setText(getString(R.string.study_schedule_summary,
-                schedule.startLabel(StudySchedule.MORNING_FIRST_PERIOD),
-                schedule.endLabel(StudySchedule.MORNING_FIRST_PERIOD
-                        + StudySchedule.SEGMENT_PERIODS - 1),
-                schedule.startLabel(StudySchedule.AFTERNOON_FIRST_PERIOD),
-                schedule.endLabel(StudySchedule.AFTERNOON_FIRST_PERIOD
-                        + StudySchedule.SEGMENT_PERIODS - 1),
-                schedule.startLabel(StudySchedule.EVENING_FIRST_PERIOD),
-                schedule.endLabel(StudySchedule.EVENING_FIRST_PERIOD
-                        + StudySchedule.SEGMENT_PERIODS - 1)));
+                schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_MORNING)),
+                schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_MORNING)),
+                schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_AFTERNOON)),
+                schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_AFTERNOON)),
+                schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_EVENING)),
+                schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_EVENING))));
 
         boolean winter = season == StudySchedule.SEASON_WINTER;
         styleSeasonChip(binding.chipSeasonWinter, winter);
         styleSeasonChip(binding.chipSeasonSummer, !winter);
+    }
+
+    private void styleCountButton(@NonNull android.widget.TextView button, boolean enabled) {
+        button.setEnabled(enabled);
+        button.setAlpha(enabled ? 1f : 0.3f);
+    }
+
+    private void changePeriodCount(int segment, int delta) {
+        int count = schedule.periodCount(segment) + delta;
+        if (count < StudySchedule.MIN_PERIODS_PER_SEGMENT
+                || count > StudySchedule.MAX_PERIODS_PER_SEGMENT) {
+            return;
+        }
+        applySchedule(schedule.withPeriodCount(segment, count));
     }
 
     private void styleSeasonChip(@NonNull android.widget.TextView chip, boolean selected) {
@@ -308,6 +356,10 @@ public class StudySettingsActivity extends AppCompatActivity {
 
     @Nullable
     private String scheduleError(@NonNull StudySchedule candidate) {
+        if (candidate.totalPeriods() > StudySchedule.MAX_TOTAL_PERIODS) {
+            return getString(R.string.study_schedule_error_total,
+                    StudySchedule.MAX_TOTAL_PERIODS);
+        }
         if (candidate.morningStart() >= candidate.afternoonStart()
                 || candidate.afternoonStart() >= candidate.eveningStart()
                 || candidate.eveningStart() >= 24 * 60) {
@@ -316,21 +368,21 @@ public class StudySettingsActivity extends AppCompatActivity {
         if (candidate.segmentEndMinutes(StudySchedule.SEGMENT_MORNING)
                 > candidate.afternoonStart()) {
             return getString(R.string.study_schedule_error_morning,
-                    candidate.endLabel(StudySchedule.MORNING_FIRST_PERIOD
-                            + StudySchedule.SEGMENT_PERIODS - 1),
-                    candidate.startLabel(StudySchedule.AFTERNOON_FIRST_PERIOD));
+                    candidate.periodCount(StudySchedule.SEGMENT_MORNING),
+                    candidate.endLabel(candidate.lastPeriod(StudySchedule.SEGMENT_MORNING)),
+                    candidate.startLabel(candidate.firstPeriod(StudySchedule.SEGMENT_AFTERNOON)));
         }
         if (candidate.segmentEndMinutes(StudySchedule.SEGMENT_AFTERNOON)
                 > candidate.eveningStart()) {
             return getString(R.string.study_schedule_error_afternoon,
-                    candidate.endLabel(StudySchedule.AFTERNOON_FIRST_PERIOD
-                            + StudySchedule.SEGMENT_PERIODS - 1),
-                    candidate.startLabel(StudySchedule.EVENING_FIRST_PERIOD));
+                    candidate.periodCount(StudySchedule.SEGMENT_AFTERNOON),
+                    candidate.endLabel(candidate.lastPeriod(StudySchedule.SEGMENT_AFTERNOON)),
+                    candidate.startLabel(candidate.firstPeriod(StudySchedule.SEGMENT_EVENING)));
         }
         if (candidate.segmentEndMinutes(StudySchedule.SEGMENT_EVENING) > 24 * 60) {
             return getString(R.string.study_schedule_error_evening,
-                    candidate.endLabel(StudySchedule.EVENING_FIRST_PERIOD
-                            + StudySchedule.SEGMENT_PERIODS - 1));
+                    candidate.periodCount(StudySchedule.SEGMENT_EVENING),
+                    candidate.endLabel(candidate.lastPeriod(StudySchedule.SEGMENT_EVENING)));
         }
         return candidate.isValid() ? null : getString(R.string.study_schedule_invalid);
     }

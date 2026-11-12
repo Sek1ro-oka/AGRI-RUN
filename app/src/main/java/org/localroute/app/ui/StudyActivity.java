@@ -601,15 +601,12 @@ public class StudyActivity extends AppCompatActivity {
         binding.textTimetableNote.setText(getString(R.string.study_timetable_note,
                 getString(season == StudySchedule.SEASON_SUMMER
                         ? R.string.study_season_summer : R.string.study_season_winter),
-                schedule.startLabel(StudySchedule.MORNING_FIRST_PERIOD),
-                schedule.endLabel(StudySchedule.MORNING_FIRST_PERIOD
-                        + StudySchedule.SEGMENT_PERIODS - 1),
-                schedule.startLabel(StudySchedule.AFTERNOON_FIRST_PERIOD),
-                schedule.endLabel(StudySchedule.AFTERNOON_FIRST_PERIOD
-                        + StudySchedule.SEGMENT_PERIODS - 1),
-                schedule.startLabel(StudySchedule.EVENING_FIRST_PERIOD),
-                schedule.endLabel(StudySchedule.EVENING_FIRST_PERIOD
-                        + StudySchedule.SEGMENT_PERIODS - 1)));
+                schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_MORNING)),
+                schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_MORNING)),
+                schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_AFTERNOON)),
+                schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_AFTERNOON)),
+                schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_EVENING)),
+                schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_EVENING))));
         binding.timetableGrid.setData(courses, schedule);
 
         boolean empty = courses.isEmpty();

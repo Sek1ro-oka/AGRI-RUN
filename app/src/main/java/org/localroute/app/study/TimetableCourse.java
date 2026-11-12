@@ -14,7 +14,8 @@ import java.util.UUID;
 public final class TimetableCourse {
 
     public static final int MIN_PERIOD = 1;
-    public static final int MAX_PERIOD = 12;
+    /** 与 StudySchedule.MAX_TOTAL_PERIODS 一致：上午/下午/晚课三段合计最多 15 节。 */
+    public static final int MAX_PERIOD = 15;
 
     private final String id;
     private final String name;
