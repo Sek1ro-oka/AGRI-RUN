@@ -129,15 +129,6 @@
                                 android:textColor="@color/campus_ink"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/textActivationStatus"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="@string/app_settings_activation_hint"
-                                android:textColor="@color/campus_muted"
-                                android:textSize="11sp" />
                         </LinearLayout>
 
                         <ImageView
@@ -148,16 +139,6 @@
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="10dp"
-                android:lineSpacingExtra="2dp"
-                android:text="@string/app_settings_activation_note"
-                android:textColor="@color/campus_muted"
-                android:textSize="11sp" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

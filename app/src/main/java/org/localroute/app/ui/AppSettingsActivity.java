@@ -48,13 +48,6 @@ public class AppSettingsActivity extends AppCompatActivity {
         }
         prefs = getSharedPreferences(PresetUnlock.PREFS_NAME, MODE_PRIVATE);
         binding.rowActivation.setOnClickListener(v -> showActivationDialog());
-        renderActivationStatus();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        renderActivationStatus();
     }
 
     @Override
@@ -64,13 +57,6 @@ public class AppSettingsActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
-    }
-
-    private void renderActivationStatus() {
-        boolean unlocked = prefs.getBoolean(PresetUnlock.KEY_UNLOCKED, false);
-        binding.textActivationStatus.setText(unlocked
-                ? R.string.app_settings_activation_done
-                : R.string.app_settings_activation_hint);
     }
 
     private void showActivationDialog() {
@@ -83,7 +69,6 @@ public class AppSettingsActivity extends AppCompatActivity {
         input.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
         input.setSingleLine(true);
-        input.setHint(R.string.app_settings_activation_dialog_hint);
         int padding = dp(20);
         FrameLayout container = new FrameLayout(this);
         container.setPadding(padding, dp(8), padding, 0);
@@ -103,7 +88,6 @@ public class AppSettingsActivity extends AppCompatActivity {
                         return;
                     }
                     prefs.edit().putBoolean(PresetUnlock.KEY_UNLOCKED, true).apply();
-                    renderActivationStatus();
                     dialog.dismiss();
                     Toast.makeText(AppSettingsActivity.this,
                             R.string.app_settings_activation_success,
