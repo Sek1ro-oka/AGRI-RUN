@@ -17,7 +17,9 @@ import java.util.regex.Pattern;
  */
 public final class HomeworkItem {
 
-    private static final Pattern WORK_ID = Pattern.compile("[?&]workId=(\\d+)");
+    /** 逐课程列表用 workId，聚合作业页用 taskrefId，两者都指向同一条作业。 */
+    private static final Pattern WORK_ID = Pattern.compile(
+            "[?&](?:workId|taskrefId)=(\\d+)", Pattern.CASE_INSENSITIVE);
 
     public enum Status {
         PENDING,

@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -69,6 +70,23 @@ public final class HomeworkFilter {
                     : item.withDeadline(old.deadlineEpochMillis(), old.deadlineRaw()));
         }
         return merged;
+    }
+
+    /**
+     * 风控导致只读到部分课程时，把这次没读到的缓存作业补回列表，
+     * 避免一次半途中断把上一次的完整结果清空。
+     */
+    @NonNull
+    public static List<HomeworkItem> mergeUnread(@NonNull List<HomeworkItem> fresh,
+                                                 @NonNull List<HomeworkItem> cached) {
+        Map<String, HomeworkItem> merged = new LinkedHashMap<>();
+        for (HomeworkItem item : fresh) {
+            merged.put(item.key(), item);
+        }
+        for (HomeworkItem item : cached) {
+            merged.putIfAbsent(item.key(), item);
+        }
+        return new ArrayList<>(merged.values());
     }
 
     private static void sortByDeadline(List<HomeworkItem> items) {

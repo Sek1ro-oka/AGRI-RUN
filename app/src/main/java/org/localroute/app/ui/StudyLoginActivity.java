@@ -157,6 +157,10 @@ public class StudyLoginActivity extends AppCompatActivity {
         if (closing || validating.get() || url == null) {
             return;
         }
+        if (url.contains("antispider") || url.contains("processVerify.ac")) {
+            // 安全验证页本身不是登录成功的标志，等用户完成验证后手动点「完成」。
+            return;
+        }
         String host = Uri.parse(url).getHost();
         if (host == null) {
             return;
@@ -176,6 +180,10 @@ public class StudyLoginActivity extends AppCompatActivity {
         }
         mergeCookieHeader(CookieManager.getInstance().getCookie(ChaoxingClient.LOGIN_URL));
         mergeCookieHeader(CookieManager.getInstance().getCookie("https://i.chaoxing.com/"));
+        mergeCookieHeader(CookieManager.getInstance().getCookie(
+                "https://mooc1-api.chaoxing.com/"));
+        mergeCookieHeader(CookieManager.getInstance().getCookie(
+                "https://mooc1.chaoxing.com/"));
         String cookie = cookieHeader();
         if (cookie.isEmpty()) {
             validating.set(false);
@@ -212,11 +220,23 @@ public class StudyLoginActivity extends AppCompatActivity {
                     finish();
                 });
             } catch (ChaoxingClient.AntiSpiderException blocked) {
-                runOnUiThread(() -> onValidationFailed(R.string.study_antispider_message));
+                runOnUiThread(this::showLoginVerification);
             } catch (IOException error) {
                 runOnUiThread(() -> onValidationFailed(R.string.study_login_network_error));
             }
         });
+    }
+
+    /** 登录校验遇到风控时，直接在同一个 WebView 里完成官方图片验证。 */
+    private void showLoginVerification() {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        validating.set(false);
+        binding.loginLoading.setVisibility(android.view.View.GONE);
+        Toast.makeText(this, R.string.study_antispider_verify_hint,
+                Toast.LENGTH_LONG).show();
+        binding.loginWebView.loadUrl(StudyVerifyActivity.VERIFY_URL);
     }
 
     private void onValidationFailed(int messageRes) {

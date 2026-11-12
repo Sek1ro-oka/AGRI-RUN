@@ -83,6 +83,14 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ui.StudyVerifyActivity"
+            android:exported="false"
+            android:label="@string/study_antispider_verify_title"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.RouteWorkshop.CampusRun"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".ui.StudySettingsActivity"
             android:exported="false"
             android:label="@string/study_settings_title"

@@ -52,6 +52,21 @@ public final class ChaoxingHtmlParser {
     private static final Pattern PAGE_SCRIPT = Pattern.compile(
             "pageNum\\s*:\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
 
+    /** 聚合作业页（work/stu-work）的条目：ul.nav > li > div[role=option]。 */
+    private static final Pattern AGG_ITEM = Pattern.compile(
+            "<li\\b([^>]*)>(.*?)</li>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern AGG_DATA = Pattern.compile(
+            "\\bdata\\s*=\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AGG_OPTION = Pattern.compile(
+            "<div\\b[^>]*\\brole\\s*=\\s*[\"']option[\"'][^>]*>(.*?)</div>",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern AGG_PARAGRAPH = Pattern.compile(
+            "<p\\b[^>]*>(.*?)</p>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern AGG_PARAGRAPH_BLOCK = Pattern.compile(
+            "<p\\b[^>]*>.*?</p>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern AGG_SPAN = Pattern.compile(
+            "<span\\b([^>]*)>(.*?)</span>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+
     private static final Pattern PENDING_STATUS = Pattern.compile(
             "未交|未提交|待互評|待互评|待批閱|待批阅|待批改|待做");
     private static final Pattern DONE_STATUS = Pattern.compile(
@@ -194,7 +209,99 @@ public final class ChaoxingHtmlParser {
         return new WorkPage(items, parseTotalPages(html));
     }
 
-    /** “剩余90小时37分钟”折算成毫秒；无法识别或已结束时返回 -1。 */
+    /**
+     * 聚合作业页（{@code mooc1-api.chaoxing.com/work/stu-work}）的识别与解析。
+     *
+     * <p>这个页面一次返回所有课程的作业，条目形如
+     * {@code ul.nav > li[data] > div[role=option]}：标题在第一个 {@code p}，
+     * 状态、课程名、剩余时间依次在 {@code span} 中，剩余时间通常带 {@code fr} class。
+     * 不是这个页面结构时返回 {@code null}，调用方可以退回逐课程读取。
+     */
+    @Nullable
+    public static List<HomeworkItem> parseAggregateWorkPage(@Nullable String html, long nowMillis) {
+        if (!looksLikeAggregatePage(html)) {
+            return null;
+        }
+        List<HomeworkItem> items = new ArrayList<>();
+        Matcher itemMatcher = AGG_ITEM.matcher(html);
+        while (itemMatcher.find()) {
+            String attributes = itemMatcher.group(1);
+            String block = itemMatcher.group(2);
+            String url = "";
+            Matcher data = AGG_DATA.matcher(attributes);
+            if (data.find()) {
+                url = decodeEntities(data.group(1)).trim();
+            }
+            Matcher optionMatcher = AGG_OPTION.matcher(block);
+            String option = optionMatcher.find() ? optionMatcher.group(1) : block;
+            String title = stripTags(firstGroup(AGG_PARAGRAPH, option));
+            if (title.isEmpty()) {
+                continue;
+            }
+            // 标题里的 span 不算状态/课程/剩余时间，先去掉 p 块再读 span。
+            String meta = AGG_PARAGRAPH_BLOCK.matcher(option).replaceAll(" ");
+            String statusText = "";
+            String courseName = "";
+            String timeRaw = "";
+            boolean statusSeen = false;
+            Matcher spanMatcher = AGG_SPAN.matcher(meta);
+            while (spanMatcher.find()) {
+                String classes = spanMatcher.group(1);
+                String text = stripTags(spanMatcher.group(2));
+                if (text.isEmpty()) {
+                    continue;
+                }
+                if (classes.contains("fr") || looksLikeRemainingTime(text)) {
+                    if (timeRaw.isEmpty()) {
+                        timeRaw = text;
+                    }
+                } else if (!statusSeen) {
+                    statusText = text;
+                    statusSeen = true;
+                } else if (courseName.isEmpty()) {
+                    courseName = text;
+                }
+            }
+            HomeworkItem.Status status = statusOf(statusText);
+            long deadline = 0L;
+            boolean expired = false;
+            if (!timeRaw.isEmpty()) {
+                long remaining = parseRemainingMillis(timeRaw);
+                if (remaining >= 0L) {
+                    deadline = nowMillis + remaining;
+                } else {
+                    deadline = parseAbsoluteDeadline(timeRaw, nowMillis);
+                    if (deadline == 0L && EXPIRED_TEXT.matcher(timeRaw).find()) {
+                        expired = true;
+                    }
+                }
+                if (deadline > 0L && deadline <= nowMillis
+                        && status != HomeworkItem.Status.DONE) {
+                    expired = true;
+                }
+            }
+            if (expired) {
+                status = HomeworkItem.Status.EXPIRED;
+            }
+            boolean peer = block.contains("互评") || block.contains("互評");
+            items.add(new HomeworkItem(courseName, title, statusText, status,
+                    deadline, timeRaw, url, peer));
+        }
+        return items;
+    }
+
+    /** 聚合页一定带 {@code role="option"}；用它区分真正的聚合页和登录/风控页。 */
+    public static boolean looksLikeAggregatePage(@Nullable String html) {
+        return html != null
+                && (html.contains("role=\"option\"") || html.contains("role='option'"));
+    }
+
+    private static boolean looksLikeRemainingTime(@NonNull String text) {
+        return text.contains("剩余") || text.contains("剩餘")
+                || EXPIRED_TEXT.matcher(text).find();
+    }
+
+    /** 解析「剩余 2天3小时」为毫秒；没有剩余时间或已过期时返回 -1。 */
     public static long parseRemainingMillis(@Nullable String text) {
         if (text == null || text.isEmpty()) {
             return -1L;

@@ -368,6 +368,7 @@
     <string name="study_homework_empty_hint">当前账号的课程里没有待办作业，稍后刷新即可。</string>
     <string name="study_homework_recent_empty_title">近一周暂无作业</string>
     <string name="study_homework_recent_empty_hint">只显示近一周内的作业；已截止超过一周或没有截止时间的作业不再列出。</string>
+    <string name="study_homework_recent_empty_hint_count">学习通本次返回了 %1$d 条作业，但都没有可用的截止时间或已超出近一周，因此未在此列出。作业本身已成功读取。</string>
     <string name="study_homework_error_title">读取失败</string>
     <string name="study_homework_retry">重试</string>
     <string name="study_homework_unbound_title">还没有绑定学习通</string>
@@ -379,7 +380,15 @@
     <string name="study_homework_untitled">未命名作业</string>
     <string name="study_homework_peer_review">互评</string>
     <string name="study_homework_error_hint">请检查网络后重试；学习通有时会要求完成安全验证。</string>
-    <string name="study_antispider_message">学习通要求安全验证，请稍后再试，或重新登录学习通。</string>
+    <string name="study_antispider_title">需要学习通安全验证</string>
+    <string name="study_antispider_verify_hint">学习通拦截了这次请求。点「去安全验证」在本机页面完成一次图片验证码，完成后会自动继续读取作业。</string>
+    <string name="study_antispider_verify_action">去安全验证</string>
+    <string name="study_antispider_verify_title">学习通安全验证</string>
+    <string name="study_antispider_verify_tip">验证码只在学习通官方页面输入；应用不读取、不保存验证码。完成后点右上角「完成」，会继续读取作业。</string>
+    <string name="study_antispider_verify_done">完成</string>
+    <string name="study_antispider_verify_failed">还没有检测到验证通过，请完成图片验证码后再点「完成」。</string>
+    <string name="study_antispider_partial">部分课程被学习通安全验证拦截，先显示已读取的作业。</string>
+    <string name="study_verify_loading">正在加载安全验证页…</string>
     <string name="study_network_error">网络不可用，已显示上次缓存的结果。</string>
     <string name="study_login_network_error">网络不可用，请检查网络后重试。</string>
     <string name="study_timetable_summary">共 %1$d 门课 · 周一至周日</string>
@@ -415,6 +424,7 @@
     <string name="study_course_weekday">星期</string>
     <string name="study_course_period">节次</string>
     <string name="study_course_period_hint">如 1-2</string>
+    <string name="study_course_time_range">第 %1$s 节 · %2$s–%3$s（每节 %4$d 分钟）</string>
     <string name="study_course_weeks">周次</string>
     <string name="study_course_weeks_hint">如 1-16 或 1-16单</string>
     <string name="study_course_location">地点</string>

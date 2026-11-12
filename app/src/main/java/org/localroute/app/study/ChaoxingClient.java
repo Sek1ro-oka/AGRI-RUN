@@ -38,6 +38,9 @@ public final class ChaoxingClient {
             "https://sso.chaoxing.com/apis/login/userLogin4UAP.do";
     private static final String WORK_LIST_URL =
             "https://mooc1.chaoxing.com/mooc-ans/mooc2/work/list";
+    /** 聚合作业页：一次请求拿到所有课程的作业，明显降低触发风控的概率。 */
+    private static final String AGGREGATE_WORK_URL =
+            "https://mooc1-api.chaoxing.com/work/stu-work";
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
     private static final Pattern CHARSET = Pattern.compile(
@@ -103,9 +106,29 @@ public final class ChaoxingClient {
 
     @NonNull
     public FetchResult fetchHomework(@Nullable ProgressListener listener) throws IOException {
+        if (listener != null) {
+            listener.onProgress(0, 1, "");
+        }
+        List<HomeworkItem> aggregate = null;
+        try {
+            aggregate = requestAggregateHomework();
+        } catch (SessionExpiredException | AntiSpiderException fatal) {
+            throw fatal;
+        } catch (IOException | RuntimeException ignored) {
+            // 聚合页不可用时退回逐课程读取，兼容旧版页面。
+        }
+        if (aggregate != null) {
+            if (listener != null) {
+                listener.onProgress(1, 1, "");
+            }
+            return new FetchResult(sortByDeadline(aggregate), 0,
+                    System.currentTimeMillis(), cookieHeader(), false);
+        }
+
         List<ChaoxingCourse> courses = requestCourses();
         List<HomeworkItem> items = new ArrayList<>();
         int failed = 0;
+        boolean blocked = false;
         for (int index = 0; index < courses.size(); index++) {
             if (Thread.currentThread().isInterrupted()) {
                 throw new IOException("已取消");
@@ -118,8 +141,11 @@ public final class ChaoxingClient {
                 fetchCourseHomework(course, items);
             } catch (SessionExpiredException expired) {
                 throw expired;
-            } catch (AntiSpiderException blocked) {
-                throw blocked;
+            } catch (AntiSpiderException blockedError) {
+                // 已经读到的课程不再丢弃；完全没有结果时才要求用户做安全验证。
+                blocked = true;
+                failed++;
+                break;
             } catch (IOException | RuntimeException error) {
                 failed++;
             }
@@ -127,9 +153,29 @@ public final class ChaoxingClient {
                 sleep(COURSE_DELAY_MS);
             }
         }
+        if (blocked && items.isEmpty()) {
+            throw new AntiSpiderException();
+        }
         if (listener != null) {
             listener.onProgress(courses.size(), courses.size(), "");
         }
+        return new FetchResult(sortByDeadline(items), failed,
+                System.currentTimeMillis(), cookieHeader(), blocked);
+    }
+
+    /** 聚合页返回 null 表示页面结构不认识，需要退回逐课程读取。 */
+    @Nullable
+    private List<HomeworkItem> requestAggregateHomework() throws IOException {
+        Response response = get(AGGREGATE_WORK_URL, "https://i.chaoxing.com/");
+        ensureUsable(response);
+        List<HomeworkItem> items = ChaoxingHtmlParser.parseAggregateWorkPage(
+                response.body, System.currentTimeMillis());
+        // 识别到聚合页却一条都没读出来时退回逐课程，避免结构变化被误报成「没有作业」。
+        return items == null || items.isEmpty() ? null : items;
+    }
+
+    @NonNull
+    private static List<HomeworkItem> sortByDeadline(@NonNull List<HomeworkItem> items) {
         List<HomeworkItem> sorted = new ArrayList<>(items);
         sorted.sort((left, right) -> {
             int rank = Integer.compare(left.statusRank(), right.statusRank());
@@ -149,7 +195,7 @@ public final class ChaoxingClient {
             }
             return Long.compare(leftDeadline, rightDeadline);
         });
-        return new FetchResult(sorted, failed, System.currentTimeMillis(), cookieHeader());
+        return sorted;
     }
 
     private void fetchCourseHomework(ChaoxingCourse course, List<HomeworkItem> out)
@@ -351,13 +397,16 @@ public final class ChaoxingClient {
         public final int failedCourses;
         public final long fetchedAt;
         public final String cookieHeader;
+        /** 有课程因安全验证被跳过，本次只返回部分结果。 */
+        public final boolean blocked;
 
         FetchResult(List<HomeworkItem> items, int failedCourses,
-                    long fetchedAt, String cookieHeader) {
+                    long fetchedAt, String cookieHeader, boolean blocked) {
             this.items = items;
             this.failedCourses = failedCourses;
             this.fetchedAt = fetchedAt;
             this.cookieHeader = cookieHeader;
+            this.blocked = blocked;
         }
     }
 

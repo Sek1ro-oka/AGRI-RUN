@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -246,6 +248,23 @@ public final class StudyDialogs {
             binding.inputCourseWeeks.setText("1-16");
         }
 
+        // 显示节次对应的实际时间，方便边改边核对；时长跟随设置页的「每节课分钟数」。
+        updateCourseTimeHint(activity, binding);
+        binding.inputCoursePeriod.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence text, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable text) {
+                updateCourseTimeHint(activity, binding);
+            }
+        });
+
         AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle(existing == null ? R.string.study_course_add_title
                         : R.string.study_course_edit_title)
@@ -295,6 +314,25 @@ public final class StudyDialogs {
                     onSaved.accept(course);
                 }));
         dialog.show();
+    }
+
+    /** 节次变化时刷新「第 X-Y 节 · HH:MM–HH:MM」提示；节次非法时隐藏。 */
+    private static void updateCourseTimeHint(Activity activity,
+                                             DialogStudyCourseBinding binding) {
+        int[] periods = TimetableText.parsePeriods(
+                binding.inputCoursePeriod.getText().toString());
+        if (periods == null) {
+            binding.textCourseTimeRange.setVisibility(View.GONE);
+            return;
+        }
+        int minutes = StudyTimetableStore.loadPeriodMinutes(activity);
+        binding.textCourseTimeRange.setText(activity.getString(
+                R.string.study_course_time_range,
+                TimetableText.formatPeriods(periods[0], periods[1]),
+                StudyTimetableStore.periodStartLabel(periods[0], minutes),
+                StudyTimetableStore.periodEndLabel(periods[1], minutes),
+                minutes));
+        binding.textCourseTimeRange.setVisibility(View.VISIBLE);
     }
 
     public static void confirmDeleteCourse(@NonNull Activity activity,

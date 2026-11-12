@@ -51,6 +51,9 @@ import java.util.concurrent.Executors;
  */
 public class StudyActivity extends AppCompatActivity {
 
+    /** 作业自动刷新间隔；逐课程读取请求较多，缩短间隔容易触发学习通安全验证。 */
+    private static final long AUTO_REFRESH_INTERVAL_MS = 30L * 60L * 1000L;
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<HomeworkItem> homework = new ArrayList<>();
@@ -63,6 +66,7 @@ public class StudyActivity extends AppCompatActivity {
 
     private ActivityResultLauncher<Intent> loginLauncher;
     private ActivityResultLauncher<Intent> settingsLauncher;
+    private ActivityResultLauncher<Intent> verifyLauncher;
     private ActivityResultLauncher<String[]> pdfLauncher;
 
     @Override
@@ -100,6 +104,20 @@ public class StudyActivity extends AppCompatActivity {
                 new ActivityResultContracts.OpenDocument(), uri -> {
                     if (uri != null) {
                         StudyDialogs.showImportTimetable(this, uri, this::renderTimetable);
+                    }
+                });
+        verifyLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(), result -> {
+                    StudySession latest = StudySessionStore.load(this);
+                    if (latest != null) {
+                        session = latest;
+                        renderAccount();
+                    }
+                    if (result.getResultCode() == RESULT_OK) {
+                        startFetch();
+                    } else if (homework.isEmpty()
+                            && (cache == null || cache.items.isEmpty())) {
+                        showVerificationState();
                     }
                 });
         settingsLauncher = registerForActivityResult(
@@ -158,7 +176,7 @@ public class StudyActivity extends AppCompatActivity {
         if (session != null) {
             loadCachedHomework();
             if (cache == null
-                    || System.currentTimeMillis() - cache.fetchedAt > 60_000L) {
+                    || System.currentTimeMillis() - cache.fetchedAt > AUTO_REFRESH_INTERVAL_MS) {
                 startFetch();
             }
         } else if (savedInstanceState == null) {
@@ -276,19 +294,22 @@ public class StudyActivity extends AppCompatActivity {
                                 }
                             });
                         });
+                List<HomeworkItem> merged = HomeworkFilter.mergeCachedDeadlines(
+                        result.items, previous);
+                if (result.blocked) {
+                    merged = HomeworkFilter.mergeUnread(merged, previous);
+                }
                 StudyHomeworkCache snapshot = new StudyHomeworkCache(current.uid(),
-                        result.fetchedAt, result.failedCourses,
-                        HomeworkFilter.mergeCachedDeadlines(result.items, previous));
+                        result.fetchedAt, result.failedCourses, merged);
                 StudyHomeworkCache.save(this, snapshot);
                 StudySession refreshed = new StudySession(current.uid(), current.name(),
                         result.cookieHeader, current.boundAt());
                 StudySessionStore.updateCookie(this, refreshed);
-                mainHandler.post(() -> onFetchSuccess(snapshot, refreshed));
+                mainHandler.post(() -> onFetchSuccess(snapshot, refreshed, result.blocked));
             } catch (ChaoxingClient.SessionExpiredException expired) {
                 mainHandler.post(() -> onSessionExpired());
             } catch (ChaoxingClient.AntiSpiderException blocked) {
-                mainHandler.post(() -> onFetchFailed(
-                        getString(R.string.study_antispider_message), true));
+                mainHandler.post(this::onAntiSpider);
             } catch (IOException | RuntimeException error) {
                 String message = error.getMessage();
                 if (message == null || message.isEmpty()) {
@@ -300,7 +321,8 @@ public class StudyActivity extends AppCompatActivity {
         });
     }
 
-    private void onFetchSuccess(StudyHomeworkCache snapshot, StudySession refreshed) {
+    private void onFetchSuccess(StudyHomeworkCache snapshot, StudySession refreshed,
+                                boolean blocked) {
         if (isFinishing() || isDestroyed()) {
             return;
         }
@@ -322,12 +344,58 @@ public class StudyActivity extends AppCompatActivity {
         } else {
             showList();
         }
+        if (blocked) {
+            Toast.makeText(this, R.string.study_antispider_partial, Toast.LENGTH_LONG).show();
+        }
     }
 
     private void showRecentEmpty() {
-        showEmptyState(R.string.study_homework_recent_empty_title,
-                getString(R.string.study_homework_recent_empty_hint),
+        int returned = cache == null ? 0 : cache.items.size();
+        CharSequence hint = returned > 0
+                ? getString(R.string.study_homework_recent_empty_hint_count, returned)
+                : getString(R.string.study_homework_recent_empty_hint);
+        showEmptyState(R.string.study_homework_recent_empty_title, hint,
                 R.string.study_homework_retry, this::startFetch);
+    }
+
+    /** 学习通风控：有缓存时保留列表，并引导用户完成一次本机安全验证。 */
+    private void onAntiSpider() {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        fetching = false;
+        binding.buttonHomeworkRefresh.setEnabled(true);
+        binding.buttonHomeworkRefresh.setAlpha(1f);
+        if (!homework.isEmpty() || (cache != null && !cache.items.isEmpty())) {
+            if (homework.isEmpty()) {
+                showRecentEmpty();
+            } else {
+                showList();
+            }
+            if (cache != null) {
+                updateSummary(cache);
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.study_antispider_title)
+                    .setMessage(R.string.study_antispider_verify_hint)
+                    .setNegativeButton(R.string.campus_cancel, null)
+                    .setPositiveButton(R.string.study_antispider_verify_action,
+                            (dialog, which) -> openVerification())
+                    .show();
+            return;
+        }
+        showVerificationState();
+    }
+
+    private void showVerificationState() {
+        showEmptyState(R.string.study_antispider_title,
+                getString(R.string.study_antispider_verify_hint),
+                R.string.study_antispider_verify_action, this::openVerification);
+        binding.textHomeworkSummary.setText(R.string.study_antispider_title);
+    }
+
+    private void openVerification() {
+        verifyLauncher.launch(new Intent(this, StudyVerifyActivity.class));
     }
 
     private void onSessionExpired() {

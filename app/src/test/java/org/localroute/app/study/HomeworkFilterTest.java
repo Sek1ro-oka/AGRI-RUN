@@ -105,6 +105,24 @@ public class HomeworkFilterTest {
         assertTrue(merged.get(0).deadlineEpochMillis() > 0L);
     }
 
+    @Test
+    public void mergeUnreadKeepsCachedItemsMissingFromPartialFetch() {
+        HomeworkItem fresh = item("高数", "新作业", "https://x/work/view?workId=50",
+                HomeworkItem.Status.PENDING, NOW + DAY);
+        HomeworkItem cachedOnly = item("英语", "Unit 5", "https://x/work/view?workId=51",
+                HomeworkItem.Status.PENDING, NOW + 2 * DAY);
+        HomeworkItem sameWork = item("高数", "旧版本", "https://x/work/view?workId=50",
+                HomeworkItem.Status.PENDING, 0L);
+
+        List<HomeworkItem> merged = HomeworkFilter.mergeUnread(
+                Collections.singletonList(fresh),
+                Arrays.asList(cachedOnly, sameWork));
+
+        assertEquals(2, merged.size());
+        assertEquals("新作业", merged.get(0).title());
+        assertEquals("Unit 5", merged.get(1).title());
+    }
+
     private static HomeworkItem item(String course, String title, String url,
                                      HomeworkItem.Status status, long deadline) {
         return new HomeworkItem(course, title, "", status, deadline, "", url, false);

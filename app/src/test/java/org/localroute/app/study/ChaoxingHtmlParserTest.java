@@ -147,6 +147,68 @@ public class ChaoxingHtmlParserTest {
         assertEquals("", ChaoxingHtmlParser.stripTags(null));
     }
 
+    @Test
+    public void parsesAggregateWorkPage() {
+        long now = fixedNow();
+        String html = "<ul class=\"nav\">"
+                + "<li data=\"https://mooc1.chaoxing.com/mooc-ans/mooc2/work/task"
+                + "?courseId=1&amp;classId=2&amp;taskrefId=77\">"
+                + "<div role=\"option\">"
+                + "<p>第三次作业</p>"
+                + "<div class=\"info\">"
+                + "<span class=\"status\">未交</span>"
+                + "<span class=\"course\">高等数学</span>"
+                + "<span class=\"fr\">剩余 2天3小时</span>"
+                + "</div></div></li>"
+                + "<li data=\"https://mooc1.chaoxing.com/mooc-ans/mooc2/work/task?taskrefId=78\">"
+                + "<div role=\"option\">"
+                + "<p>过期作业</p>"
+                + "<div class=\"info\">"
+                + "<span class=\"status\">未交</span>"
+                + "<span class=\"course\">大学英语</span>"
+                + "<span class=\"fr\">已过期</span>"
+                + "</div></div></li>"
+                + "<li data=\"https://mooc1.chaoxing.com/mooc-ans/mooc2/work/task?taskrefId=79\">"
+                + "<div role=\"option\">"
+                + "<p>已完成作业</p>"
+                + "<div class=\"info\">"
+                + "<span class=\"status\">已完成</span>"
+                + "<span class=\"course\">大学英语</span>"
+                + "</div></div></li>"
+                + "</ul>";
+
+        List<HomeworkItem> items = ChaoxingHtmlParser.parseAggregateWorkPage(html, now);
+        assertNotNull(items);
+        assertEquals(3, items.size());
+
+        HomeworkItem pending = items.get(0);
+        assertEquals("第三次作业", pending.title());
+        assertEquals("高等数学", pending.courseName());
+        assertEquals("未交", pending.statusText());
+        assertEquals(HomeworkItem.Status.PENDING, pending.status());
+        assertEquals(now + (2L * 24 + 3) * 60 * 60 * 1000, pending.deadlineEpochMillis());
+        assertEquals("高等数学|77", pending.key());
+
+        assertEquals(HomeworkItem.Status.EXPIRED, items.get(1).status());
+        assertEquals(0L, items.get(1).deadlineEpochMillis());
+        assertEquals(HomeworkItem.Status.DONE, items.get(2).status());
+    }
+
+    @Test
+    public void aggregatePageRequiresOptionMarkup() {
+        assertNull(ChaoxingHtmlParser.parseAggregateWorkPage(
+                "<form id=\"loginForm\"></form>", fixedNow()));
+        assertNull(ChaoxingHtmlParser.parseAggregateWorkPage(null, fixedNow()));
+        assertFalse(ChaoxingHtmlParser.looksLikeAggregatePage(
+                "<div class=\"antispider\">请输入验证码</div>"));
+        assertTrue(ChaoxingHtmlParser.looksLikeAggregatePage(
+                "<div role='option'><p>作业</p></div>"));
+        List<HomeworkItem> empty = ChaoxingHtmlParser.parseAggregateWorkPage(
+                "<div role=\"option\"></div>", fixedNow());
+        assertNotNull(empty);
+        assertTrue(empty.isEmpty());
+    }
+
     private static long fixedNow() {
         Calendar calendar = Calendar.getInstance();
         calendar.clear();
