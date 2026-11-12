@@ -30,8 +30,8 @@ android {
         applicationId 'org.localroute.app'
         minSdk 29
         targetSdk 35
-        versionCode 23
-        versionName '0.7.1'
+        versionCode 24
+        versionName '0.8.0'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         // 不想被语言分包影响：本项目只有中文资源
         resourceConfigurations += ['zh', 'en']
@@ -127,8 +127,6 @@ dependencies {
     implementation "com.google.android.gms:play-services-location:21.3.0"
     // 高德官方 3D SDK：只有 Key + arm 架构时才真正启用（MapBackendPolicy 判定），否则走栅格瓦片。
     implementation "com.amap.api:3dmap:10.0.600"
-    // 课表 PDF：读取教务系统导出的 PDF 文字坐标，按星期列与节次还原课程。
-    implementation libs.pdfbox.android
 
     testImplementation libs.junit
     // 仅测试用：为 JVM 单元测试提供与 Android 平台同 API 的 org.json 参考实现

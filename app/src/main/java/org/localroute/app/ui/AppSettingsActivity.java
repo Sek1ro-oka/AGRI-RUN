@@ -47,7 +47,13 @@ public class AppSettingsActivity extends AppCompatActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
         prefs = getSharedPreferences(PresetUnlock.PREFS_NAME, MODE_PRIVATE);
-        binding.rowActivation.setOnClickListener(v -> showActivationDialog());
+        PresetUnlock.migrate(prefs);
+        renderActivationRow();
+        binding.rowActivation.setOnClickListener(v -> {
+            if (!PresetUnlock.isActivated(prefs)) {
+                showActivationDialog();
+            }
+        });
     }
 
     @Override
@@ -59,10 +65,29 @@ public class AppSettingsActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    /** 已激活时入口直接禁用并显示状态，不再弹出输入框。 */
+    private void renderActivationRow() {
+        boolean activated = PresetUnlock.isActivated(prefs);
+        binding.rowActivation.setEnabled(!activated);
+        binding.rowActivation.setClickable(!activated);
+        binding.rowActivation.setFocusable(!activated);
+        binding.rowActivation.setAlpha(activated ? 0.62f : 1f);
+        binding.imageActivationChevron.setVisibility(
+                activated ? android.view.View.GONE : android.view.View.VISIBLE);
+        if (activated) {
+            binding.textActivationState.setText(
+                    R.string.app_settings_activation_state_used);
+        } else if (PresetUnlock.hasResetPending(prefs)) {
+            binding.textActivationState.setText(
+                    R.string.app_settings_activation_state_reset);
+        } else {
+            binding.textActivationState.setText(
+                    R.string.app_settings_activation_state_unused);
+        }
+    }
+
     private void showActivationDialog() {
-        if (prefs.getBoolean(PresetUnlock.KEY_UNLOCKED, false)) {
-            Toast.makeText(this, R.string.app_settings_activation_already,
-                    Toast.LENGTH_SHORT).show();
+        if (PresetUnlock.isActivated(prefs)) {
             return;
         }
         EditText input = new EditText(this);
@@ -87,8 +112,9 @@ public class AppSettingsActivity extends AppCompatActivity {
                         input.requestFocus();
                         return;
                     }
-                    prefs.edit().putBoolean(PresetUnlock.KEY_UNLOCKED, true).apply();
+                    PresetUnlock.consume(prefs);
                     dialog.dismiss();
+                    renderActivationRow();
                     Toast.makeText(AppSettingsActivity.this,
                             R.string.app_settings_activation_success,
                             Toast.LENGTH_LONG).show();

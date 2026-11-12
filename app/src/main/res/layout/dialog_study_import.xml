@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:lineSpacingExtra="2dp"
-        android:text="@string/study_import_hint"
+        android:text="@string/study_import_dialog_hint"
         android:textColor="@color/campus_muted"
         android:textSize="11sp" />
 
@@ -25,14 +25,6 @@
         android:padding="12dp"
         android:textColor="@color/campus_ink"
         android:textSize="13sp" />
-
-    <ProgressBar
-        android:id="@+id/progressImport"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="14dp"
-        android:indeterminateTint="@color/campus_mint" />
 
     <TextView
         android:id="@+id/textImportSummary"
@@ -60,16 +52,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textColor="@color/campus_muted"
-        android:textSize="11sp"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/textImportError"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:lineSpacingExtra="2dp"
-        android:textColor="@color/campus_danger"
         android:textSize="11sp"
         android:visibility="gone" />
 </LinearLayout>

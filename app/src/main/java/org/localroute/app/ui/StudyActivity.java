@@ -68,7 +68,7 @@ public class StudyActivity extends AppCompatActivity {
     private ActivityResultLauncher<Intent> loginLauncher;
     private ActivityResultLauncher<Intent> settingsLauncher;
     private ActivityResultLauncher<Intent> verifyLauncher;
-    private ActivityResultLauncher<String[]> pdfLauncher;
+    private ActivityResultLauncher<Intent> jwLauncher;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -101,10 +101,10 @@ public class StudyActivity extends AppCompatActivity {
                     loadCachedHomework();
                     startFetch();
                 });
-        pdfLauncher = registerForActivityResult(
-                new ActivityResultContracts.OpenDocument(), uri -> {
-                    if (uri != null) {
-                        StudyDialogs.showImportTimetable(this, uri, this::renderTimetable);
+        jwLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(), result -> {
+                    if (result.getResultCode() == RESULT_OK) {
+                        renderTimetable();
                     }
                 });
         verifyLauncher = registerForActivityResult(
@@ -155,14 +155,8 @@ public class StudyActivity extends AppCompatActivity {
                 startFetch();
             }
         });
-        binding.buttonImportTimetable.setOnClickListener(view -> {
-            try {
-                pdfLauncher.launch(new String[]{"application/pdf"});
-            } catch (RuntimeException error) {
-                Toast.makeText(this, R.string.study_import_pdf_no_picker,
-                        Toast.LENGTH_LONG).show();
-            }
-        });
+        binding.buttonImportTimetable.setOnClickListener(view ->
+                jwLauncher.launch(new Intent(this, JwImportActivity.class)));
         binding.buttonAddCourse.setOnClickListener(view ->
                 StudyDialogs.showCourseEditor(this, null, course -> renderTimetable()));
         binding.timetableGrid.setOnEmptySlotClickListener((weekday, period) ->

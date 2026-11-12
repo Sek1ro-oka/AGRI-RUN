@@ -401,6 +401,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 prefs.edit().remove(KEY_CUSTOM_POINTS).apply();
             }
         }
+        PresetUnlock.migrate(prefs);
         applyPresetActivation();
         String selectedId = prefs.getString(KEY_SELECTED_ROUTE, "");
         route = null;

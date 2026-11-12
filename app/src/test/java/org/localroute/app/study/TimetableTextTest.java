@@ -6,7 +6,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-/** 手动编辑与 PDF 详情共用的节次、周次归一化。 */
+/** 手动编辑与教务导入共用的节次、周次归一化。 */
 public class TimetableTextTest {
 
     @Test
@@ -24,18 +24,6 @@ public class TimetableTextTest {
     }
 
     @Test
-    public void extractsPeriodsFromPdfDetail() {
-        assertArrayEquals(new int[]{1, 2},
-                TimetableText.periodsFromDetail("(1-2节)1-16周/校区:本部/场地:基616"));
-        assertArrayEquals(new int[]{3, 5},
-                TimetableText.periodsFromDetail("（3-5节）1-12周"));
-        assertArrayEquals(new int[]{8, 8},
-                TimetableText.periodsFromDetail("第8节/场地:基501"));
-        assertNull(TimetableText.periodsFromDetail("1-16周/场地:基616"));
-        assertNull(TimetableText.periodsFromDetail(null));
-    }
-
-    @Test
     public void normalizesWeeks() {
         assertEquals("1-16", TimetableText.normalizeWeeks(""));
         assertEquals("1-16", TimetableText.normalizeWeeks("第1-16周"));
@@ -45,15 +33,6 @@ public class TimetableTextTest {
         assertEquals("1-16", TimetableText.normalizeWeeks("第1周-第16周"));
         assertNull(TimetableText.normalizeWeeks("操场"));
         assertNull(TimetableText.normalizeWeeks(null));
-    }
-
-    @Test
-    public void extractsWeeksFromPdfDetail() {
-        assertEquals("1-16", TimetableText.weeksFromDetail("(1-2节)1-16周/场地:基616"));
-        assertEquals("1-10", TimetableText.weeksFromDetail("(1-2节)1-10周/教师:王老师"));
-        assertEquals("1-16双", TimetableText.weeksFromDetail("(3-4节)1-16双周"));
-        assertNull(TimetableText.weeksFromDetail("(1-2节)/场地:基616"));
-        assertNull(TimetableText.weeksFromDetail(null));
     }
 
     @Test
