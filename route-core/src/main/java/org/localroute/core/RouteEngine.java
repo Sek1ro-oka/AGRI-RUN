@@ -101,6 +101,12 @@ public final class RouteEngine {
             this.finished = finished;
         }
 
+        /** 同一进度的位置替换（用于叠加路线扰动），其余字段保持不变。 */
+        public Progress withPosition(double newLatitude, double newLongitude) {
+            return new Progress(newLatitude, newLongitude, bearingDegrees, distanceMeters,
+                    completedLoops, targetLoops, lapLengthMeters, speedMps, finished);
+        }
+
         public double latitude() {
             return latitude;
         }

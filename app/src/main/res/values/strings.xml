@@ -192,6 +192,26 @@
     <string name="home_settings_title">设置</string>
     <string name="home_settings_subtitle">模拟定位与权限检查</string>
     <string name="home_first_use_hint">首次使用请进入「校园快跑」，在「设置」完成模拟定位检查后再开始跑圈。</string>
+    <string name="home_app_settings_title">设置</string>
+    <string name="home_app_settings_subtitle">语言 · 激活码</string>
+
+    <!-- 应用设置 -->
+    <string name="app_settings_title">设置</string>
+    <string name="app_settings_section_general">通用</string>
+    <string name="app_settings_language_title">语言</string>
+    <string name="app_settings_language_value">简体中文</string>
+    <string name="app_settings_language_badge">暂未开放</string>
+    <string name="app_settings_activation_title">激活码</string>
+    <string name="app_settings_activation_hint">输入激活码解锁 A操 / B操 预设路线</string>
+    <string name="app_settings_activation_done">已激活 · A操 / B操 已解锁</string>
+    <string name="app_settings_activation_dialog_title">输入激活码</string>
+    <string name="app_settings_activation_dialog_hint">请输入激活码</string>
+    <string name="app_settings_activation_confirm">激活</string>
+    <string name="app_settings_activation_cancel">取消</string>
+    <string name="app_settings_activation_wrong">激活码不正确</string>
+    <string name="app_settings_activation_success">激活成功，A操 / B操 已加入跑圈路线</string>
+    <string name="app_settings_activation_already">已经激活过了</string>
+    <string name="app_settings_activation_note">激活后可在「校园快跑」的「目标」里选择 A操 / B操。</string>
 
     <!-- 校园快跑 -->
     <string name="campus_entry_title">校园快跑</string>
@@ -214,8 +234,15 @@
     <string name="campus_laps_plus">增加一圈</string>
     <string name="campus_natural_title">自然变速</string>
     <string name="campus_natural_hint">配速在设定值附近小幅波动，每次不同</string>
-    <string name="campus_vary_title">路径浮动</string>
-    <string name="campus_vary_hint">轨迹在路线两侧自然漂移，每次跑圈略有差异</string>
+    <string name="campus_vary_title">路线扰动</string>
+    <string name="campus_vary_hint">扰动越大，每圈轨迹越不重合；偏移始终限制在跑道内</string>
+    <string name="campus_vary_value_placeholder">中等 · 50%</string>
+    <string name="campus_vary_value">%1$s · %2$d%%</string>
+    <string name="campus_vary_level_off">关闭</string>
+    <string name="campus_vary_level_low">轻微</string>
+    <string name="campus_vary_level_medium">中等</string>
+    <string name="campus_vary_level_high">较大</string>
+    <string name="campus_vary_level_max">最大</string>
     <string name="campus_overlay_title">悬浮窗</string>
     <string name="campus_route_none">未选择路线</string>
     <string name="campus_route_required">还没有路线，请先点「目标」绘制一条</string>
@@ -301,6 +328,7 @@
     <string name="campus_route_delete">删除</string>
     <string name="campus_route_deleted">已删除路线「%1$s」</string>
     <string name="campus_route_delete_running">跑圈进行中，不能删除当前路线</string>
+    <string name="campus_route_preset_fixed">A操 / B操 是内置预设路线，不能删除</string>
     <string name="campus_done_completed">跑圈完成</string>
     <string name="campus_done_stopped">已结束</string>
     <string name="campus_done_error">跑圈出错</string>

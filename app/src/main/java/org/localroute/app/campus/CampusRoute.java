@@ -9,9 +9,10 @@ import java.util.List;
 /**
  * 一条校园跑圈路线：地图上的设计点 + 这条路线自己的米/单位比例。
  *
- * <p>目前路线只来自用户在地图上绘制的自定义路线，使用固定比例 0.9 米/单位
- * 与默认校园基准点；后续可由导入能力补充更多路线。路线本身不保存运行状态；
- * 每次开始跑圈时再叠加路径浮动并编译成 {@link org.localroute.core.CompiledRoute}。
+ * <p>路线分两类：用户在地图上绘制的自定义路线（会经过自动修正与平滑），
+ * 以及内置的预设路线（点已经按跑道像素校准好，原样使用）。路线本身不保存
+ * 运行状态；每次开始跑圈时编译成 {@link org.localroute.core.CompiledRoute}，
+ * 运行期的横向扰动由模拟服务叠加。
  */
 public final class CampusRoute {
 
@@ -24,16 +25,18 @@ public final class CampusRoute {
     private final List<CampusPoint> rawWaypoints;
     private final double metersPerUnit;
     private final double lapMeters;
+    private final boolean preset;
 
     private CampusRoute(String id, String name, List<CampusPoint> points,
                         List<CampusPoint> rawWaypoints, double metersPerUnit,
-                        double lapMeters) {
+                        double lapMeters, boolean preset) {
         this.id = id;
         this.name = name;
         this.points = Collections.unmodifiableList(new ArrayList<>(points));
         this.rawWaypoints = Collections.unmodifiableList(new ArrayList<>(rawWaypoints));
         this.metersPerUnit = metersPerUnit;
         this.lapMeters = lapMeters;
+        this.preset = preset;
     }
 
     /**
@@ -45,7 +48,17 @@ public final class CampusRoute {
         List<CampusPoint> corrected = CampusGeo.autoCorrectClosed(waypoints);
         List<CampusPoint> loop = CampusGeo.smoothClosed(corrected);
         double meters = CampusGeo.perimeterMeters(loop, CUSTOM_METERS_PER_UNIT);
-        return new CampusRoute(id, name, loop, corrected, CUSTOM_METERS_PER_UNIT, meters);
+        return new CampusRoute(id, name, loop, corrected, CUSTOM_METERS_PER_UNIT, meters, false);
+    }
+
+    /**
+     * 内置预设路线：点已经沿真实跑道的像素中心线采样并校准过圈长，
+     * 不再做自动修正/平滑，避免改变与橙色跑道的相对位置。
+     */
+    public static CampusRoute preset(String id, String name, List<CampusPoint> points) {
+        List<CampusPoint> copy = new ArrayList<>(points);
+        double meters = CampusGeo.perimeterMeters(copy, CUSTOM_METERS_PER_UNIT);
+        return new CampusRoute(id, name, copy, copy, CUSTOM_METERS_PER_UNIT, meters, true);
     }
 
     public String id() {
@@ -58,6 +71,11 @@ public final class CampusRoute {
 
     public double metersPerUnit() {
         return metersPerUnit;
+    }
+
+    /** 是否为内置预设路线；预设路线不参与绘制时的自动修正。 */
+    public boolean isPreset() {
+        return preset;
     }
 
     /** 未叠加路径浮动时的单圈长度（米）。 */
@@ -87,12 +105,9 @@ public final class CampusRoute {
         return CampusGeo.toGeo(startPoint(), metersPerUnit);
     }
 
-    /** 把设计点换算成系统模拟定位使用的 WGS-84 坐标；可选叠加本次跑圈的路径浮动。 */
-    public List<GeoPoint> buildGeoPoints(boolean varyPath, long seed) {
-        List<CampusPoint> design = varyPath
-                ? CampusGeo.drift(points, metersPerUnit, seed)
-                : points;
-        return CampusGeo.toGeoList(design, metersPerUnit);
+    /** 把设计点换算成系统模拟定位使用的 WGS-84 坐标（不含运行期扰动）。 */
+    public List<GeoPoint> buildGeoPoints() {
+        return CampusGeo.toGeoList(points, metersPerUnit);
     }
 
     public CampusPoint toDesign(double latitude, double longitude) {

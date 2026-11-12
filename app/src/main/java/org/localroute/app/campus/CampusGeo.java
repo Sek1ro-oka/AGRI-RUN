@@ -6,7 +6,6 @@ import org.localroute.core.GeoPoint;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 
 /**
  * 校园快跑的设计坐标 ↔ WGS-84 换算与几何工具。
@@ -250,43 +249,6 @@ public final class CampusGeo {
             total += GeoMath.distanceMeters(a, b);
         }
         return total;
-    }
-
-    /**
-     * 路径浮动：在闭环两侧叠加平滑的法向偏移。
-     *
-     * <p>偏移量以米计（约 0.7—1.3 米），换算成设计单位后加在法线方向；
-     * 同一次跑圈内振幅和相位固定，不同跑圈由 seed 决定，因此每次轨迹略有差异。
-     * 该偏移会真正进入提交给系统的路线，而不是只改画面。
-     */
-    public static List<CampusPoint> drift(List<CampusPoint> points, double metersPerUnit, long seed) {
-        int n = points.size();
-        if (n < 3) {
-            return new ArrayList<>(points);
-        }
-        Random random = new Random(seed);
-        double amplitudeMeters = 0.7d + random.nextDouble() * 0.6d;
-        double p1 = random.nextDouble() * Math.PI * 2d;
-        double p2 = random.nextDouble() * Math.PI * 2d;
-        double p3 = random.nextDouble() * Math.PI * 2d;
-        List<CampusPoint> result = new ArrayList<>(n);
-        for (int i = 0; i < n; i++) {
-            CampusPoint prev = points.get((i - 1 + n) % n);
-            CampusPoint next = points.get((i + 1) % n);
-            double tx = next.x - prev.x;
-            double ty = next.y - prev.y;
-            double length = Math.hypot(tx, ty);
-            double nx = length == 0d ? 0d : -ty / length;
-            double ny = length == 0d ? 0d : tx / length;
-            double t = i / (double) n;
-            // 低频为主，高频只留一点「人气」，避免轨迹出现肉眼可见的锯齿抖动。
-            double wave = 0.62d * Math.sin(Math.PI * 4d * t + p1)
-                    + 0.26d * Math.sin(Math.PI * 8d * t + p2)
-                    + 0.12d * Math.sin(Math.PI * 14d * t + p3);
-            double offsetUnits = amplitudeMeters * wave / metersPerUnit;
-            result.add(new CampusPoint(points.get(i).x + nx * offsetUnits, points.get(i).y + ny * offsetUnits));
-        }
-        return result;
     }
 
     /**

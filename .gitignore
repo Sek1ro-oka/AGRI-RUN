@@ -41,6 +41,7 @@ delivery/SHA256SUMS.txt
 
 # ---- 运行期证据与本机日志 ----
 evidence/*.log
+.debug/
 *.hprof
 *.hprof.*
 

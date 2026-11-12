@@ -79,6 +79,12 @@
             android:label="@string/settings_title"
             android:theme="@style/Theme.RouteWorkshop.Home" />
 
+        <activity
+            android:name=".ui.AppSettingsActivity"
+            android:exported="false"
+            android:label="@string/app_settings_title"
+            android:theme="@style/Theme.RouteWorkshop.Home" />
+
         <!-- 作业查询：学习通绑定、作业列表与课表 -->
         <activity
             android:name=".ui.StudyActivity"

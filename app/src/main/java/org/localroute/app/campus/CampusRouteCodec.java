@@ -18,11 +18,12 @@ import java.util.Set;
  */
 public final class CampusRouteCodec {
 
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     private static final String KEY_VERSION = "version";
     private static final String KEY_ROUTES = "routes";
     private static final String KEY_ID = "id";
     private static final String KEY_NAME = "name";
+    private static final String KEY_PRESET = "preset";
     private static final String KEY_WAYPOINTS = "waypoints";
     private static final String KEY_X = "x";
     private static final String KEY_Y = "y";
@@ -45,6 +46,7 @@ public final class CampusRouteCodec {
                     JSONObject entry = new JSONObject();
                     entry.put(KEY_ID, route.id());
                     entry.put(KEY_NAME, route.name());
+                    entry.put(KEY_PRESET, route.isPreset());
                     JSONArray waypoints = new JSONArray();
                     for (CampusPoint point : route.waypointsForSave()) {
                         JSONObject item = new JSONObject();
@@ -123,7 +125,10 @@ public final class CampusRouteCodec {
             if (points.size() < 3) {
                 return null;
             }
-            CampusRoute route = CampusRoute.custom(id, name, points);
+            // v1 数据没有 preset 字段：按自定义路线重新修正/平滑。
+            CampusRoute route = entry.optBoolean(KEY_PRESET, false)
+                    ? CampusRoute.preset(id, name, points)
+                    : CampusRoute.custom(id, name, points);
             return route.lapMeters() > 0d ? route : null;
         } catch (JSONException | RuntimeException e) {
             return null;

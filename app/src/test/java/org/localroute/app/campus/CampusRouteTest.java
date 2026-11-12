@@ -112,42 +112,28 @@ public class CampusRouteTest {
     }
 
     @Test
-    public void pathDriftIsSmoothAndKeepsRoughLength() {
-        CampusRoute route = sampleRoute();
-        long seed = 20261110L;
-        List<CampusPoint> base = route.points();
-        List<CampusPoint> drifted = CampusGeo.drift(base, route.metersPerUnit(), seed);
-        assertEquals(base.size(), drifted.size());
-
-        double maxShift = 0d;
-        for (int i = 0; i < base.size(); i++) {
-            maxShift = Math.max(maxShift, base.get(i).distanceTo(drifted.get(i)));
-        }
-        // 偏移不超过约 1.3 米对应的设计单位。
-        assertTrue("偏移过大：" + maxShift, maxShift * route.metersPerUnit() <= 1.5d);
-
-        double driftedMeters = CampusGeo.perimeterMeters(drifted, route.metersPerUnit());
-        assertEquals(route.lapMeters(), driftedMeters, 6d);
+    public void presetsKeepCalibratedLapLengths() {
+        CampusRoute a = CampusPresets.routeA();
+        CampusRoute b = CampusPresets.routeB();
+        assertTrue(a.isPreset());
+        assertTrue(b.isPreset());
+        assertEquals(423d, a.lapMeters(), 1.0d);
+        assertEquals(433d, b.lapMeters(), 1.0d);
+        assertEquals(a.lapMeters(),
+                CampusGeo.perimeterMeters(a.points(), a.metersPerUnit()), 1e-6d);
+        assertEquals(b.lapMeters(),
+                CampusGeo.perimeterMeters(b.points(), b.metersPerUnit()), 1e-6d);
     }
 
     @Test
-    public void pathDriftIsDeterministicForSameSeed() {
-        List<CampusPoint> base = CampusGeo.ellipse(180d, 310d, 62d, 104d, 160);
-        List<CampusPoint> first = CampusGeo.drift(base, 0.9d, 42L);
-        List<CampusPoint> second = CampusGeo.drift(base, 0.9d, 42L);
-        List<CampusPoint> other = CampusGeo.drift(base, 0.9d, 43L);
-        for (int i = 0; i < first.size(); i++) {
-            assertEquals(first.get(i).x, second.get(i).x, 1e-9d);
-            assertEquals(first.get(i).y, second.get(i).y, 1e-9d);
-        }
-        boolean differs = false;
-        for (int i = 0; i < first.size(); i++) {
-            if (first.get(i).distanceTo(other.get(i)) > 1e-6d) {
-                differs = true;
-                break;
-            }
-        }
-        assertTrue(differs);
+    public void presetLocationsAreOnZhejiangAfUniversityTracks() {
+        GeoPoint a = CampusPresets.routeA().startGeo();
+        GeoPoint b = CampusPresets.routeB().startGeo();
+        // A操锚点 30.25817N 119.72101E，B操锚点 30.26206N 119.72009E，允许路线起点离锚点几十米。
+        assertEquals(30.25817d, a.latitude(), 0.001d);
+        assertEquals(119.72101d, a.longitude(), 0.001d);
+        assertEquals(30.26206d, b.latitude(), 0.001d);
+        assertEquals(119.72009d, b.longitude(), 0.001d);
     }
 
     @Test

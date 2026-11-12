@@ -50,8 +50,10 @@ import org.localroute.app.R;
 import org.localroute.app.campus.CampusFormat;
 import org.localroute.app.campus.CampusGeo;
 import org.localroute.app.campus.CampusPoint;
+import org.localroute.app.campus.CampusPresets;
 import org.localroute.app.campus.CampusRoute;
 import org.localroute.app.campus.CampusRouteCodec;
+import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivityCampusRunBinding;
 import org.localroute.app.databinding.DialogCampusRoutesBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
@@ -104,7 +106,9 @@ public final class CampusRunActivity extends AppCompatActivity {
     private static final String KEY_PACE = "pace_seconds";
     private static final String KEY_LAPS = "laps";
     private static final String KEY_NATURAL = "natural_speed";
-    private static final String KEY_VARY = "vary_path";
+    /** 新键：0..1 的扰动程度；旧版的是布尔 {@code vary_path}，首次读取时迁移。 */
+    private static final String KEY_VARY_STRENGTH = "vary_strength";
+    private static final String KEY_VARY_LEGACY = "vary_path";
     private static final String KEY_CUSTOM_POINTS = "custom_points";
     private static final String KEY_CUSTOM_ROUTES = "custom_routes";
     private static final String KEY_SELECTED_ROUTE = "selected_route_id";
@@ -176,7 +180,10 @@ public final class CampusRunActivity extends AppCompatActivity {
     private int paceSeconds = DEFAULT_PACE_RUN;
     private int laps = 5;
     private boolean naturalEnabled = true;
-    private boolean varyEnabled = true;
+    /** 路线扰动程度 0..1，0 表示关闭。 */
+    private double varyStrength = 0.5d;
+    /** 程序化设置扰动滑条时避免重复持久化。 */
+    private boolean varySeekGuard;
 
     /** 程序化勾选悬浮窗开关时避免再次触发监听。 */
     private boolean overlaySwitchGuard;
@@ -333,7 +340,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         laps = clamp(prefs.getInt(KEY_LAPS, RunConfig.DEFAULT_LOOPS),
                 RunConfig.MIN_LOOPS, RunConfig.MAX_LOOPS);
         naturalEnabled = prefs.getBoolean(KEY_NATURAL, true);
-        varyEnabled = prefs.getBoolean(KEY_VARY, true);
+        loadVaryStrength();
         loadRoutes();
         activeRunId = prefs.getString(KEY_ACTIVE_RUN_ID, "");
         activeLapMeters = prefs.getFloat(KEY_ACTIVE_LAP,
@@ -360,6 +367,20 @@ public final class CampusRunActivity extends AppCompatActivity {
         return false;
     }
 
+    /** 读取扰动程度；旧版的「路径浮动」布尔开关迁移成 0.5 / 0。 */
+    private void loadVaryStrength() {
+        if (prefs.contains(KEY_VARY_STRENGTH)) {
+            varyStrength = clamp(prefs.getFloat(KEY_VARY_STRENGTH, 0.5f), 0f, 1f);
+            return;
+        }
+        boolean legacyOn = prefs.getBoolean(KEY_VARY_LEGACY, true);
+        varyStrength = legacyOn ? 0.5d : 0d;
+        prefs.edit()
+                .putFloat(KEY_VARY_STRENGTH, (float) varyStrength)
+                .remove(KEY_VARY_LEGACY)
+                .apply();
+    }
+
     /**
      * 读取全部自定义路线，并恢复上次选中的路线。
      *
@@ -377,6 +398,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 prefs.edit().remove(KEY_CUSTOM_POINTS).apply();
             }
         }
+        syncPresetRoutes();
         String selectedId = prefs.getString(KEY_SELECTED_ROUTE, "");
         route = null;
         for (CampusRoute candidate : customRoutes) {
@@ -388,6 +410,56 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (route == null && !customRoutes.isEmpty()) {
             route = customRoutes.get(0);
         }
+    }
+
+    /**
+     * 按激活状态同步内置预设：已激活时把缺失的 A操 / B操 放回列表，
+     * 未激活时移除（兼容早期调试版自动写入的预设）。预设不可删除，
+     * 避免删除操作与这里的自动补齐互相覆盖。
+     *
+     * @return 路线列表是否发生变化
+     */
+    private boolean syncPresetRoutes() {
+        boolean changed = false;
+        if (prefs.getBoolean(PresetUnlock.KEY_UNLOCKED, false)) {
+            List<CampusRoute> presets = Arrays.asList(CampusPresets.routeA(), CampusPresets.routeB());
+            for (int i = presets.size() - 1; i >= 0; i--) {
+                CampusRoute preset = presets.get(i);
+                if (indexOfRoute(preset.id()) < 0) {
+                    customRoutes.add(0, preset);
+                    changed = true;
+                }
+            }
+        } else {
+            for (int i = customRoutes.size() - 1; i >= 0; i--) {
+                if (customRoutes.get(i).isPreset()) {
+                    customRoutes.remove(i);
+                    changed = true;
+                }
+            }
+        }
+        if (changed) {
+            saveRoutes();
+        }
+        return changed;
+    }
+
+    /**
+     * 从其它页面（设置里激活预设）回到本页时刷新路线列表；
+     * 正在跑圈或已经进入地图页时不打扰当前状态。
+     */
+    private void refreshPresetRoutesIfIdle() {
+        if (runScreenVisible || snapshot.isActive()) {
+            return;
+        }
+        if (!syncPresetRoutes()) {
+            return;
+        }
+        if (route == null || indexOfRoute(route.id()) < 0) {
+            route = customRoutes.isEmpty() ? null : customRoutes.get(0);
+            persistSelectedRoute(route);
+        }
+        renderSetupValues();
     }
 
     /** 解析旧版单条路线；格式不合法或长度越界时返回 null。 */
@@ -468,9 +540,23 @@ public final class CampusRunActivity extends AppCompatActivity {
             naturalEnabled = checked;
             prefs.edit().putBoolean(KEY_NATURAL, checked).apply();
         });
-        binding.switchVary.setOnCheckedChangeListener((button, checked) -> {
-            varyEnabled = checked;
-            prefs.edit().putBoolean(KEY_VARY, checked).apply();
+        binding.seekVary.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                varyStrength = progress / 100d;
+                renderVaryValue();
+                if (fromUser && !varySeekGuard) {
+                    prefs.edit().putFloat(KEY_VARY_STRENGTH, (float) varyStrength).apply();
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+            }
         });
         binding.switchCampusOverlay.setOnCheckedChangeListener((button, checked) -> {
             if (overlaySwitchGuard) {
@@ -723,7 +809,28 @@ public final class CampusRunActivity extends AppCompatActivity {
         renderPaceValue();
         binding.textLaps.setText(String.valueOf(laps));
         binding.switchNatural.setChecked(naturalEnabled);
-        binding.switchVary.setChecked(varyEnabled);
+        varySeekGuard = true;
+        binding.seekVary.setProgress((int) Math.round(varyStrength * 100d));
+        varySeekGuard = false;
+        renderVaryValue();
+    }
+
+    /** 扰动滑条的档位文案与百分比。 */
+    private void renderVaryValue() {
+        int percent = (int) Math.round(varyStrength * 100d);
+        String level;
+        if (percent <= 0) {
+            level = getString(R.string.campus_vary_level_off);
+        } else if (percent <= 25) {
+            level = getString(R.string.campus_vary_level_low);
+        } else if (percent <= 55) {
+            level = getString(R.string.campus_vary_level_medium);
+        } else if (percent <= 80) {
+            level = getString(R.string.campus_vary_level_high);
+        } else {
+            level = getString(R.string.campus_vary_level_max);
+        }
+        binding.textVaryValue.setText(getString(R.string.campus_vary_value, level, percent));
     }
 
     private int defaultPaceSeconds(String sport) {
@@ -908,16 +1015,16 @@ public final class CampusRunActivity extends AppCompatActivity {
         resultRequested = false;
 
         CompiledRoute compiled;
+        long varySeed = System.nanoTime();
         try {
-            long seed = System.nanoTime();
-            compiled = RouteCompiler.compile(
-                    route.buildGeoPoints(varyEnabled, seed), EndBehavior.LOOP);
+            compiled = RouteCompiler.compile(route.buildGeoPoints(), EndBehavior.LOOP);
         } catch (InvalidRouteException e) {
             toast(e.getMessage() == null ? getString(R.string.campus_route_invalid) : e.getMessage());
             return;
         }
         RunConfig config = new RunConfig(speedKmh, loops);
-        RunRequest request = RunRequest.create(route.name(), compiled, config);
+        RunRequest request = RunRequest.create(route.name(), compiled, config,
+                varyStrength, varySeed);
 
         activeLapMeters = compiled.lapLengthMeters();
         baseSpeedKmh = speedKmh;
@@ -1640,9 +1747,11 @@ public final class CampusRunActivity extends AppCompatActivity {
         swipe.addAction(getString(R.string.campus_route_edit),
                 getColor(R.color.campus_mint_dark),
                 () -> showRouteEditDialog(candidate, dialog));
-        swipe.addAction(getString(R.string.campus_route_delete),
-                getColor(R.color.campus_danger),
-                () -> deleteRoute(candidate, dialog));
+        if (!candidate.isPreset()) {
+            swipe.addAction(getString(R.string.campus_route_delete),
+                    getColor(R.color.campus_danger),
+                    () -> deleteRoute(candidate, dialog));
+        }
 
         LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1687,8 +1796,9 @@ public final class CampusRunActivity extends AppCompatActivity {
                         dialog.dismiss();
                         return;
                     }
-                    CampusRoute renamed = CampusRoute.custom(
-                            candidate.id(), name, candidate.waypointsForSave());
+                    CampusRoute renamed = candidate.isPreset()
+                            ? CampusRoute.preset(candidate.id(), name, candidate.points())
+                            : CampusRoute.custom(candidate.id(), name, candidate.waypointsForSave());
                     customRoutes.set(index, renamed);
                     saveRoutes();
                     if (route != null && route.id().equals(renamed.id())) {
@@ -1714,6 +1824,11 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     private void deleteRoute(CampusRoute candidate, BottomSheetDialog dialog) {
+        if (candidate.isPreset()) {
+            toast(getString(R.string.campus_route_preset_fixed));
+            dialog.dismiss();
+            return;
+        }
         boolean selected = route != null && route.id().equals(candidate.id());
         if (selected && claimOwnSession && snapshot.isActive() && !snapshot.singlePoint()) {
             toast(getString(R.string.campus_route_delete_running));
@@ -1933,6 +2048,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         if (runScreenVisible) {
             updateRunUi();
+        } else {
+            refreshPresetRoutesIfIdle();
         }
         if (pendingOverlayEnable) {
             if (OverlayPanel.canDrawOverlays(this)) {
@@ -2040,6 +2157,10 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private static int clamp(int value, int min, int max) {
