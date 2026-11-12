@@ -84,7 +84,8 @@ keyPassword=<你的口令>
 ```
 
 `app/build.gradle` 会**条件式**读取它：文件存在就签名，不存在就产出未签名包，构建不会因此失败。
-交付用的 APK 用的就是本机自签名证书（本地测试用途，不是公开发布的正式证书）。
+0.6.3 起的公开 Release 使用本机自签名证书（不是应用商店证书）签名；后续版本必须使用同一 keystore 才能覆盖升级，请离线备份 `keystore/` 与口令。
+公开包不内置高德 Key（当前版本未接入官方 SDK），可用 `.\gradlew.bat :app:assembleRelease "-PamapKey= "`（值是一个空格）覆盖 `local.properties` 里的 Key；不带该参数时仍按本机配置注入。
 
 校验：
 

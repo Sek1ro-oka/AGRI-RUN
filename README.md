@@ -5,7 +5,7 @@
 一个面向校园生活的 Android 小工具：**校园快跑**在地图上点出闭合路线，用 Android 系统模拟位置沿路线跑圈；
 **作业查询**可绑定学习通读取课程作业，并提供一份完全本地的周课表。
 
-- 包名：`org.localroute.app`　版本：0.6.2（versionCode 19）
+- 包名：`org.localroute.app`　版本：0.6.3（versionCode 20）
 - 代码仓库：<https://github.com/Sek1ro-oka/AGRI-RUN>（**不含** APK、签名密钥、`local.properties` 与高德 Key）
 - 交付包：`delivery/路线工坊-0.3.3-release.apk`、`delivery/定位探针-0.1.4-debug.apk`、`delivery/SHA256SUMS.txt`（当前哈希清单）；0.3.2 的成功包保留在 `delivery/baseline-0.3.2/` 作对照
 - 最低系统：Android 10（API 29），编译 SDK 35
@@ -127,7 +127,7 @@ delivery/         交付物：APK、源码包、使用说明、测试报告、�
 - OSM 公共瓦片有使用政策（署名、UA、禁止批量抓取），正式长期使用应换成自建或商业瓦片源。
 - 未在真机（真我 GT Neo5）上实测的功能都在 `delivery/TEST_REPORT_测试结果.md` 中显式标注「未实测」；
   0.1.3 在 API 35 模拟器上实测了「运行 → 独立探针读到 mock 帧」这条主链路，但模拟器不等于真机 ROM。
-- 检查更新读取 GitHub Releases 的匿名接口，要求发布仓库**公开**且 Release 附带 `route-workshop-*.apk`。当前仓库未发布任何 Release，因此检查更新只会提示「没有找到公开的发布版本」；发布高于当前版本（0.6.2）的 Release 后才能实际下载安装。安装 APK 还需用户允许「安装未知应用」。
+- 检查更新读取 GitHub Releases 的匿名接口，要求发布仓库**公开**且 Release 附带 `route-workshop-*.apk`。仓库已发布 `v0.6.3`，此后发布高于当前版本（0.6.3）的 Release 即可在应用内下载安装；安装 APK 还需用户允许「安装未知应用」。调试包（包名带 `.debug`）与正式包包名不同，不能原地升级，需先手动安装正式包。
 
 ## 许可与第三方
 
