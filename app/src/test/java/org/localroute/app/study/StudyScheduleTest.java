@@ -56,20 +56,22 @@ public class StudyScheduleTest {
 
     @Test
     public void overlapWithNextSegmentIsInvalid() {
-        StudySchedule schedule = new StudySchedule(8 * 60, 11 * 60, 18 * 60, 45, 10);
+        StudySchedule schedule = new StudySchedule(8 * 60, 11 * 60, 18 * 60,
+                45, 10, 4, 4, 4);
         assertFalse(schedule.isValid());
     }
 
     @Test
     public void eveningOverflowIsInvalid() {
-        StudySchedule schedule = new StudySchedule(8 * 60, 14 * 60, 21 * 60, 45, 10);
+        StudySchedule schedule = new StudySchedule(8 * 60, 14 * 60, 21 * 60,
+                45, 10, 4, 4, 4);
         assertFalse(schedule.isValid());
     }
 
     @Test
     public void encodeDecodeRoundTrip() {
         StudySchedule schedule = new StudySchedule(8 * 60 + 5, 13 * 60 + 55,
-                18 * 60 + 40, 50, 5);
+                18 * 60 + 40, 50, 5, 5, 4, 3);
         StudySchedule decoded = StudySchedule.decode(schedule.encode());
         assertNotNull(decoded);
         assertEquals(schedule.morningStart(), decoded.morningStart());
@@ -77,6 +79,9 @@ public class StudyScheduleTest {
         assertEquals(schedule.eveningStart(), decoded.eveningStart());
         assertEquals(schedule.periodMinutes(), decoded.periodMinutes());
         assertEquals(schedule.breakMinutes(), decoded.breakMinutes());
+        assertEquals(5, decoded.periodCount(StudySchedule.SEGMENT_MORNING));
+        assertEquals(4, decoded.periodCount(StudySchedule.SEGMENT_AFTERNOON));
+        assertEquals(3, decoded.periodCount(StudySchedule.SEGMENT_EVENING));
     }
 
     @Test
@@ -94,6 +99,54 @@ public class StudyScheduleTest {
         assertEquals(510, decoded.morningStart());
         assertEquals(14 * 60, decoded.afternoonStart());
         assertEquals(45, decoded.periodMinutes());
+        assertEquals(4, decoded.periodCount(StudySchedule.SEGMENT_MORNING));
+        assertEquals(4, decoded.periodCount(StudySchedule.SEGMENT_AFTERNOON));
+        assertEquals(4, decoded.periodCount(StudySchedule.SEGMENT_EVENING));
+    }
+
+    @Test
+    public void morningFivePeriodsShiftAfternoonAndEveningNumbering() {
+        StudySchedule schedule = StudySchedule.winterDefault()
+                .withPeriodCount(StudySchedule.SEGMENT_MORNING, 5);
+        assertTrue(schedule.isValid());
+        assertEquals(5, schedule.periodCount(StudySchedule.SEGMENT_MORNING));
+        assertEquals(6, schedule.firstPeriod(StudySchedule.SEGMENT_AFTERNOON));
+        assertEquals(10, schedule.firstPeriod(StudySchedule.SEGMENT_EVENING));
+        assertEquals(13, schedule.totalPeriods());
+        assertEquals("11:40", schedule.startLabel(5));
+        assertEquals("12:25", schedule.endLabel(5));
+        assertEquals("14:00", schedule.startLabel(6));
+        assertEquals("18:30", schedule.startLabel(10));
+    }
+
+    @Test
+    public void customCountsKeepTimeCalculationConsistent() {
+        StudySchedule schedule = StudySchedule.winterDefault()
+                .withPeriodCount(StudySchedule.SEGMENT_MORNING, 5)
+                .withPeriodCount(StudySchedule.SEGMENT_EVENING, 3);
+        assertTrue(schedule.isValid());
+        assertEquals(12, schedule.totalPeriods());
+        assertEquals(9, schedule.lastPeriod(StudySchedule.SEGMENT_AFTERNOON));
+        assertEquals(10, schedule.firstPeriod(StudySchedule.SEGMENT_EVENING));
+        assertEquals("18:30", schedule.startLabel(10));
+        assertEquals("21:05", schedule.endLabel(12));
+    }
+
+    @Test
+    public void tooManyTotalPeriodsIsInvalid() {
+        StudySchedule schedule = StudySchedule.winterDefault()
+                .withPeriodCount(StudySchedule.SEGMENT_MORNING, 6)
+                .withPeriodCount(StudySchedule.SEGMENT_AFTERNOON, 6)
+                .withPeriodCount(StudySchedule.SEGMENT_EVENING, 6);
+        assertEquals(18, schedule.totalPeriods());
+        assertFalse(schedule.isValid());
+    }
+
+    @Test
+    public void periodCountOutsideRangeIsInvalid() {
+        StudySchedule schedule = StudySchedule.winterDefault()
+                .withPeriodCount(StudySchedule.SEGMENT_MORNING, 0);
+        assertFalse(schedule.isValid());
     }
 
     @Test

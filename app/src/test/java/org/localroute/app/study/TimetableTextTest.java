@@ -15,8 +15,9 @@ public class TimetableTextTest {
         assertArrayEquals(new int[]{3, 3}, TimetableText.parsePeriods("第3节"));
         assertArrayEquals(new int[]{5, 6}, TimetableText.parsePeriods("5~6"));
         assertArrayEquals(new int[]{1, 2}, TimetableText.parsePeriods("1 - 2"));
+        assertArrayEquals(new int[]{13, 14}, TimetableText.parsePeriods("13-14"));
         assertNull(TimetableText.parsePeriods("0-1"));
-        assertNull(TimetableText.parsePeriods("13-14"));
+        assertNull(TimetableText.parsePeriods("16-17"));
         assertNull(TimetableText.parsePeriods("5-3"));
         assertNull(TimetableText.parsePeriods("早上"));
         assertNull(TimetableText.parsePeriods(null));
@@ -49,7 +50,7 @@ public class TimetableTextTest {
     @Test
     public void extractsWeeksFromPdfDetail() {
         assertEquals("1-16", TimetableText.weeksFromDetail("(1-2节)1-16周/场地:基616"));
-        assertEquals("1-10", TimetableText.weeksFromDetail("(1-2节)1-10周/教师:张泽宇"));
+        assertEquals("1-10", TimetableText.weeksFromDetail("(1-2节)1-10周/教师:王老师"));
         assertEquals("1-16双", TimetableText.weeksFromDetail("(3-4节)1-16双周"));
         assertNull(TimetableText.weeksFromDetail("(1-2节)/场地:基616"));
         assertNull(TimetableText.weeksFromDetail(null));

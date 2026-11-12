@@ -307,6 +307,195 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
+                <!-- 每天节数：上午/下午/晚课分别可调，节次连续编号 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/study_schedule_counts_title"
+                        android:textColor="@color/campus_ink"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/textTotalPeriods"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/campus_muted"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingVertical="6dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/study_schedule_count_morning"
+                        android:textColor="@color/campus_ink"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/buttonMorningMinus"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/bg_campus_soft_circle"
+                        android:clickable="true"
+                        android:contentDescription="@string/study_schedule_count_minus"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="−"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/textMorningCount"
+                        android:layout_width="42dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/buttonMorningPlus"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/bg_campus_soft_circle"
+                        android:clickable="true"
+                        android:contentDescription="@string/study_schedule_count_plus"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="+"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="18sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/campus_card_stroke" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingVertical="6dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/study_schedule_count_afternoon"
+                        android:textColor="@color/campus_ink"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/buttonAfternoonMinus"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/bg_campus_soft_circle"
+                        android:clickable="true"
+                        android:contentDescription="@string/study_schedule_count_minus"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="−"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/textAfternoonCount"
+                        android:layout_width="42dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/buttonAfternoonPlus"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/bg_campus_soft_circle"
+                        android:clickable="true"
+                        android:contentDescription="@string/study_schedule_count_plus"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="+"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="18sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/campus_card_stroke" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingVertical="6dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/study_schedule_count_evening"
+                        android:textColor="@color/campus_ink"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/buttonEveningMinus"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/bg_campus_soft_circle"
+                        android:clickable="true"
+                        android:contentDescription="@string/study_schedule_count_minus"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="−"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/textEveningCount"
+                        android:layout_width="42dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/buttonEveningPlus"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@drawable/bg_campus_soft_circle"
+                        android:clickable="true"
+                        android:contentDescription="@string/study_schedule_count_plus"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="+"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="18sp" />
+                </LinearLayout>
+
                 <LinearLayout
                     android:id="@+id/rowMorningStart"
                     android:layout_width="match_parent"

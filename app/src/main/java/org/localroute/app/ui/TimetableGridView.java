@@ -140,10 +140,8 @@ public class TimetableGridView extends View {
         for (TimetableCourse course : courses) {
             maxEnd = Math.max(maxEnd, course.endPeriod());
         }
-        displayPeriods = Math.max(8, Math.min(TimetableCourse.MAX_PERIOD, maxEnd));
-        if (courses.isEmpty()) {
-            displayPeriods = 10;
-        }
+        displayPeriods = Math.min(TimetableCourse.MAX_PERIOD,
+                Math.max(8, Math.max(schedule.totalPeriods(), maxEnd)));
         rebuildBlocks(courses);
         setContentDescription(String.format(Locale.CHINA, "周课表，共 %d 门课", courses.size()));
         requestLayout();
