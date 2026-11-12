@@ -17,12 +17,14 @@ import static org.junit.Assert.assertTrue;
 public class HomeworkItemTest {
 
     @Test
-    public void ranksPendingBeforeDoneAndExpired() {
+    public void ranksPendingBeforeSubmittedDoneAndExpired() {
         HomeworkItem pending = item(HomeworkItem.Status.PENDING);
+        HomeworkItem submitted = item(HomeworkItem.Status.SUBMITTED);
         HomeworkItem done = item(HomeworkItem.Status.DONE);
         HomeworkItem expired = item(HomeworkItem.Status.EXPIRED);
         HomeworkItem other = item(HomeworkItem.Status.OTHER);
-        assertTrue(pending.statusRank() < done.statusRank());
+        assertTrue(pending.statusRank() < submitted.statusRank());
+        assertTrue(submitted.statusRank() < done.statusRank());
         assertTrue(done.statusRank() < expired.statusRank());
         assertTrue(expired.statusRank() < other.statusRank());
     }
@@ -30,8 +32,13 @@ public class HomeworkItemTest {
     @Test
     public void labelsDeadlineWithFallbacks() {
         assertEquals("未标注截止时间", item(HomeworkItem.Status.PENDING).deadlineLabel());
+        assertEquals("已提交", item(HomeworkItem.Status.SUBMITTED).deadlineLabel());
         assertEquals("已截止", item(HomeworkItem.Status.EXPIRED).deadlineLabel());
         assertEquals("已完成", item(HomeworkItem.Status.DONE).deadlineLabel());
+
+        HomeworkItem reviewing = new HomeworkItem("高数", "作业", "待批阅",
+                HomeworkItem.Status.SUBMITTED, 0L, "", "", false);
+        assertEquals("待批阅", reviewing.deadlineLabel());
 
         Calendar calendar = Calendar.getInstance();
         calendar.clear();
@@ -47,7 +54,7 @@ public class HomeworkItemTest {
     @Test
     public void roundTripsThroughJson() throws Exception {
         HomeworkItem original = new HomeworkItem("大学英语", "Unit 3 作文",
-                "待互评", HomeworkItem.Status.PENDING, 1_800_000_000_000L,
+                "待互评", HomeworkItem.Status.SUBMITTED, 1_800_000_000_000L,
                 "剩余2天", "https://example.com/work/1", true);
         JSONObject json = original.toJson();
         HomeworkItem decoded = HomeworkItem.fromJson(json);
@@ -66,6 +73,17 @@ public class HomeworkItemTest {
     public void rejectsJsonWithoutTitle() {
         assertEquals(null, HomeworkItem.fromJson(null));
         assertEquals(null, HomeworkItem.fromJson(new JSONObject()));
+    }
+
+    @Test
+    public void migratesCachedPendingSubmittedText() throws Exception {
+        JSONObject json = new JSONObject();
+        json.put("title", "实验报告");
+        json.put("status", "PENDING");
+        json.put("status_text", "待批阅");
+        HomeworkItem decoded = HomeworkItem.fromJson(json);
+        assertNotNull(decoded);
+        assertEquals(HomeworkItem.Status.SUBMITTED, decoded.status());
     }
 
     @Test

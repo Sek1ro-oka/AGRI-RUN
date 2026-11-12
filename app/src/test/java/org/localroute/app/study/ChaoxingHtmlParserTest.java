@@ -116,7 +116,7 @@ public class ChaoxingHtmlParserTest {
         assertEquals(HomeworkItem.Status.EXPIRED, page.items.get(2).status());
 
         HomeworkItem peer = page.items.get(3);
-        assertEquals(HomeworkItem.Status.PENDING, peer.status());
+        assertEquals(HomeworkItem.Status.SUBMITTED, peer.status());
         assertTrue(peer.peerReview());
     }
 
@@ -211,6 +211,37 @@ public class ChaoxingHtmlParserTest {
         assertEquals(HomeworkItem.Status.EXPIRED, items.get(1).status());
         assertEquals(0L, items.get(1).deadlineEpochMillis());
         assertEquals(HomeworkItem.Status.DONE, items.get(2).status());
+    }
+
+    @Test
+    public void keepsSubmittedWorkAfterDeadline() {
+        long now = fixedNow();
+        String html = "<ul class=\"nav\">"
+                + "<li data=\"https://mooc1.chaoxing.com/mooc-ans/mooc2/work/task?taskrefId=81\">"
+                + "<div role=\"option\">"
+                + "<p>已提交作业</p>"
+                + "<div class=\"info\">"
+                + "<span class=\"status\">待批阅</span>"
+                + "<span class=\"course\">大学物理</span>"
+                + "<span class=\"fr\">已结束</span>"
+                + "</div></div></li>"
+                + "<li data=\"https://mooc1.chaoxing.com/mooc-ans/mooc2/work/task?taskrefId=82\">"
+                + "<div role=\"option\">"
+                + "<p>已交作业</p>"
+                + "<div class=\"info\">"
+                + "<span class=\"status\">已提交</span>"
+                + "<span class=\"course\">大学物理</span>"
+                + "<span class=\"fr\">剩余 1天</span>"
+                + "</div></div></li>"
+                + "</ul>";
+
+        List<HomeworkItem> items = ChaoxingHtmlParser.parseAggregateWorkPage(html, now);
+        assertNotNull(items);
+        assertEquals(2, items.size());
+        assertEquals(HomeworkItem.Status.SUBMITTED, items.get(0).status());
+        assertEquals("待批阅", items.get(0).statusText());
+        assertEquals(HomeworkItem.Status.SUBMITTED, items.get(1).status());
+        assertTrue(items.get(1).deadlineEpochMillis() > now);
     }
 
     @Test

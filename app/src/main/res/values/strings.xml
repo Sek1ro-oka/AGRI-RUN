@@ -375,6 +375,7 @@
     <string name="study_homework_unbound_title">还没有绑定学习通</string>
     <string name="study_homework_unbound_hint">绑定后可自动汇总每门课程的作业与截止时间。</string>
     <string name="study_homework_status_pending">待完成</string>
+    <string name="study_homework_status_submitted">待批阅</string>
     <string name="study_homework_status_done">已完成</string>
     <string name="study_homework_status_expired">已截止</string>
     <string name="study_homework_status_other">其他</string>
