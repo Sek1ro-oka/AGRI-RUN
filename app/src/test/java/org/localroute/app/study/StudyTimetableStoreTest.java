@@ -22,7 +22,7 @@ public class StudyTimetableStoreTest {
                 StudySchedule.SEASON_WINTER, 120);
         assertEquals(StudySchedule.winterDefault().periodMinutes(),
                 schedule.periodMinutes());
-        assertEquals("14:00", schedule.startLabel(5));
+        assertEquals("13:30", schedule.startLabel(5));
         assertTrue(schedule.isValid());
     }
 

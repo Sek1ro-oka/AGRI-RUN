@@ -15,15 +15,16 @@ public class StudyScheduleTest {
         StudySchedule schedule = StudySchedule.winterDefault();
         assertTrue(schedule.isValid());
         assertEquals(45, schedule.periodMinutes());
-        assertEquals(10, schedule.breakMinutes());
+        assertEquals(5, schedule.breakMinutes());
+        assertEquals(15, schedule.longBreakMinutes());
         assertEquals("08:00", schedule.startLabel(1));
         assertEquals("08:45", schedule.endLabel(1));
         assertEquals("09:50", schedule.startLabel(3));
-        assertEquals("11:30", schedule.endLabel(4));
-        assertEquals("14:00", schedule.startLabel(5));
-        assertEquals("17:30", schedule.endLabel(8));
+        assertEquals("11:25", schedule.endLabel(4));
+        assertEquals("13:30", schedule.startLabel(5));
+        assertEquals("16:55", schedule.endLabel(8));
         assertEquals("18:30", schedule.startLabel(9));
-        assertEquals("22:00", schedule.endLabel(12));
+        assertEquals("21:45", schedule.endLabel(12));
     }
 
     @Test
@@ -31,16 +32,42 @@ public class StudyScheduleTest {
         StudySchedule schedule = StudySchedule.summerDefault();
         assertTrue(schedule.isValid());
         assertEquals("08:00", schedule.startLabel(1));
-        assertEquals("14:30", schedule.startLabel(5));
-        assertEquals("18:00", schedule.endLabel(8));
+        assertEquals("14:00", schedule.startLabel(5));
+        assertEquals("17:25", schedule.endLabel(8));
         assertEquals("19:00", schedule.startLabel(9));
+    }
+
+    @Test
+    public void longBreakOnlyFollowsSecondPeriodOfMorningAndAfternoon() {
+        StudySchedule schedule = StudySchedule.winterDefault();
+        assertEquals(5, schedule.breakBeforePeriod(2));
+        assertEquals(15, schedule.breakBeforePeriod(3));
+        assertEquals(5, schedule.breakBeforePeriod(4));
+        assertEquals(15, schedule.breakBeforePeriod(7));
+        assertEquals(5, schedule.breakBeforePeriod(8));
+        assertEquals(5, schedule.breakBeforePeriod(10));
+        assertEquals("10:40", schedule.startLabel(4));
+        assertEquals("16:10", schedule.startLabel(8));
+        assertEquals("19:20", schedule.startLabel(10));
     }
 
     @Test
     public void breakMinutesPushLaterPeriods() {
         StudySchedule schedule = StudySchedule.winterDefault().withBreakMinutes(0);
-        assertEquals("10:15", schedule.startLabel(4));
-        assertEquals("11:00", schedule.endLabel(4));
+        assertEquals(15, schedule.longBreakMinutes());
+        assertEquals("10:30", schedule.startLabel(4));
+        assertEquals("11:15", schedule.endLabel(4));
+        assertTrue(schedule.isValid());
+    }
+
+    @Test
+    public void longBreakMinutesPushMorningAndAfternoonPeriods() {
+        StudySchedule schedule = StudySchedule.winterDefault().withLongBreakMinutes(30);
+        assertEquals("09:35", schedule.endLabel(2));
+        assertEquals("10:05", schedule.startLabel(3));
+        assertEquals("10:55", schedule.startLabel(4));
+        assertEquals("15:35", schedule.startLabel(7));
+        assertEquals("18:30", schedule.startLabel(9));
         assertTrue(schedule.isValid());
     }
 
@@ -57,21 +84,21 @@ public class StudyScheduleTest {
     @Test
     public void overlapWithNextSegmentIsInvalid() {
         StudySchedule schedule = new StudySchedule(8 * 60, 11 * 60, 18 * 60,
-                45, 10, 4, 4, 4);
+                45, 10, 15, 4, 4, 4);
         assertFalse(schedule.isValid());
     }
 
     @Test
     public void eveningOverflowIsInvalid() {
         StudySchedule schedule = new StudySchedule(8 * 60, 14 * 60, 21 * 60,
-                45, 10, 4, 4, 4);
+                45, 10, 15, 4, 4, 4);
         assertFalse(schedule.isValid());
     }
 
     @Test
     public void encodeDecodeRoundTrip() {
         StudySchedule schedule = new StudySchedule(8 * 60 + 5, 13 * 60 + 55,
-                18 * 60 + 40, 50, 5, 5, 4, 3);
+                18 * 60 + 40, 50, 5, 15, 5, 4, 3);
         StudySchedule decoded = StudySchedule.decode(schedule.encode());
         assertNotNull(decoded);
         assertEquals(schedule.morningStart(), decoded.morningStart());
@@ -79,6 +106,7 @@ public class StudyScheduleTest {
         assertEquals(schedule.eveningStart(), decoded.eveningStart());
         assertEquals(schedule.periodMinutes(), decoded.periodMinutes());
         assertEquals(schedule.breakMinutes(), decoded.breakMinutes());
+        assertEquals(schedule.longBreakMinutes(), decoded.longBreakMinutes());
         assertEquals(5, decoded.periodCount(StudySchedule.SEGMENT_MORNING));
         assertEquals(4, decoded.periodCount(StudySchedule.SEGMENT_AFTERNOON));
         assertEquals(3, decoded.periodCount(StudySchedule.SEGMENT_EVENING));
@@ -87,6 +115,7 @@ public class StudyScheduleTest {
     @Test
     public void decodeRejectsBrokenOrInvalidJson() {
         assertNull(StudySchedule.decode(null));
+        assertNull(StudySchedule.decode(""));
         assertNull(StudySchedule.decode("not json"));
         assertNull(StudySchedule.decode("{\"morning\":480,\"afternoon\":300,"
                 + "\"evening\":1110,\"period\":45,\"break\":10}"));
@@ -97,11 +126,66 @@ public class StudyScheduleTest {
         StudySchedule decoded = StudySchedule.decode("{\"morning\":510}");
         assertNotNull(decoded);
         assertEquals(510, decoded.morningStart());
-        assertEquals(14 * 60, decoded.afternoonStart());
+        assertEquals(13 * 60 + 30, decoded.afternoonStart());
+        assertEquals(18 * 60 + 30, decoded.eveningStart());
         assertEquals(45, decoded.periodMinutes());
+        assertEquals(5, decoded.breakMinutes());
+        assertEquals(15, decoded.longBreakMinutes());
         assertEquals(4, decoded.periodCount(StudySchedule.SEGMENT_MORNING));
         assertEquals(4, decoded.periodCount(StudySchedule.SEGMENT_AFTERNOON));
         assertEquals(4, decoded.periodCount(StudySchedule.SEGMENT_EVENING));
+    }
+
+    @Test
+    public void legacyJsonWithoutLongBreakMigratesToNewDefaults() {
+        String legacy = "{\"morning\":480,\"afternoon\":840,\"evening\":1110,"
+                + "\"period\":45,\"break\":10,\"morningCount\":5,"
+                + "\"afternoonCount\":4,\"eveningCount\":4}";
+        StudySchedule decoded = StudySchedule.decode(legacy, StudySchedule.SEASON_WINTER);
+        assertNotNull(decoded);
+        assertEquals(13 * 60 + 30, decoded.afternoonStart());
+        assertEquals(5, decoded.breakMinutes());
+        assertEquals(15, decoded.longBreakMinutes());
+        assertEquals(5, decoded.periodCount(StudySchedule.SEGMENT_MORNING));
+        assertEquals("18:30", decoded.startLabel(10));
+        assertTrue(decoded.isValid());
+    }
+
+    @Test
+    public void legacyCustomAfternoonStartIsPreserved() {
+        String legacy = "{\"morning\":480,\"afternoon\":900,\"evening\":1110,"
+                + "\"period\":45,\"break\":10}";
+        StudySchedule decoded = StudySchedule.decode(legacy, StudySchedule.SEASON_WINTER);
+        assertNotNull(decoded);
+        assertEquals(900, decoded.afternoonStart());
+        assertEquals(5, decoded.breakMinutes());
+        assertEquals(15, decoded.longBreakMinutes());
+        assertTrue(decoded.isValid());
+    }
+
+    @Test
+    public void legacyTightScheduleKeepsOldBreakInsteadOfLosingCounts() {
+        String legacy = "{\"morning\":480,\"afternoon\":750,\"evening\":960,"
+                + "\"period\":45,\"break\":0,\"morningCount\":6,"
+                + "\"afternoonCount\":4,\"eveningCount\":4}";
+        StudySchedule decoded = StudySchedule.decode(legacy, StudySchedule.SEASON_WINTER);
+        assertNotNull(decoded);
+        assertEquals(0, decoded.breakMinutes());
+        assertEquals(0, decoded.longBreakMinutes());
+        assertEquals(6, decoded.periodCount(StudySchedule.SEGMENT_MORNING));
+        assertEquals(750, decoded.afternoonStart());
+        assertTrue(decoded.isValid());
+    }
+
+    @Test
+    public void legacySummerAfternoonStartMovesToNewDefault() {
+        String legacy = "{\"morning\":480,\"afternoon\":870,\"evening\":1140,"
+                + "\"period\":45,\"break\":10}";
+        StudySchedule decoded = StudySchedule.decode(legacy, StudySchedule.SEASON_SUMMER);
+        assertNotNull(decoded);
+        assertEquals(14 * 60, decoded.afternoonStart());
+        assertEquals(19 * 60, decoded.eveningStart());
+        assertTrue(decoded.isValid());
     }
 
     @Test
@@ -113,9 +197,9 @@ public class StudyScheduleTest {
         assertEquals(6, schedule.firstPeriod(StudySchedule.SEGMENT_AFTERNOON));
         assertEquals(10, schedule.firstPeriod(StudySchedule.SEGMENT_EVENING));
         assertEquals(13, schedule.totalPeriods());
-        assertEquals("11:40", schedule.startLabel(5));
-        assertEquals("12:25", schedule.endLabel(5));
-        assertEquals("14:00", schedule.startLabel(6));
+        assertEquals("11:30", schedule.startLabel(5));
+        assertEquals("12:15", schedule.endLabel(5));
+        assertEquals("13:30", schedule.startLabel(6));
         assertEquals("18:30", schedule.startLabel(10));
     }
 
@@ -129,7 +213,7 @@ public class StudyScheduleTest {
         assertEquals(9, schedule.lastPeriod(StudySchedule.SEGMENT_AFTERNOON));
         assertEquals(10, schedule.firstPeriod(StudySchedule.SEGMENT_EVENING));
         assertEquals("18:30", schedule.startLabel(10));
-        assertEquals("21:05", schedule.endLabel(12));
+        assertEquals("20:55", schedule.endLabel(12));
     }
 
     @Test

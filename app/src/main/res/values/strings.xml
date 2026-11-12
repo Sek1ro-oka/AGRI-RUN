@@ -452,9 +452,10 @@
     <string name="study_schedule_count_minus">减少一节</string>
     <string name="study_schedule_count_plus">增加一节</string>
     <string name="study_schedule_period_title">每节课时长</string>
-    <string name="study_schedule_break_title">课间休息</string>
+    <string name="study_schedule_break_title">普通课间休息</string>
+    <string name="study_schedule_long_break_title">大课间（上午、下午第 2 节后）</string>
     <string name="study_schedule_minutes">%1$d 分钟</string>
-    <string name="study_schedule_summary">上午 %1$s–%2$s · 午休 %2$s–%3$s\n下午 %3$s–%4$s · 晚餐 %4$s–%5$s\n晚课 %5$s–%6$s</string>
+    <string name="study_schedule_summary">上午 %1$s–%2$s · 午休 %2$s–%3$s\n下午 %3$s–%4$s · 晚餐 %4$s–%5$s\n晚课 %5$s–%6$s\n课间 %7$d 分钟 · 大课间 %8$d 分钟（晚课除外）</string>
     <string name="study_schedule_reset">恢复本季默认</string>
     <string name="study_schedule_reset_done">已恢复本季默认作息</string>
     <string name="study_schedule_pick_morning">选择上午上课时间</string>
