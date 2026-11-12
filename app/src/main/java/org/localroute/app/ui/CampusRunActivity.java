@@ -56,6 +56,8 @@ import org.localroute.app.map.AmapRouteMapView;
 import org.localroute.app.map.MapBackendPolicy;
 import org.localroute.app.map.RouteMapController;
 import org.localroute.app.map.RouteMapHost;
+import org.localroute.app.overlay.OverlayHost;
+import org.localroute.app.overlay.OverlayPanel;
 import org.localroute.app.run.RunRequest;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
@@ -158,6 +160,11 @@ public final class CampusRunActivity extends AppCompatActivity {
     private int laps = 5;
     private boolean naturalEnabled = true;
     private boolean varyEnabled = true;
+
+    /** 程序化勾选悬浮窗开关时避免再次触发监听。 */
+    private boolean overlaySwitchGuard;
+    /** 用户想打开悬浮窗但还在等系统授权页返回。 */
+    private boolean pendingOverlayEnable;
 
     private boolean runScreenVisible;
     private boolean drawMode;
@@ -393,6 +400,20 @@ public final class CampusRunActivity extends AppCompatActivity {
             varyEnabled = checked;
             prefs.edit().putBoolean(KEY_VARY, checked).apply();
         });
+        binding.switchCampusOverlay.setOnCheckedChangeListener((button, checked) -> {
+            if (overlaySwitchGuard) {
+                return;
+            }
+            if (checked) {
+                requestCampusOverlay();
+            } else {
+                pendingOverlayEnable = false;
+                OverlayHost.get(this).setEnabled(false);
+                toast(getString(R.string.settings_overlay_disable_toast));
+                refreshCampusOverlay();
+            }
+        });
+        refreshCampusOverlay();
         binding.rowAppSettings.setOnClickListener(v ->
                 startActivity(new Intent(this, SettingsCheckActivity.class)));
         binding.buttonGoal.setOnClickListener(v -> showRouteSheet());
@@ -1758,6 +1779,15 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (runScreenVisible) {
             updateRunUi();
         }
+        if (pendingOverlayEnable) {
+            if (OverlayPanel.canDrawOverlays(this)) {
+                enableCampusOverlayNow();
+            } else {
+                pendingOverlayEnable = false;
+                toast(getString(R.string.settings_overlay_denied_toast));
+            }
+        }
+        refreshCampusOverlay();
     }
 
     @Override
@@ -1801,6 +1831,51 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (mapHost != null) {
             mapHost.onSaveInstanceState(outState);
         }
+    }
+
+    // ---------------------------------------------------------------- 悬浮窗开关
+
+    private void requestCampusOverlay() {
+        if (!OverlayPanel.canDrawOverlays(this)) {
+            pendingOverlayEnable = true;
+            setCampusOverlaySwitch(false);
+            OverlayPanel.requestPermission(this);
+            toast(getString(R.string.settings_overlay_need_permission_toast));
+            return;
+        }
+        enableCampusOverlayNow();
+    }
+
+    private void enableCampusOverlayNow() {
+        pendingOverlayEnable = false;
+        OverlayHost.get(this).setEnabled(true);
+        toast(getString(R.string.settings_overlay_enable_toast));
+        refreshCampusOverlay();
+    }
+
+    private void refreshCampusOverlay() {
+        boolean enabled = OverlayHost.get(this).isEnabled();
+        boolean allowed = OverlayPanel.canDrawOverlays(this);
+        setCampusOverlaySwitch(enabled);
+        int statusRes;
+        if (!enabled) {
+            statusRes = R.string.settings_overlay_status_off;
+        } else if (allowed) {
+            statusRes = R.string.settings_overlay_status_on;
+        } else {
+            statusRes = R.string.settings_overlay_status_on_missing;
+        }
+        binding.textCampusOverlayStatus.setText(statusRes);
+        if (enabled) {
+            // 权限可能刚在系统页里授予：让面板按当前开关重新渲染一次。
+            OverlayHost.get(this).refresh();
+        }
+    }
+
+    private void setCampusOverlaySwitch(boolean checked) {
+        overlaySwitchGuard = true;
+        binding.switchCampusOverlay.setChecked(checked);
+        overlaySwitchGuard = false;
     }
 
     private void toast(String message) {

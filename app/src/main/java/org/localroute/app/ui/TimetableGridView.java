@@ -30,8 +30,8 @@ import java.util.Locale;
 /**
  * 周课表网格：左侧节次/时间，右侧周一至周日；课程按节次纵向跨行绘制。
  *
- * <p>完全自绘，避免 8×12 个 View 带来的层级与测量开销；放在
- * HorizontalScrollView 里横向滚动，纵向随页面滚动。
+ * <p>完全自绘，避免 8×12 个 View 带来的层级与测量开销。列宽按可用宽度自适应，
+ * 手机上七列同屏显示，不需要横向滚动；纵向随页面滚动。
  */
 public class TimetableGridView extends View {
 
@@ -39,6 +39,8 @@ public class TimetableGridView extends View {
     private static final String[] DAY_LABELS = {
             "周一", "周二", "周三", "周四", "周五", "周六", "周日"
     };
+    private static final float DEFAULT_DAY_COLUMN_DP = 48f;
+    private static final float MIN_DAY_COLUMN_DP = 30f;
 
     private final Paint gridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -46,8 +48,10 @@ public class TimetableGridView extends View {
     private final TextPaint titlePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint detailPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
 
+    private final float density;
     private final int timeColumnWidth;
-    private final int dayColumnWidth;
+    private final int minDayColumnWidth;
+    private int dayColumnWidth;
     private final int headerHeight;
     private final int rowHeight;
 
@@ -60,6 +64,7 @@ public class TimetableGridView extends View {
     private final int colorToday;
 
     private final List<Block> blocks = new ArrayList<>();
+    private final List<TimetableCourse> courses = new ArrayList<>();
     private final int touchSlop;
 
     private StudySchedule schedule = StudySchedule.winterDefault();
@@ -86,10 +91,11 @@ public class TimetableGridView extends View {
 
     public TimetableGridView(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
-        float density = getResources().getDisplayMetrics().density;
+        density = getResources().getDisplayMetrics().density;
         touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-        timeColumnWidth = Math.round(46 * density);
-        dayColumnWidth = Math.round(80 * density);
+        timeColumnWidth = Math.round(40 * density);
+        dayColumnWidth = Math.round(DEFAULT_DAY_COLUMN_DP * density);
+        minDayColumnWidth = Math.round(MIN_DAY_COLUMN_DP * density);
         headerHeight = Math.round(38 * density);
         rowHeight = Math.round(60 * density);
 
@@ -100,8 +106,8 @@ public class TimetableGridView extends View {
         labelPaint.setTextAlign(Paint.Align.CENTER);
 
         titlePaint.setFakeBoldText(true);
-        titlePaint.setTextSize(sp(10.5f));
-        detailPaint.setTextSize(sp(8.5f));
+        titlePaint.setTextSize(sp(10f));
+        detailPaint.setTextSize(sp(8f));
 
         blockFills = new int[]{
                 ContextCompat.getColor(context, R.color.study_block_mint_fill),
@@ -136,6 +142,8 @@ public class TimetableGridView extends View {
 
     public void setData(@NonNull List<TimetableCourse> courses, @NonNull StudySchedule schedule) {
         this.schedule = schedule;
+        this.courses.clear();
+        this.courses.addAll(courses);
         int maxEnd = 0;
         for (TimetableCourse course : courses) {
             maxEnd = Math.max(maxEnd, course.endPeriod());
@@ -150,8 +158,7 @@ public class TimetableGridView extends View {
 
     private void rebuildBlocks(@NonNull List<TimetableCourse> courses) {
         blocks.clear();
-        int textWidth = dayColumnWidth - Math.round(12 * getResources()
-                .getDisplayMetrics().density);
+        int textWidth = Math.max(1, dayColumnWidth - Math.round(9 * density));
         for (TimetableCourse course : courses) {
             int index = Math.floorMod(course.id().hashCode(), blockFills.length);
             int span = Math.max(1, course.endPeriod() - course.startPeriod() + 1);
@@ -162,7 +169,7 @@ public class TimetableGridView extends View {
             detailPaint.setAlpha(220);
             String name = course.name();
             StaticLayout title = layout(name, titlePaint, textWidth,
-                    span >= 2 ? 2 : 1);
+                    span >= 2 ? 3 : 1);
             StringBuilder detail = new StringBuilder();
             if (!course.location().isEmpty()) {
                 detail.append(course.location());
@@ -192,12 +199,30 @@ public class TimetableGridView extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+        int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+        int available = widthSize - getPaddingLeft() - getPaddingRight();
+        int nextDayWidth;
+        if (widthMode != MeasureSpec.UNSPECIFIED && available > timeColumnWidth) {
+            nextDayWidth = Math.max(minDayColumnWidth,
+                    (available - timeColumnWidth) / DAYS);
+        } else {
+            nextDayWidth = Math.round(DEFAULT_DAY_COLUMN_DP * density);
+        }
+        if (nextDayWidth != dayColumnWidth) {
+            dayColumnWidth = nextDayWidth;
+            if (!courses.isEmpty()) {
+                // 列宽变了，课程名的换行宽度也要跟着重排。
+                rebuildBlocks(courses);
+            }
+        }
         int width = getPaddingLeft() + timeColumnWidth + DAYS * dayColumnWidth
                 + getPaddingRight();
         int height = getPaddingTop() + headerHeight + displayPeriods * rowHeight
                 + getPaddingBottom();
-        setMeasuredDimension(resolveSize(width, widthMeasureSpec),
-                resolveSize(height, heightMeasureSpec));
+        int measuredWidth = widthMode == MeasureSpec.EXACTLY
+                ? widthSize : resolveSize(width, widthMeasureSpec);
+        setMeasuredDimension(measuredWidth, resolveSize(height, heightMeasureSpec));
     }
 
     @Override
@@ -271,10 +296,13 @@ public class TimetableGridView extends View {
         for (Block block : blocks) {
             TimetableCourse course = block.course;
             float left = timeColumnWidth + (course.weekday() - 1) * dayColumnWidth
-                    + 2 * density;
-            float top = headerHeight + (course.startPeriod() - 1) * rowHeight + 2 * density;
-            float right = timeColumnWidth + course.weekday() * dayColumnWidth - 2 * density;
-            float bottom = headerHeight + course.endPeriod() * rowHeight - 2 * density;
+                    + 1.5f * density;
+            float top = headerHeight + (course.startPeriod() - 1) * rowHeight
+                    + 1.5f * density;
+            float right = timeColumnWidth + course.weekday() * dayColumnWidth
+                    - 1.5f * density;
+            float bottom = headerHeight + course.endPeriod() * rowHeight
+                    - 1.5f * density;
             rect.set(left, top, right, bottom);
 
             fillPaint.setColor(block.fillColor);
@@ -282,8 +310,8 @@ public class TimetableGridView extends View {
 
             canvas.save();
             canvas.clipRect(rect);
-            float textLeft = left + 5 * density;
-            float textTop = top + 5 * density;
+            float textLeft = left + 3 * density;
+            float textTop = top + 4 * density;
             canvas.translate(textLeft, textTop);
             block.title.draw(canvas);
             canvas.translate(0, block.title.getHeight() + 1 * density);
