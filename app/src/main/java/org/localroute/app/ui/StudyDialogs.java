@@ -82,6 +82,14 @@ public final class StudyDialogs {
                     }
                     StudyTimetableStore.saveCourses(activity,
                             StudyTimetableStore.sorted(courses));
+                    // 教务课表自带周次范围：教学周不足时自动扩展到课程覆盖的最大周。
+                    int maxWeek = 0;
+                    for (TimetableCourse course : courses) {
+                        maxWeek = Math.max(maxWeek, TimetableText.maxWeek(course.weeks()));
+                    }
+                    if (maxWeek > StudyTimetableStore.loadTotalWeeks(activity)) {
+                        StudyTimetableStore.saveTotalWeeks(activity, maxWeek);
+                    }
                     Toast.makeText(activity, added == 0
                                     ? activity.getString(R.string.study_import_no_new)
                                     : activity.getString(R.string.study_import_result, added),
@@ -186,7 +194,8 @@ public final class StudyDialogs {
             } else {
                 binding.inputCoursePeriod.setText("1-2");
             }
-            binding.inputCourseWeeks.setText("1-16");
+            binding.inputCourseWeeks.setText(
+                    "1-" + StudyTimetableStore.loadTotalWeeks(activity));
         }
 
         // 显示节次对应的实际时间，方便边改边核对；时间跟随设置页的冬/夏令时作息。
@@ -234,7 +243,8 @@ public final class StudyDialogs {
                 int[] periods = TimetableText.parsePeriods(
                         binding.inputCoursePeriod.getText().toString());
                 String weeksRaw = binding.inputCourseWeeks.getText().toString().trim();
-                String weeks = weeksRaw.isEmpty() ? "1-16"
+                String weeks = weeksRaw.isEmpty()
+                        ? "1-" + StudyTimetableStore.loadTotalWeeks(activity)
                         : TimetableText.normalizeWeeks(weeksRaw);
                 if (name.isEmpty() || periods == null || weeks == null) {
                     Toast.makeText(activity, R.string.study_course_invalid,

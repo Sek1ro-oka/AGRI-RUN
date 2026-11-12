@@ -206,9 +206,6 @@
     <string name="app_settings_activation_cancel">取消</string>
     <string name="app_settings_activation_wrong">激活码不正确</string>
     <string name="app_settings_activation_success">激活成功</string>
-    <string name="app_settings_activation_state_unused">未激活</string>
-    <string name="app_settings_activation_state_reset">可重新激活一次</string>
-    <string name="app_settings_activation_state_used">已激活 · 激活码仅可使用一次</string>
 
     <!-- 校园快跑 -->
     <string name="campus_entry_title">校园快跑</string>
@@ -412,7 +409,18 @@
     <string name="study_verify_loading">正在加载安全验证页…</string>
     <string name="study_network_error">网络不可用，已显示上次缓存的结果。</string>
     <string name="study_login_network_error">网络不可用，请检查网络后重试。</string>
-    <string name="study_timetable_summary">共 %1$d 门课 · 周一至周日</string>
+    <string name="study_timetable_summary">第 %1$d 周 · 本周 %2$d 门 · 全学期 %3$d 门</string>
+    <string name="study_week_first">第 1 周</string>
+    <string name="study_week_total_default">共 20 周</string>
+    <string name="study_week_current">第 %1$d 周</string>
+    <string name="study_week_total">共 %1$d 周 · 点击选择</string>
+    <string name="study_week_prev">上一周</string>
+    <string name="study_week_next">下一周</string>
+    <string name="study_week_pick_title">选择周次</string>
+    <string name="study_week_pick_total">总周数</string>
+    <string name="study_week_total_title">学期总周数</string>
+    <string name="study_week_total_message">按学校教学日历设置；导入课程超出时会自动扩展。</string>
+    <string name="study_week_confirm">查看</string>
     <string name="study_timetable_empty">还没有课表。可以从学校教务系统直接导入，也可以点击任意空白格添加课程或事件。</string>
     <string name="study_timetable_note">%1$s · 上午 %2$s–%3$s · 下午 %4$s–%5$s · 晚课 %6$s–%7$s\n点击课程卡片可修改或删除，点击空白格可添加事件。</string>
     <string name="study_timetable_import">从教务系统导入</string>
@@ -434,6 +442,16 @@
 
     <!-- 教务系统导入（正方 jwglxt） -->
     <string name="study_jw_title">导入教务课表</string>
+    <string name="study_jw_school_title">选择学校</string>
+    <string name="study_jw_school_none">尚未选择学校</string>
+    <string name="study_jw_school_change">更换</string>
+    <string name="study_jw_school_current">当前学校：%1$s</string>
+    <string name="study_jw_school_item_current">%1$s（当前）</string>
+    <string name="study_jw_school_custom">其他高校（手动填写教务地址）</string>
+    <string name="study_jw_school_custom_title">填写教务地址</string>
+    <string name="study_jw_school_custom_hint">https://jwxt.example.edu.cn/jwglxt/xtgl/login_slogin.html</string>
+    <string name="study_jw_school_custom_help">填写学校教务系统登录页地址；只填域名时会自动补全正方教务系统路径。内置列表未收录的学校用这里添加。</string>
+    <string name="study_jw_school_custom_invalid">地址格式不正确，请填写教务系统登录页地址</string>
     <string name="study_jw_hint">请在校内网或学校 VPN 下使用。登录只在教务系统官方页面完成，应用不读取、不保存账号密码；登录后点底部「读取课表」。</string>
     <string name="study_jw_loading">正在加载教务系统…</string>
     <string name="study_jw_fetch">读取课表</string>
@@ -444,7 +462,7 @@
     <string name="study_jw_web_error">无法打开教务系统页面。请确认已连接校园网或学校 VPN，然后重新登录。</string>
     <string name="study_jw_timeout">读取课表超时，请检查网络后重试；校外访问需要先连接学校 VPN。</string>
     <string name="study_jw_no_courses">教务系统没有返回当前学期的课程。请确认学期与课表已在网页中显示。</string>
-    <string name="study_jw_source">%1$s · 共 %2$d 门</string>
+    <string name="study_jw_source">%1$s · %2$s · 共 %3$d 门</string>
     <string name="study_jw_error_session">还没有登录或登录已失效，请先在页面上完成登录，再点「读取课表」。</string>
     <string name="study_jw_error_page">当前页面不是教务系统。请回到教务系统登录页后再读取。</string>
     <string name="study_jw_error_term">没有识别到学年学期，请先在教务系统课表页选择学期。</string>

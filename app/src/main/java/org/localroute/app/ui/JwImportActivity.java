@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.text.InputType;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
@@ -18,11 +19,14 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -34,6 +38,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityJwImportBinding;
+import org.localroute.app.study.JwSchools;
 import org.localroute.app.study.JwTimetableJavascript;
 import org.localroute.app.study.JwTimetableParser;
 import org.localroute.app.study.TimetableCourse;
@@ -44,19 +49,17 @@ import java.util.Locale;
 /**
  * 从学校教务系统（正方 jwglxt）读取课表。
  *
- * <p>账号密码只在教务系统官方 WebView 页面里输入，应用不读取、不保存；
+ * <p>学校和登录地址由用户选择：内置部分高校入口，也可手动填写其它学校的
+ * 教务登录页。账号密码只在教务系统官方 WebView 页面里输入，应用不读取、不保存；
  * 登录成功后由页面内脚本调用学校自己的课表接口，只把课程 JSON 带回本机。
  * 本页不写日志、不上传任何页面内容。
  */
 public class JwImportActivity extends AppCompatActivity {
 
-    /** 浙江农林大学正方教务系统入口（校外需先连学校 VPN）。 */
-    public static final String LOGIN_URL =
-            "http://jwxt.zafu.edu.cn/jwglxt/xtgl/login_slogin.html";
-    private static final String BASE_URL = "http://jwxt.zafu.edu.cn/jwglxt/";
     private static final long FETCH_TIMEOUT_MS = 25_000L;
 
     private ActivityJwImportBinding binding;
+    private JwSchools.School school;
     private boolean pageLoaded;
     private boolean fetching;
 
@@ -150,11 +153,11 @@ public class JwImportActivity extends AppCompatActivity {
             }
         });
         binding.jwWebView.addJavascriptInterface(new JwBridge(), "LegionJw");
-        binding.jwWebView.loadUrl(LOGIN_URL);
 
         binding.buttonJwBack.setOnClickListener(view -> finish());
         binding.buttonJwRelogin.setOnClickListener(view -> relogin());
         binding.buttonJwFetch.setOnClickListener(view -> fetchTimetable());
+        binding.rowJwSchool.setOnClickListener(view -> showSchoolPicker());
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -165,14 +168,106 @@ public class JwImportActivity extends AppCompatActivity {
                 }
             }
         });
+
+        school = JwSchools.loadSaved(this);
+        if (school == null) {
+            // 第一次使用先让用户选择学校，避免默认假定某所高校。
+            mainHandler.post(() -> showSchoolPicker(true));
+        } else {
+            openSchool(school);
+        }
+    }
+
+    /** 打开一所学校的登录页；同一入口长期复用，切换学校时重新加载。 */
+    private void openSchool(@NonNull JwSchools.School target) {
+        school = target;
+        JwSchools.save(this, target);
+        binding.textJwSchool.setText(getString(R.string.study_jw_school_current,
+                target.name()));
+        pageLoaded = false;
+        showStatus(null);
+        binding.jwLoading.setVisibility(View.VISIBLE);
+        binding.jwWebView.loadUrl(target.loginUrl());
+    }
+
+    /**
+     * 学校选择：内置高校 + 手动填写。首次进入取消时直接退出，
+     * 已选过学校时取消则保持当前页面。
+     */
+    private void showSchoolPicker() {
+        showSchoolPicker(false);
+    }
+
+    private void showSchoolPicker(boolean exitWhenCancelled) {
+        List<JwSchools.School> schools = JwSchools.builtIns();
+        String[] labels = new String[schools.size() + 1];
+        for (int i = 0; i < schools.size(); i++) {
+            JwSchools.School item = schools.get(i);
+            boolean current = school != null && school.loginUrl().equals(item.loginUrl());
+            labels[i] = current
+                    ? getString(R.string.study_jw_school_item_current, item.name())
+                    : item.name();
+        }
+        labels[schools.size()] = getString(R.string.study_jw_school_custom);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.study_jw_school_title)
+                .setItems(labels, (ignored, which) -> {
+                    if (which == schools.size()) {
+                        showCustomSchoolDialog();
+                    } else {
+                        openSchool(schools.get(which));
+                    }
+                })
+                .setNegativeButton(R.string.campus_cancel, null)
+                .create();
+        dialog.setOnCancelListener(ignored -> {
+            if (exitWhenCancelled && school == null) {
+                finish();
+            }
+        });
+        dialog.show();
+    }
+
+    private void showCustomSchoolDialog() {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        input.setSingleLine(true);
+        input.setHint(R.string.study_jw_school_custom_hint);
+        int padding = Math.round(20 * getResources().getDisplayMetrics().density);
+        FrameLayout container = new FrameLayout(this);
+        container.setPadding(padding, Math.round(8 * getResources().getDisplayMetrics().density),
+                padding, 0);
+        container.addView(input);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.study_jw_school_custom_title)
+                .setMessage(R.string.study_jw_school_custom_help)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                    JwSchools.School custom = JwSchools.normalizeCustom(
+                            input.getText().toString());
+                    if (custom == null) {
+                        input.setError(getString(R.string.study_jw_school_custom_invalid));
+                        input.requestFocus();
+                        return;
+                    }
+                    dialog.dismiss();
+                    openSchool(custom);
+                }));
+        dialog.show();
     }
 
     private void relogin() {
-        if (fetching) {
+        if (fetching || school == null) {
             return;
         }
+        String baseUrl = JwSchools.baseUrl(school);
         CookieManager cookieManager = CookieManager.getInstance();
-        String cookies = cookieManager.getCookie(BASE_URL);
+        String cookies = cookieManager.getCookie(baseUrl);
         if (cookies != null) {
             for (String pair : cookies.split(";")) {
                 int index = pair.indexOf('=');
@@ -183,19 +278,19 @@ public class JwImportActivity extends AppCompatActivity {
                 if (name.isEmpty()) {
                     continue;
                 }
-                cookieManager.setCookie(BASE_URL, name + "=; Max-Age=0; Path=/");
+                cookieManager.setCookie(baseUrl, name + "=; Max-Age=0; Path=/");
             }
             cookieManager.flush();
         }
         pageLoaded = false;
         showStatus(null);
         binding.jwLoading.setVisibility(View.VISIBLE);
-        binding.jwWebView.loadUrl(LOGIN_URL);
+        binding.jwWebView.loadUrl(school.loginUrl());
         Toast.makeText(this, R.string.study_jw_relogin_done, Toast.LENGTH_SHORT).show();
     }
 
     private void fetchTimetable() {
-        if (fetching) {
+        if (fetching || school == null) {
             return;
         }
         if (!pageLoaded) {
@@ -243,6 +338,7 @@ public class JwImportActivity extends AppCompatActivity {
         }
         finishFetch();
         String source = getString(R.string.study_jw_source,
+                school == null ? "" : school.name(),
                 JwTimetableParser.termLabel(root.optString("xnm", ""),
                         root.optString("xqm", "")),
                 courses.size());

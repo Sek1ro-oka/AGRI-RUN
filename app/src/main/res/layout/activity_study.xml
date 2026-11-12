@@ -223,6 +223,68 @@
                     android:textColor="@color/campus_muted"
                     android:textSize="12sp" />
 
+                <!-- 教学周次：按周查看，默认显示第 1 周 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_campus_card"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="8dp">
+
+                    <ImageButton
+                        android:id="@+id/buttonPrevWeek"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_campus_soft_circle"
+                        android:contentDescription="@string/study_week_prev"
+                        android:padding="10dp"
+                        android:rotation="180"
+                        android:src="@drawable/ic_campus_chevron_right" />
+
+                    <LinearLayout
+                        android:id="@+id/weekPicker"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingVertical="2dp">
+
+                        <TextView
+                            android:id="@+id/textWeekLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/study_week_first"
+                            android:textColor="@color/campus_ink"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/textWeekRange"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:text="@string/study_week_total_default"
+                            android:textColor="@color/campus_muted"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <ImageButton
+                        android:id="@+id/buttonNextWeek"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_campus_soft_circle"
+                        android:contentDescription="@string/study_week_next"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_campus_chevron_right" />
+                </LinearLayout>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -231,7 +293,7 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/buttonImportTimetable"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        style="@style/Widget.Material3.Button"
                         android:layout_width="0dp"
                         android:layout_height="42dp"
                         android:layout_weight="1"
@@ -242,13 +304,13 @@
                         android:textColor="@color/campus_mint_dark"
                         android:textSize="13sp"
                         android:textStyle="bold"
+                        app:backgroundTint="@color/campus_mint_pale"
                         app:cornerRadius="14dp"
                         app:icon="@drawable/ic_study_import"
                         app:iconGravity="textStart"
                         app:iconPadding="4dp"
                         app:iconSize="16dp"
-                        app:iconTint="@color/campus_mint_dark"
-                        app:strokeColor="@color/campus_card_stroke" />
+                        app:iconTint="@color/campus_mint_dark" />
 
                     <Space
                         android:layout_width="10dp"
@@ -264,16 +326,16 @@
                         android:insetBottom="0dp"
                         android:minWidth="0dp"
                         android:text="@string/study_timetable_add"
-                        android:textColor="@color/brand_on_primary"
+                        android:textColor="@color/campus_mint_dark"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        app:backgroundTint="@color/campus_mint"
+                        app:backgroundTint="@color/campus_mint_pale"
                         app:cornerRadius="14dp"
                         app:icon="@drawable/ic_study_add"
                         app:iconGravity="textStart"
                         app:iconPadding="4dp"
                         app:iconSize="16dp"
-                        app:iconTint="@color/brand_on_primary" />
+                        app:iconTint="@color/campus_mint_dark" />
                 </LinearLayout>
 
                 <org.localroute.app.ui.TimetableGridView

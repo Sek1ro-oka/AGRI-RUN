@@ -21,8 +21,15 @@ public final class StudyTimetableStore {
     private static final String KEY_SEASON = "season";
     private static final String KEY_SCHEDULE_WINTER = "schedule_winter";
     private static final String KEY_SCHEDULE_SUMMER = "schedule_summer";
+    private static final String KEY_TOTAL_WEEKS = "total_weeks";
+    private static final String KEY_CURRENT_WEEK = "current_week";
     /** 旧版本只保存了每节课分钟数，读取时迁移后删除。 */
     private static final String KEY_LEGACY_PERIOD_MINUTES = "period_minutes";
+
+    /** 默认按 20 个教学周展示；导入课程超出时自动扩展，可手动调整。 */
+    public static final int DEFAULT_TOTAL_WEEKS = 20;
+    public static final int MIN_TOTAL_WEEKS = 1;
+    public static final int MAX_TOTAL_WEEKS = 30;
 
     private StudyTimetableStore() {
     }
@@ -38,6 +45,30 @@ public final class StudyTimetableStore {
 
     public static void clearCourses(Context context) {
         prefs(context).edit().remove(KEY_COURSES).apply();
+    }
+
+    /** 学期教学总周数：默认 20，限制在 1–30。 */
+    public static int loadTotalWeeks(Context context) {
+        int stored = prefs(context).getInt(KEY_TOTAL_WEEKS, DEFAULT_TOTAL_WEEKS);
+        return Math.max(MIN_TOTAL_WEEKS, Math.min(MAX_TOTAL_WEEKS, stored));
+    }
+
+    public static void saveTotalWeeks(Context context, int weeks) {
+        int value = Math.max(MIN_TOTAL_WEEKS, Math.min(MAX_TOTAL_WEEKS, weeks));
+        prefs(context).edit().putInt(KEY_TOTAL_WEEKS, value).apply();
+    }
+
+    /** 当前查看的教学周；超出总周数时收回到最后一周年。 */
+    public static int loadWeek(Context context) {
+        int total = loadTotalWeeks(context);
+        int stored = prefs(context).getInt(KEY_CURRENT_WEEK, 1);
+        return Math.max(1, Math.min(total, stored));
+    }
+
+    public static void saveWeek(Context context, int week) {
+        int total = loadTotalWeeks(context);
+        int value = Math.max(1, Math.min(total, week));
+        prefs(context).edit().putInt(KEY_CURRENT_WEEK, value).apply();
     }
 
     /** 未手动选择时按当前月份推断：5-10 月夏令时，其余冬令时。 */
