@@ -1,15 +1,10 @@
 package org.localroute.app.overlay;
 
-import android.app.Activity;
-import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
 
@@ -26,15 +21,18 @@ import org.localroute.app.run.SimulationStateRepo;
  * <p>现在改成单例：面板、订阅、开关状态都挂在应用上下文上，只有「用户开关悬浮窗」时才
  * attach / detach 一次（成对）。Activity 被销毁不再影响悬浮条，重建也不会多出第二个窗口。
  *
- * <p>0.5.0 起悬浮条只在 Legion 处于后台时显示：前台时隐藏，避免盖住应用自己的界面；
- * 应用被切到后台（所有 Activity 都 STOPPED）后再出现。判断不依赖 Activity 生命周期回调
- * 的瞬时状态，而是延迟 150 ms 复查，避免旋转屏幕等重建过程造成闪烁。用户在面板上点
- * 「关闭」会把开关写回 false，之后必须在设置页手动重新开启。
+ * <p>0.8.3 起显隐条件改为「虚拟定位任务运行中，且用户已经离开跑圈地图」：
+ * 跑圈地图上不遮挡地图；切到校园快跑设置页、主页、作业/课表等其它页面或系统后台时出现；
+ * 任务结束立即收起。冷启动、只画路线或只浏览地图时不再提前弹出。是否显示由
+ * {@link OverlayPolicy} 统一判断，{@code CampusRunActivity} 只负责上报跑圈地图是否可见。
  */
 public final class OverlayHost {
 
     private static final String PREFS = "ui";
     private static final String PREF_ENABLED = "overlay_enabled";
+
+    /** 离开跑圈地图后稍等再显示，避开页面切换 / Activity 重建的中间态。 */
+    private static final long SHOW_DELAY_MS = 150L;
 
     private static OverlayHost instance;
 
@@ -45,10 +43,7 @@ public final class OverlayHost {
         return instance;
     }
 
-    /** Activity STOPPED 后稍等再显示，避开旋转屏幕/页面重建的中间态。 */
-    private static final long BACKGROUND_SETTLE_MS = 150L;
-
-    private final Application app;
+    private final Context app;
     private final SharedPreferences prefs;
     private final OverlayPanel panel;
     private final LiveData<RunSnapshot> snapshots;
@@ -56,148 +51,102 @@ public final class OverlayHost {
     private final OverlaySession session;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
-    private OverlaySession.Listener currentListener;
     private boolean enabled;
-    private boolean foreground = true;
-    private int startedActivities;
-    private boolean lifecycleInstalled;
-    private RunSnapshot lastSnapshot;
+    /** 跑圈地图是否正显示在前台；由 {@code CampusRunActivity} 上报。 */
+    private boolean runMapVisible;
 
-    private final Runnable showWhenBackground = () -> {
-        if (enabled && !foreground) {
-            showNow();
-        }
-    };
+    private final Runnable showWhenAllowed = this::refreshNow;
 
     private OverlayHost(Context appContext) {
-        this.app = (Application) appContext.getApplicationContext();
+        this.app = appContext.getApplicationContext();
         this.prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         this.enabled = prefs.getBoolean(PREF_ENABLED, false);
         this.panel = new OverlayPanel(appContext, () -> setEnabled(false));
         this.snapshots = SimulationStateRepo.get().snapshot();
-        this.observer = snapshot -> {
-            lastSnapshot = snapshot;
-            OverlaySession.Listener listener = currentListener;
-            if (listener != null) {
-                listener.onSnapshot(snapshot);
-            }
-        };
+        this.observer = this::render;
         this.session = new OverlaySession(new SnapshotSource() {
             @Override
             public void subscribe(OverlaySession.Listener listener) {
-                currentListener = listener;
                 snapshots.observeForever(observer);
-                RunSnapshot current = snapshots.getValue();
-                listener.onSnapshot(current == null ? RunSnapshot.idle() : current);
+                listener.onSnapshot(current());
             }
 
             @Override
             public void unsubscribe(OverlaySession.Listener listener) {
                 // 与 subscribe 严格成对：不是「永不注销」的 observeForever。
-                currentListener = null;
                 snapshots.removeObserver(observer);
             }
         }, this::render);
-        installLifecycle();
     }
 
     /**
      * 按已保存的偏好恢复悬浮条。
      *
-     * <p>应用启动时调用一次即可；它只确保前后台监听已安装，不会在前台弹出悬浮条——
-     * 用户要看到面板，需要等 Legion 真正被切到后台。
+     * <p>应用启动时调用一次即可；只有虚拟定位已在下单且不在跑圈地图时才显示。
      */
     public void restore() {
-        installLifecycle();
+        refresh();
     }
 
     public boolean isEnabled() {
         return enabled;
     }
 
-    /** 用户开关悬浮控制条：写偏好；前台只记住开关，切到后台才真正显示。 */
+    /** 用户开关悬浮控制条：写偏好，并按「运行中 + 是否在看跑圈地图」立即重算显隐。 */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
         prefs.edit().putBoolean(PREF_ENABLED, enabled).apply();
-        if (enabled && !foreground) {
-            showNow();
-        } else {
-            hideNow();
-        }
+        refresh();
     }
 
     /**
-     * 按当前开关与前后台状态重新渲染一次（权限可能刚在系统设置里变化）。
+     * 跑圈地图是否可见。
      *
-     * <p>前台只收起并记住开关；从系统授权页回到应用后，等下次切到后台再显示。
+     * <p>由 {@code CampusRunActivity} 在切页、onStart / onStop 时上报。进入跑圈地图立即收起；
+     * 离开时延迟一拍再显示，避免页面切换或重建造成闪烁。
      */
+    public void setRunMapVisible(boolean visible) {
+        if (runMapVisible == visible) {
+            return;
+        }
+        runMapVisible = visible;
+        handler.removeCallbacks(showWhenAllowed);
+        if (visible) {
+            refreshNow();
+        } else {
+            handler.postDelayed(showWhenAllowed, SHOW_DELAY_MS);
+        }
+    }
+
+    /** 权限或运行状态可能刚变化：按当前条件重新渲染一次。 */
     public void refresh() {
-        if (enabled && !foreground) {
-            showNow();
+        handler.removeCallbacks(showWhenAllowed);
+        refreshNow();
+    }
+
+    private void refreshNow() {
+        RunSnapshot current = current();
+        if (OverlayPolicy.shouldShow(current, enabled,
+                OverlayPanel.canDrawOverlays(app), runMapVisible)) {
+            showNow(current);
         } else {
             hideNow();
         }
     }
 
-    private void installLifecycle() {
-        if (lifecycleInstalled) {
-            return;
-        }
-        lifecycleInstalled = true;
-        app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
-            @Override
-            public void onActivityStarted(@NonNull Activity activity) {
-                startedActivities++;
-                foreground = true;
-                handler.removeCallbacks(showWhenBackground);
-                hideNow();
-            }
-
-            @Override
-            public void onActivityStopped(@NonNull Activity activity) {
-                startedActivities = Math.max(0, startedActivities - 1);
-                if (startedActivities == 0) {
-                    foreground = false;
-                    // 再等一拍：Activity 重建时新页面通常已经 STARTED，不会误判为切后台。
-                    handler.removeCallbacks(showWhenBackground);
-                    handler.postDelayed(showWhenBackground, BACKGROUND_SETTLE_MS);
-                }
-            }
-
-            @Override
-            public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
-            }
-
-            @Override
-            public void onActivityResumed(@NonNull Activity activity) {
-            }
-
-            @Override
-            public void onActivityPaused(@NonNull Activity activity) {
-            }
-
-            @Override
-            public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle outState) {
-            }
-
-            @Override
-            public void onActivityDestroyed(@NonNull Activity activity) {
-            }
-        });
+    private RunSnapshot current() {
+        RunSnapshot value = snapshots.getValue();
+        return value == null ? SimulationStateRepo.get().current() : value;
     }
 
-    private void showNow() {
-        if (!enabled || foreground) {
-            return;
-        }
-        if (!OverlayPanel.canDrawOverlays(app)) {
-            // 没授权时不建立订阅，避免后台空转；授权后用户再切一次前后台即可。
-            panel.hide();
-            session.detach();
+    private void showNow(RunSnapshot snapshot) {
+        if (!OverlayPolicy.shouldShow(snapshot, enabled,
+                OverlayPanel.canDrawOverlays(app), runMapVisible)) {
+            hideNow();
             return;
         }
         session.attach();
-        render(lastSnapshot == null ? RunSnapshot.idle() : lastSnapshot);
+        panel.sync(snapshot, true);
     }
 
     private void hideNow() {
@@ -207,7 +156,9 @@ public final class OverlayHost {
 
     /** 渲染面板；由 LiveData 主线程回调驱动，不受 Activity 生命周期影响。 */
     private void render(RunSnapshot snapshot) {
-        if (!enabled || foreground) {
+        if (!OverlayPolicy.shouldShow(snapshot, enabled,
+                OverlayPanel.canDrawOverlays(app), runMapVisible)) {
+            hideNow();
             return;
         }
         panel.sync(snapshot == null ? RunSnapshot.idle() : snapshot, true);
