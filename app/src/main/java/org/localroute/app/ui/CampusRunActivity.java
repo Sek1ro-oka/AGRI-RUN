@@ -24,6 +24,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.LinearInterpolator;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -53,6 +54,7 @@ import org.localroute.app.campus.CampusPoint;
 import org.localroute.app.campus.CampusPresets;
 import org.localroute.app.campus.CampusRoute;
 import org.localroute.app.campus.CampusRouteCodec;
+import org.localroute.app.campus.PresetConflicts;
 import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivityCampusRunBinding;
 import org.localroute.app.databinding.DialogCampusRoutesBinding;
@@ -115,6 +117,12 @@ public final class CampusRunActivity extends AppCompatActivity {
     /** 预设路线几何版本：1 = 0.7.0 初版；2 = 弯道平滑并统一方向。 */
     private static final String KEY_PRESET_REVISION = "preset_revision";
     private static final int PRESET_REVISION = 2;
+    /**
+     * 预设清单版本：3 = 增加「衣锦」。老用户升级时只补这一条新增预设，
+     * 不补回已经删掉的 A操 / B操。
+     */
+    private static final String KEY_PRESET_CATALOG = "preset_catalog_revision";
+    private static final int PRESET_CATALOG_REVISION = 3;
     private static final String KEY_ACTIVE_RUN_ID = "active_run_id";
     private static final String KEY_ACTIVE_LAP = "active_lap_meters";
     private static final String KEY_OWNED = "campus_owned";
@@ -197,6 +205,10 @@ public final class CampusRunActivity extends AppCompatActivity {
     private boolean drawMode;
     private final List<CampusPoint> draftPoints = new ArrayList<>();
     private boolean teleportArmed;
+
+    /** 激活码导入中遇到重名、等页面可见后逐个询问的预设。 */
+    private final List<PresetConflict> pendingPresetConflicts = new ArrayList<>();
+    private boolean presetConflictDialogShowing;
 
     private boolean claimOwnSession;
     private String activeRunId = "";
@@ -417,9 +429,10 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     /**
-     * 落实激活码效果：已激活时确保 A操 / B操 在列表中，按 id 去重。
+     * 落实激活码效果：已激活时确保全部预设都在列表中，按 id 去重。
      * 每次输入激活码都会重置“已补回”标记，再次进入本页时补回被删掉的预设；
      * 已存在的预设不会重复添加，也不覆盖用户改过的名称与几何。
+     * 升级到 0.8.2 的老用户只补新增的「衣锦」，不补回自己删掉的 A操 / B操。
      * 未激活时移除早期调试版自动写入的预设。
      *
      * @return 路线列表是否发生变化
@@ -427,18 +440,27 @@ public final class CampusRunActivity extends AppCompatActivity {
     private boolean applyPresetActivation() {
         boolean changed = false;
         if (prefs.getBoolean(PresetUnlock.KEY_UNLOCKED, false)) {
-            if (!prefs.getBoolean(PresetUnlock.KEY_PRESETS_ADDED, false)) {
-                List<CampusRoute> presets = Arrays.asList(CampusPresets.routeA(), CampusPresets.routeB());
-                for (int i = presets.size() - 1; i >= 0; i--) {
-                    CampusRoute preset = presets.get(i);
-                    if (indexOfRoute(preset.id()) < 0) {
-                        customRoutes.add(0, preset);
-                        changed = true;
-                    }
-                }
+            boolean presetsAdded = prefs.getBoolean(PresetUnlock.KEY_PRESETS_ADDED, false);
+            int catalog = prefs.getInt(KEY_PRESET_CATALOG, 0);
+            List<CampusRoute> presets = new ArrayList<>();
+            if (!presetsAdded) {
+                presets.addAll(CampusPresets.all());
+            } else if (catalog < PRESET_CATALOG_REVISION) {
+                presets.add(CampusPresets.routeYijin());
+            }
+            if (!presets.isEmpty()) {
+                // 只有真正导入时才重置待询问队列，避免页面恢复时把刚排好的弹窗清掉。
+                pendingPresetConflicts.clear();
+                changed |= importPresetRoutes(presets);
+            }
+            if (!presetsAdded) {
                 prefs.edit().putBoolean(PresetUnlock.KEY_PRESETS_ADDED, true).apply();
             }
+            if (catalog < PRESET_CATALOG_REVISION) {
+                prefs.edit().putInt(KEY_PRESET_CATALOG, PRESET_CATALOG_REVISION).apply();
+            }
         } else {
+            pendingPresetConflicts.clear();
             for (int i = customRoutes.size() - 1; i >= 0; i--) {
                 if (customRoutes.get(i).isPreset()) {
                     customRoutes.remove(i);
@@ -451,6 +473,136 @@ public final class CampusRunActivity extends AppCompatActivity {
             saveRoutes();
         }
         return changed;
+    }
+
+    /**
+     * 把缺失的预设插入列表最前面。遇到同名路线时：
+     * 开启询问则先记下来，等页面可见后弹窗；关闭询问则按上次动作跳过或替换。
+     */
+    private boolean importPresetRoutes(List<CampusRoute> presets) {
+        boolean changed = false;
+        for (int i = presets.size() - 1; i >= 0; i--) {
+            CampusRoute preset = presets.get(i);
+            if (indexOfRoute(preset.id()) >= 0) {
+                continue;
+            }
+            List<CampusRoute> conflicts = PresetConflicts.findBySameName(customRoutes, preset);
+            if (!conflicts.isEmpty()) {
+                if (PresetUnlock.isConflictAskEnabled(prefs)) {
+                    // 逆序插入待询问列表，弹窗顺序与预设顺序一致。
+                    pendingPresetConflicts.add(0, new PresetConflict(preset, conflicts));
+                } else if (PresetUnlock.ACTION_REPLACE.equals(PresetUnlock.conflictAction(prefs))
+                        && !isRunActiveNow()) {
+                    changed |= replacePresetConflict(preset, conflicts);
+                }
+                continue;
+            }
+            customRoutes.add(0, preset);
+            changed = true;
+        }
+        return changed;
+    }
+
+    /** 用预设替换全部同名路线，位置沿用最后一个被替换条目的位置。 */
+    private boolean replacePresetConflict(CampusRoute preset, List<CampusRoute> conflicts) {
+        if (indexOfRoute(preset.id()) >= 0) {
+            return false;
+        }
+        int insertAt = customRoutes.size();
+        for (int i = customRoutes.size() - 1; i >= 0; i--) {
+            if (PresetConflicts.contains(conflicts, customRoutes.get(i).id())) {
+                insertAt = i;
+                customRoutes.remove(i);
+            }
+        }
+        customRoutes.add(Math.min(insertAt, customRoutes.size()), preset);
+        return true;
+    }
+
+    /** 当前是否已有跑圈会话；导入只在空闲时改路线，避免动到正在使用的路线。 */
+    private boolean isRunActiveNow() {
+        return snapshot.isActive() || SimulationStateRepo.get().current().isActive();
+    }
+
+    /**
+     * 页面空闲后逐个弹重名询问。激活码入口在别处，导入发生在进入本页时，
+     * 那时视图还没 inflate，所以统一等到可见后再弹。
+     */
+    private void maybeShowPresetConflicts() {
+        if (presetConflictDialogShowing || pendingPresetConflicts.isEmpty()
+                || runScreenVisible || isRunActiveNow()
+                || isFinishing() || isDestroyed()) {
+            return;
+        }
+        showNextPresetConflict();
+    }
+
+    private void showNextPresetConflict() {
+        if (presetConflictDialogShowing || pendingPresetConflicts.isEmpty()
+                || runScreenVisible || isRunActiveNow()
+                || isFinishing() || isDestroyed()) {
+            return;
+        }
+        presetConflictDialogShowing = true;
+        PresetConflict conflict = pendingPresetConflicts.remove(0);
+        View content = getLayoutInflater().inflate(R.layout.dialog_campus_preset_conflict, null);
+        TextView message = content.findViewById(R.id.textPresetConflictMessage);
+        CheckBox dontAsk = content.findViewById(R.id.checkPresetConflictDontAsk);
+        message.setText(getString(R.string.campus_preset_conflict_message, conflict.preset.name()));
+
+        final boolean[] handled = {false};
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.campus_preset_conflict_title)
+                .setView(content)
+                .setPositiveButton(R.string.campus_preset_conflict_replace, (d, which) -> {
+                    handled[0] = true;
+                    resolvePresetConflict(conflict, true, dontAsk.isChecked());
+                })
+                .setNegativeButton(R.string.campus_preset_conflict_skip, (d, which) -> {
+                    handled[0] = true;
+                    resolvePresetConflict(conflict, false, dontAsk.isChecked());
+                })
+                .setOnCancelListener(d -> {
+                    if (!handled[0]) {
+                        handled[0] = true;
+                        // 返回键等同本次跳过，但不算「以后不再出现」。
+                        resolvePresetConflict(conflict, false, false);
+                    }
+                })
+                .create();
+        dialog.setOnDismissListener(d -> {
+            presetConflictDialogShowing = false;
+            binding.getRoot().post(this::showNextPresetConflict);
+        });
+        dialog.show();
+    }
+
+    private void resolvePresetConflict(PresetConflict conflict, boolean replace,
+                                       boolean dontAskAgain) {
+        PresetUnlock.rememberConflictChoice(prefs, replace, dontAskAgain);
+        if (!replace) {
+            return;
+        }
+        List<CampusRoute> current = PresetConflicts.findBySameName(customRoutes, conflict.preset);
+        if (current.isEmpty()) {
+            if (indexOfRoute(conflict.preset.id()) < 0) {
+                customRoutes.add(0, conflict.preset);
+                saveRoutes();
+            }
+            return;
+        }
+        boolean selectedReplaced = route != null
+                && PresetConflicts.contains(current, route.id());
+        if (!replacePresetConflict(conflict.preset, current)) {
+            return;
+        }
+        saveRoutes();
+        if (selectedReplaced) {
+            applyRoute(conflict.preset);
+        } else if (runScreenVisible) {
+            updateRunUi();
+        }
+        toast(getString(R.string.campus_preset_conflict_replaced, conflict.preset.name()));
     }
 
     /**
@@ -2086,6 +2238,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         } else {
             refreshPresetRoutesIfIdle();
         }
+        maybeShowPresetConflicts();
         if (pendingOverlayEnable) {
             if (OverlayPanel.canDrawOverlays(this)) {
                 enableCampusOverlayNow();
@@ -2211,6 +2364,17 @@ public final class CampusRunActivity extends AppCompatActivity {
             this.route = route;
             this.speedKmh = speedKmh;
             this.loops = loops;
+        }
+    }
+
+    /** 一条待询问的预设与它导入时撞名的现有路线（只用于展示与定位）。 */
+    private static final class PresetConflict {
+        final CampusRoute preset;
+        final List<CampusRoute> existing;
+
+        PresetConflict(CampusRoute preset, List<CampusRoute> existing) {
+            this.preset = preset;
+            this.existing = new ArrayList<>(existing);
         }
     }
 }
