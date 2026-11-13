@@ -186,6 +186,9 @@ public final class CampusRunActivity extends AppCompatActivity {
     private CampusRoute renderedRoute;
     private boolean mapReady;
     private boolean pendingFit;
+    /** 传送/定位后要居中的目标；地图或页面未就绪时等就绪回调再移动镜头。 */
+    @Nullable
+    private GeoPoint pendingCameraFocus;
 
     private String sport = SPORT_RUN;
     private int paceSeconds = DEFAULT_PACE_RUN;
@@ -705,7 +708,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     // ---------------------------------------------------------------- 控件
 
     private void wireViews() {
-        binding.buttonSetupBack.setOnClickListener(v -> finish());
+        binding.buttonSetupBack.setOnClickListener(v -> handleBack());
         binding.buttonRunBack.setOnClickListener(v -> handleBack());
         binding.buttonSport.setOnClickListener(this::showSportMenu);
         binding.buttonRunSport.setOnClickListener(this::showSportMenu);
@@ -835,7 +838,9 @@ public final class CampusRunActivity extends AppCompatActivity {
             if (message == null || message.isEmpty()) {
                 binding.textMapStatus.setVisibility(View.GONE);
                 mapReady = true;
-                if (pendingFit && runScreenVisible) {
+                if (pendingCameraFocus != null) {
+                    applyPendingCameraFocus();
+                } else if (pendingFit && runScreenVisible) {
                     pendingFit = false;
                     fitMapToRoute();
                 }
@@ -919,11 +924,40 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (mapHost == null) {
             return;
         }
+        // 整条路线取景与「传送到某点」互斥：后发的操作覆盖前一个，避免刚传送就被拉回全线。
+        pendingCameraFocus = null;
         pendingFit = true;
         if (mapReady && runScreenVisible) {
             pendingFit = false;
             fitMapToRoute();
         }
+    }
+
+    /**
+     * 把镜头移到指定位置并保持居中。
+     *
+     * <p>地图页刚显示或底图还没就绪时先记住目标，等就绪回调再移动；期间不再按整条路线取景，
+     * 否则传送/定位的结果会被随后的 fitRoute 覆盖。
+     */
+    private void focusMapOn(@NonNull GeoPoint point) {
+        pendingCameraFocus = point;
+        pendingFit = false;
+        if (!runScreenVisible || mapHost == null) {
+            return;
+        }
+        if (mapReady) {
+            binding.mapContainer.post(this::applyPendingCameraFocus);
+        }
+    }
+
+    private void applyPendingCameraFocus() {
+        if (pendingCameraFocus == null || mapHost == null || !mapReady
+                || !runScreenVisible || isFinishing() || isDestroyed()) {
+            return;
+        }
+        GeoPoint point = pendingCameraFocus;
+        pendingCameraFocus = null;
+        mapHost.focusOn(point);
     }
 
     private void fitMapToRoute() {
@@ -1007,6 +1041,16 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.seekVary.setProgress((int) Math.round(varyStrength * 100d));
         varySeekGuard = false;
         renderVaryValue();
+        updateBackDescriptions();
+    }
+
+    /** 运行中两个左上角按钮的含义互换：设置页回跑圈地图，跑圈地图回设置页。 */
+    private void updateBackDescriptions() {
+        boolean running = claimOwnSession && snapshot.isActive();
+        binding.buttonSetupBack.setContentDescription(getString(
+                running ? R.string.campus_back_to_run : R.string.campus_back));
+        binding.buttonRunBack.setContentDescription(getString(
+                running ? R.string.campus_back_to_setup : R.string.campus_back));
     }
 
     /** 扰动滑条的档位文案与百分比。 */
@@ -1041,6 +1085,8 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void showSetupScreen() {
         runScreenVisible = false;
+        // 离开跑圈地图：运行中的虚拟定位不再遮挡设置页，悬浮窗按需出现。
+        OverlayHost.get(this).setRunMapVisible(false);
         drawMode = false;
         editingRouteId = null;
         teleportArmed = false;
@@ -1057,12 +1103,15 @@ public final class CampusRunActivity extends AppCompatActivity {
         deviceLocation = null;
         renderedRoute = null;
         pendingFit = false;
+        pendingCameraFocus = null;
         showRunnerNow(null);
         renderSetupValues();
     }
 
     private void showRunScreen() {
         runScreenVisible = true;
+        // 回到跑圈地图：收起悬浮窗，避免盖住地图和底部按钮。
+        OverlayHost.get(this).setRunMapVisible(true);
         binding.setupScreen.setVisibility(View.GONE);
         binding.runScreen.setVisibility(View.VISIBLE);
         binding.doneOverlay.setVisibility(View.GONE);
@@ -1072,8 +1121,17 @@ public final class CampusRunActivity extends AppCompatActivity {
         } else {
             syncMapRoute(false);
         }
+        // 在排帧前就记下是否有「传送到某点」的镜头目标：目标即使已被更早的一帧应用并清空，
+        // 也不要再补一次整线取景把镜头拉回去。
+        final boolean focusRequested = pendingCameraFocus != null;
         binding.mapContainer.post(() -> {
-            if (runScreenVisible) {
+            if (!runScreenVisible) {
+                return;
+            }
+            if (focusRequested) {
+                // 传送/定位刚发生：以目标点为中心，不要再按整条路线取景。
+                applyPendingCameraFocus();
+            } else {
                 requestMapFit();
             }
         });
@@ -1113,11 +1171,17 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         if (runScreenVisible) {
             if (claimOwnSession && snapshot.isActive()) {
-                moveTaskToBack(true);
-                toast(getString(R.string.campus_background_running));
+                // 运行中不把任务丢到后台：回到设置页，顶部左上角再点一次即可回来。
+                showSetupScreen();
+                toast(getString(R.string.campus_running_keep));
                 return;
             }
             showSetupScreen();
+            return;
+        }
+        if (claimOwnSession && snapshot.isActive()) {
+            // 运行中设置页的左上角不再退出应用，直接回到跑圈地图。
+            showRunScreen();
             return;
         }
         finish();
@@ -1293,12 +1357,12 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         if (claimOwnSession && snapshot.hasPosition()
                 && Double.isFinite(snapshot.latitude()) && Double.isFinite(snapshot.longitude())) {
-            mapHost.focusOn(new GeoPoint(snapshot.latitude(), snapshot.longitude()));
+            focusMapOn(new GeoPoint(snapshot.latitude(), snapshot.longitude()));
             toast(getString(R.string.campus_locate_done));
             return;
         }
         if (teleportTarget != null) {
-            mapHost.focusOn(teleportTarget);
+            focusMapOn(teleportTarget);
             toast(getString(R.string.campus_locate_done));
             return;
         }
@@ -1385,7 +1449,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         deviceLocation = point;
         showRunnerNow(point);
-        mapHost.focusOn(point);
+        focusMapOn(point);
         binding.textCoordinates.setText(CampusFormat.coordinates(point.latitude(), point.longitude()));
         toast(getString(R.string.campus_locate_device));
         DiagnosticLog.info("定位到设备当前位置：" + point.format() + " via " + provider);
@@ -1399,7 +1463,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         deviceLocation = null;
-        mapHost.focusOn(start);
+        focusMapOn(start);
         toast(getString(R.string.campus_locate_fallback));
     }
 
@@ -1428,8 +1492,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         teleportTarget = target;
         if (mapHost != null) {
             showRunnerNow(target);
-            mapHost.focusOn(target);
         }
+        focusMapOn(target);
 
         if (snapshot.isActive()) {
             if (!claimOwnSession) {
@@ -1474,10 +1538,12 @@ public final class CampusRunActivity extends AppCompatActivity {
                 .putFloat(KEY_ACTIVE_LAP, 0f)
                 .apply();
         SimulationService.start(this, request);
+        // 先登记镜头目标再切页：showRunScreen 的取景 post 看到待定目标就只居中到传送点，
+        // 不会再按整条路线取景把镜头拉回去。
+        focusMapOn(target);
         showRunScreen();
         if (mapHost != null) {
             showRunnerNow(target);
-            mapHost.focusOn(target);
         }
         toast(getString(R.string.campus_teleport_hold_started));
     }
@@ -1573,9 +1639,6 @@ public final class CampusRunActivity extends AppCompatActivity {
                         .putBoolean(KEY_OWNED, true)
                         .putString(KEY_ACTIVE_RUN_ID, activeRunId)
                         .apply();
-            }
-            if (!runScreenVisible) {
-                showRunScreen();
             }
         }
         if (ours && next.state() == RunState.PAUSED && next.errorCode() != null
@@ -1763,6 +1826,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.buttonGoal.setAlpha(drawMode ? 0.45f : 1f);
         binding.buttonTeleport.setAlpha(drawMode ? 0.45f : 1f);
         binding.buttonRunSport.setEnabled(!active);
+        updateBackDescriptions();
     }
 
     private void tintMainButton(int colorRes) {
@@ -2225,6 +2289,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (mapHost != null) {
             mapHost.onStart();
         }
+        // 从后台或别的页面回来：按当前页面上报，跑圈地图可见时立即收起悬浮窗。
+        OverlayHost.get(this).setRunMapVisible(runScreenVisible);
     }
 
     @Override
@@ -2263,6 +2329,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (mapHost != null) {
             mapHost.onStop();
         }
+        // 页面已经不可见：运行中的任务允许悬浮窗接管控制。
+        OverlayHost.get(this).setRunMapVisible(false);
         super.onStop();
     }
 

@@ -145,10 +145,10 @@
     <string name="menu_overlay_no_permission">需要先授予「显示在其他应用上层」权限</string>
     <string name="menu_overlay_on">悬浮控制条已开启：运行中切到别的应用也能暂停/停止</string>
     <string name="menu_overlay_off">悬浮控制条已关闭</string>
-    <string name="settings_overlay_status_on">已开启 · 切到后台时显示</string>
+    <string name="settings_overlay_status_on">已开启 · 运行中离开跑圈地图时显示</string>
     <string name="settings_overlay_status_on_missing">已开启 · 未授权</string>
     <string name="settings_overlay_status_off">未开启</string>
-    <string name="settings_overlay_enable_toast">悬浮控制台已开启：切到后台后显示</string>
+    <string name="settings_overlay_enable_toast">悬浮控制台已开启：虚拟定位运行时切到其他界面即可看到</string>
     <string name="settings_overlay_disable_toast">悬浮控制台已关闭</string>
     <string name="settings_overlay_need_permission_toast">需要「显示在其他应用上层」权限，授权后回来再打开开关</string>
     <string name="settings_overlay_denied_toast">还没获得悬浮窗权限，开关保持关闭</string>
@@ -217,6 +217,8 @@
     <string name="campus_title">校园快跑</string>
     <string name="campus_demo_label">虚拟定位</string>
     <string name="campus_back">返回</string>
+    <string name="campus_back_to_run">返回跑圈地图</string>
+    <string name="campus_back_to_setup">返回校园快跑设置</string>
     <string name="campus_sport_run">跑步</string>
     <string name="campus_sport_walk">步行</string>
     <string name="campus_sport_ride">骑行</string>
@@ -349,7 +351,7 @@
     <string name="campus_route_invalid">路线无效</string>
     <string name="campus_stopping">正在结束…</string>
     <string name="campus_hold_stopped">单点保持已结束</string>
-    <string name="campus_background_running">跑圈在后台继续，可从通知暂停或结束</string>
+    <string name="campus_running_keep">虚拟定位继续运行中，点左上角可回到跑圈地图</string>
     <string name="campus_done_distance_value">%1$s km</string>
     <string name="campus_sheet_switch_title">切换跑圈路线</string>
     <string name="campus_sheet_switch_message">从「%1$s」切换到「%2$s」会结束当前跑圈，当前进度不会保留。</string>

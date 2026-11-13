@@ -52,7 +52,8 @@ import org.localroute.core.RunState;
  * {@link SimulationService#drive(Context, GeoPoint, double, double, double)} 下发方向与速度，
  * 由服务端在定位节拍里推进坐标并发布带速度/航向的定位，松手立即停止。
  *
- * <p>面板只在 Legion 切到后台且开关打开时显示；前台不覆盖应用界面。面板可拖动、位置与
+ * <p>面板只在虚拟定位任务运行中、且用户已经离开跑圈地图时显示：跑圈地图上不遮挡地图，
+ * 切到设置页、主页、作业/课表或系统后台时出现；任务结束立即收起。面板可拖动、位置与
  * 缩放持久化；没有「显示在其他应用上层」权限时整体不显示，由设置页引导授权。
  */
 public final class OverlayPanel {
