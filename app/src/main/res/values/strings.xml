@@ -88,6 +88,9 @@
     <string name="settings_open_app_details">打开应用详情</string>
     <string name="settings_probe_mock">检测模拟位置权限</string>
     <string name="settings_probe_hint">「检测模拟位置权限」会创建并立刻移除一个测试 provider，用来判断系统是否允许本应用提交模拟位置；运行中请勿使用。</string>
+    <string name="settings_section_presets">预设路线</string>
+    <string name="settings_conflict_ask_title">重名时询问</string>
+    <string name="settings_conflict_ask_summary">激活码导入预设遇到同名路线时，弹出「跳过 / 替换」选择。关闭后按上次选择处理；还没选过时默认跳过。</string>
     <string name="settings_section_environment">环境检查</string>
     <string name="settings_intro">按下面顺序准备环境。任一项是「失败」时，模拟位置不会被系统接受。</string>
 
@@ -322,6 +325,12 @@
     <string name="campus_route_delete">删除</string>
     <string name="campus_route_deleted">已删除路线「%1$s」</string>
     <string name="campus_route_delete_running">跑圈进行中，不能删除当前路线</string>
+    <string name="campus_preset_conflict_title">预设路线重名</string>
+    <string name="campus_preset_conflict_message">激活码要添加预设路线「%1$s」，但列表里已有同名路线。\n「跳过」保留现有路线；「替换」会删除同名路线并加入预设。</string>
+    <string name="campus_preset_conflict_replace">替换</string>
+    <string name="campus_preset_conflict_skip">跳过</string>
+    <string name="campus_preset_conflict_dont_ask">以后不再出现</string>
+    <string name="campus_preset_conflict_replaced">已用预设路线替换「%1$s」</string>
     <string name="campus_done_completed">跑圈完成</string>
     <string name="campus_done_stopped">已结束</string>
     <string name="campus_done_error">跑圈出错</string>

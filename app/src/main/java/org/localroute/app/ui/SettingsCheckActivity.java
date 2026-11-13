@@ -2,6 +2,7 @@ package org.localroute.app.ui;
 
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -26,6 +27,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import org.localroute.app.R;
+import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivitySettingsCheckBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.run.SimulationStateRepo;
@@ -36,12 +38,15 @@ import java.util.List;
 /**
  * 设置页：主页同款白底 + 薄荷绿卡片。
  *
- * <p>本页只做只读环境体检与用户主动触发的权限探测，不修改任何系统设置；
- * 悬浮窗开关统一放在「校园快跑」页，避免两处入口状态不一致。
+ * <p>环境检查只读，权限探测由用户主动触发，不修改任何系统设置；
+ * 唯一会写入的是应用自己的「预设重名询问」开关，与激活码导入共用
+ * {@link PresetUnlock} 的本地偏好。悬浮窗开关统一放在「校园快跑」页，
+ * 避免两处入口状态不一致。
  */
 public class SettingsCheckActivity extends AppCompatActivity {
 
     private ActivitySettingsCheckBinding binding;
+    private SharedPreferences prefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +63,12 @@ public class SettingsCheckActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
+
+        prefs = getSharedPreferences(PresetUnlock.PREFS_NAME, MODE_PRIVATE);
+        PresetUnlock.migrate(prefs);
+        binding.switchPresetConflictAsk.setChecked(PresetUnlock.isConflictAskEnabled(prefs));
+        binding.switchPresetConflictAsk.setOnCheckedChangeListener((button, checked) ->
+                PresetUnlock.setConflictAskEnabled(prefs, checked));
 
         binding.buttonRecheck.setOnClickListener(v -> renderChecks());
         binding.buttonProbe.setOnClickListener(v -> runProbe());
