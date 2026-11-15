@@ -10,10 +10,10 @@ import java.util.Random;
  *
  * <p>设计目标：
  * <ul>
- *   <li><b>每圈不重合</b>：波形按累计距离连续推进，两条波长（151 m / 57 m）与常见跑道圈长
+ *   <li><b>每圈不重合</b>：波形按累计距离连续推进，三条波长（151 m / 57 m / 23 m）与常见跑道圈长
  *       不成整数倍，所以同一位置在下一圈会落在不同的横向位置；</li>
  *   <li><b>不出跑道</b>：偏移只朝路线外侧（远离环心）一个方向，幅度上限
- *       {@link #MAX_OFFSET_METERS}（2.5 m），落在橙色跑道的可用宽度内；</li>
+ *       {@link #MAX_OFFSET_METERS}（6 m），仍落在标准跑道的可用宽度内；</li>
  *   <li><b>平滑</b>：起终点附近 8 m 内淡入淡出，圈与圈交界处回到基准线，
  *       不会出现横向跳变。</li>
  * </ul>
@@ -22,14 +22,20 @@ import java.util.Random;
  */
 public final class RouteVary {
 
-    /** 扰动幅度上限（米）。跑道可用宽度通常在 4—6 m，留出安全余量。 */
-    public static final double MAX_OFFSET_METERS = 2.5d;
+    /**
+     * 扰动幅度上限（米）。最大档接近参考轨迹的摆动幅度；
+     * 标准 8 道跑道可用宽度约 8—10 m，内侧起跑的路线仍能留在红色跑道内。
+     */
+    public static final double MAX_OFFSET_METERS = 6d;
 
     /** 主波长（米），与 400 m 级跑道圈长不成整数倍。 */
     private static final double WAVE_LENGTH_LONG = 151d;
 
     /** 次波长（米），叠加后让相邻圈差异更明显。 */
     private static final double WAVE_LENGTH_SHORT = 57d;
+
+    /** 细节波长（米），让最大档看起来更像真实轨迹的不规则摆动。 */
+    private static final double WAVE_LENGTH_FINE = 23d;
 
     /** 起终点附近的淡入淡出长度（米）。 */
     private static final double EDGE_FADE_METERS = 8d;
@@ -39,15 +45,17 @@ public final class RouteVary {
     private final double strength;
     private final double phaseLong;
     private final double phaseShort;
+    private final double phaseFine;
     private final double centerLatitude;
     private final double centerLongitude;
     private final double lapMeters;
 
-    private RouteVary(double strength, double phaseLong, double phaseShort,
+    private RouteVary(double strength, double phaseLong, double phaseShort, double phaseFine,
                       double centerLatitude, double centerLongitude, double lapMeters) {
         this.strength = strength;
         this.phaseLong = phaseLong;
         this.phaseShort = phaseShort;
+        this.phaseFine = phaseFine;
         this.centerLatitude = centerLatitude;
         this.centerLongitude = centerLongitude;
         this.lapMeters = lapMeters;
@@ -77,7 +85,8 @@ public final class RouteVary {
         Random random = new Random(seed);
         double phaseLong = random.nextDouble() * Math.PI * 2d;
         double phaseShort = random.nextDouble() * Math.PI * 2d;
-        return new RouteVary(clamped, phaseLong, phaseShort,
+        double phaseFine = random.nextDouble() * Math.PI * 2d;
+        return new RouteVary(clamped, phaseLong, phaseShort, phaseFine,
                 centerLat, centerLon, Math.max(1e-6d, lapMeters));
     }
 
@@ -112,9 +121,11 @@ public final class RouteVary {
             return base;
         }
         // 波形按累计距离推进而不是按圈内进度，否则每一圈都会重复同一偏移。
+        // 三层波长叠加：长波决定大范围摆动，短波制造不均匀的鼓包，细波让最大档更接近真实轨迹。
         double wave = 0.5d + 0.5d * (
-                0.62d * Math.sin(2d * Math.PI * distanceMeters / WAVE_LENGTH_LONG + phaseLong)
-                        + 0.38d * Math.sin(2d * Math.PI * distanceMeters / WAVE_LENGTH_SHORT + phaseShort));
+                0.50d * Math.sin(2d * Math.PI * distanceMeters / WAVE_LENGTH_LONG + phaseLong)
+                        + 0.30d * Math.sin(2d * Math.PI * distanceMeters / WAVE_LENGTH_SHORT + phaseShort)
+                        + 0.20d * Math.sin(2d * Math.PI * distanceMeters / WAVE_LENGTH_FINE + phaseFine));
         double offsetMeters = MAX_OFFSET_METERS * strength * fade * wave;
         if (offsetMeters <= 1e-6d) {
             return base;

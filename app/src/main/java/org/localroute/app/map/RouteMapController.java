@@ -724,6 +724,7 @@ public final class RouteMapController implements RouteMapHost {
     }
 
     /** 跟随当前模拟位置；用户手动拖动地图后自动关闭。 */
+    @Override
     public void followRunner(@NonNull GeoPoint position) {
         if (map == null || !followRunner) {
             return;
@@ -732,6 +733,7 @@ public final class RouteMapController implements RouteMapHost {
                 Math.max(16f, map.getCameraPosition().zoom)));
     }
 
+    @Override
     public void setFollowRunner(boolean follow) {
         this.followRunner = follow;
     }
