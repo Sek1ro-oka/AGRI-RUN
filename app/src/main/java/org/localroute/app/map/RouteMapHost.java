@@ -62,6 +62,14 @@ public interface RouteMapHost {
 
     void followRunner(@Nullable GeoPoint position);
 
+    /**
+     * 开关镜头跟随：运行中每次模拟位置更新都让镜头追上跑者。
+     *
+     * <p>用户手动拖动地图会在地图实现里自动关闭；点「定位当前位置」或重新传送时由界面再次打开。
+     */
+    default void setFollowRunner(boolean follow) {
+    }
+
     @Nullable
     GeoPoint cameraCenter();
 

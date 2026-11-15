@@ -62,6 +62,8 @@ public final class AmapRouteMapView implements RouteMapHost {
     @Nullable
     private GeoPoint following;
     private boolean followingEnabled;
+    /** 镜头是否跟随模拟位置；用户触摸地图后关闭，界面在定位/传送时重新打开。 */
+    private boolean followEnabled = true;
     private boolean setupDone;
     private BaseLayer baseLayer = BaseLayer.SATELLITE;
     private String lastStatus = "";
@@ -115,6 +117,7 @@ public final class AmapRouteMapView implements RouteMapHost {
         // 用户一碰地图就停止跟随，逻辑与 MapLibre 版保持一致。
         map.setOnMapTouchListener((MotionEvent event) -> {
             if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                followEnabled = false;
                 followingEnabled = false;
             }
         });
@@ -256,6 +259,7 @@ public final class AmapRouteMapView implements RouteMapHost {
             return;
         }
         followingEnabled = false;
+        followEnabled = false;
         map.animateCamera(CameraUpdateFactory.newLatLngZoom(toDisplay(point), 16f));
     }
     @Override
@@ -288,11 +292,16 @@ public final class AmapRouteMapView implements RouteMapHost {
             followingEnabled = false;
             return;
         }
-        if (map == null) {
+        if (map == null || !followEnabled) {
             return;
         }
         followingEnabled = true;
         map.animateCamera(CameraUpdateFactory.newLatLng(toDisplay(position)));
+    }
+
+    @Override
+    public void setFollowRunner(boolean follow) {
+        followEnabled = follow;
     }
 
     @Nullable

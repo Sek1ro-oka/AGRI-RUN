@@ -958,6 +958,24 @@ public final class CampusRunActivity extends AppCompatActivity {
         GeoPoint point = pendingCameraFocus;
         pendingCameraFocus = null;
         mapHost.focusOn(point);
+        // 手动定位/传送后重新打开跟随：之后模拟位置怎么移动，地图都会追上。
+        // 用户再次拖动地图时由地图实现自动关闭。
+        mapHost.setFollowRunner(true);
+    }
+
+    /**
+     * 当前虚拟定位的落点；只认本页发起且快照坐标有效的运行。
+     *
+     * <p>从悬浮屏或其他页面切回跑圈地图时用它对准跑者，而不是把镜头拉回整条路线。
+     */
+    @Nullable
+    private GeoPoint simulatedPosition() {
+        if (!claimOwnSession || !snapshot.isActive() || !snapshot.hasPosition()
+                || !Double.isFinite(snapshot.latitude())
+                || !Double.isFinite(snapshot.longitude())) {
+            return null;
+        }
+        return new GeoPoint(snapshot.latitude(), snapshot.longitude());
     }
 
     private void fitMapToRoute() {
@@ -1124,12 +1142,18 @@ public final class CampusRunActivity extends AppCompatActivity {
         // 在排帧前就记下是否有「传送到某点」的镜头目标：目标即使已被更早的一帧应用并清空，
         // 也不要再补一次整线取景把镜头拉回去。
         final boolean focusRequested = pendingCameraFocus != null;
+        // 运行中回到地图（含从悬浮屏、其他页面切回）：直接对着当前模拟位置，
+        // 避免「虚拟定位已经跑到别处，地图还停在原位置」。
+        final GeoPoint simulatedHere = focusRequested ? null : simulatedPosition();
         binding.mapContainer.post(() -> {
             if (!runScreenVisible) {
                 return;
             }
             if (focusRequested) {
                 // 传送/定位刚发生：以目标点为中心，不要再按整条路线取景。
+                applyPendingCameraFocus();
+            } else if (simulatedHere != null) {
+                focusMapOn(simulatedHere);
                 applyPendingCameraFocus();
             } else {
                 requestMapFit();
@@ -1792,8 +1816,15 @@ public final class CampusRunActivity extends AppCompatActivity {
                 // STARTING 阶段的快照还没有经纬度（NaN），必须先检查有限性再换算。
                 if (ours && snapshot.hasPosition()
                         && Double.isFinite(snapshot.latitude()) && Double.isFinite(snapshot.longitude())) {
-                    animateRunnerTo(new GeoPoint(snapshot.latitude(), snapshot.longitude()),
-                            snapshot.state() == RunState.RUNNING);
+                    GeoPoint running = new GeoPoint(snapshot.latitude(), snapshot.longitude());
+                    animateRunnerTo(running, snapshot.state() == RunState.RUNNING);
+                    // 跑圈/单点保持/摇杆移动时让镜头跟着模拟位置走；用户拖动地图后
+                    // 地图实现会关闭跟随，点「定位当前位置」或再传送即可恢复。
+                    boolean moving = snapshot.state() == RunState.RUNNING
+                            || snapshot.state() == RunState.PAUSED;
+                    if (runScreenVisible && moving) {
+                        mapHost.followRunner(running);
+                    }
                 } else if (!active) {
                     showRunnerNow(teleportTarget != null ? teleportTarget : deviceLocation);
                 }
