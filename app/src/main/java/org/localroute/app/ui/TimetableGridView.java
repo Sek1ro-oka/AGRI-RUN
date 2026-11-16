@@ -22,8 +22,9 @@ import org.localroute.app.R;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.TimetableCourse;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
@@ -39,6 +40,9 @@ public class TimetableGridView extends View {
     private static final String[] DAY_LABELS = {
             "周一", "周二", "周三", "周四", "周五", "周六", "周日"
     };
+    /** 表头日期只显示月日，例如 11.09。 */
+    private static final DateTimeFormatter DATE_FORMAT =
+            DateTimeFormatter.ofPattern("MM.dd", Locale.CHINA);
     private static final float DEFAULT_DAY_COLUMN_DP = 48f;
     private static final float MIN_DAY_COLUMN_DP = 30f;
 
@@ -68,6 +72,9 @@ public class TimetableGridView extends View {
     private final int touchSlop;
 
     private StudySchedule schedule = StudySchedule.winterDefault();
+    @Nullable
+    private LocalDate weekStart;
+    private int todayWeekday;
     private int displayPeriods = 10;
     private OnEmptySlotClickListener emptySlotListener;
     private OnCourseClickListener courseListener;
@@ -141,7 +148,18 @@ public class TimetableGridView extends View {
     }
 
     public void setData(@NonNull List<TimetableCourse> courses, @NonNull StudySchedule schedule) {
+        setData(courses, schedule, null, 0);
+    }
+
+    /**
+     * @param weekStart    当前查看周的周一；为空时不显示日期
+     * @param todayWeekday 今天在这一周的星期序号（周一为 1）；0 表示不强调今天
+     */
+    public void setData(@NonNull List<TimetableCourse> courses, @NonNull StudySchedule schedule,
+                        @Nullable LocalDate weekStart, int todayWeekday) {
         this.schedule = schedule;
+        this.weekStart = weekStart;
+        this.todayWeekday = todayWeekday;
         this.courses.clear();
         this.courses.addAll(courses);
         int maxEnd = 0;
@@ -151,7 +169,12 @@ public class TimetableGridView extends View {
         displayPeriods = Math.min(TimetableCourse.MAX_PERIOD,
                 Math.max(8, Math.max(schedule.totalPeriods(), maxEnd)));
         rebuildBlocks(courses);
-        setContentDescription(String.format(Locale.CHINA, "周课表，共 %d 门课", courses.size()));
+        StringBuilder description = new StringBuilder("周课表");
+        if (weekStart != null) {
+            description.append('，').append(DATE_FORMAT.format(weekStart)).append(" 起");
+        }
+        description.append(String.format(Locale.CHINA, "，共 %d 门课", courses.size()));
+        setContentDescription(description.toString());
         requestLayout();
         invalidate();
     }
@@ -234,7 +257,7 @@ public class TimetableGridView extends View {
 
         int gridWidth = timeColumnWidth + DAYS * dayColumnWidth;
         int gridHeight = headerHeight + displayPeriods * rowHeight;
-        int today = todayIndex();
+        int today = todayWeekday;
 
         // 周末与今天列的浅色底
         fillPaint.setStyle(Paint.Style.FILL);
@@ -252,15 +275,22 @@ public class TimetableGridView extends View {
             }
         }
 
-        // 表头
-        labelPaint.setTextSize(sp(10));
+        // 表头：星期；设置开学日期后在其下方显示当天日期。
         for (int day = 1; day <= DAYS; day++) {
             boolean isToday = day == today;
             labelPaint.setColor(isToday ? colorMintDark : colorMuted);
             labelPaint.setFakeBoldText(isToday);
+            labelPaint.setTextSize(sp(10));
             float x = timeColumnWidth + (day - 1) * dayColumnWidth + dayColumnWidth / 2f;
-            canvas.drawText(DAY_LABELS[day - 1], x, headerHeight / 2f
-                    + labelPaint.getTextSize() / 3f, labelPaint);
+            float labelBaseline = weekStart == null
+                    ? headerHeight / 2f + labelPaint.getTextSize() / 3f
+                    : headerHeight * 0.36f + labelPaint.getTextSize() / 3f;
+            canvas.drawText(DAY_LABELS[day - 1], x, labelBaseline, labelPaint);
+            if (weekStart != null) {
+                labelPaint.setTextSize(sp(8));
+                canvas.drawText(DATE_FORMAT.format(weekStart.plusDays(day - 1L)), x,
+                        headerHeight * 0.76f + labelPaint.getTextSize() / 3f, labelPaint);
+            }
         }
 
         // 左侧节次与时间
@@ -384,11 +414,6 @@ public class TimetableGridView extends View {
         if (emptySlotListener != null) {
             emptySlotListener.onEmptySlot(weekday, period);
         }
-    }
-
-    private static int todayIndex() {
-        int calendarDay = Calendar.getInstance().get(Calendar.DAY_OF_WEEK);
-        return calendarDay == Calendar.SUNDAY ? 7 : calendarDay - 1;
     }
 
     private float sp(float value) {

@@ -4,7 +4,9 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +25,7 @@ public final class StudyTimetableStore {
     private static final String KEY_SCHEDULE_SUMMER = "schedule_summer";
     private static final String KEY_TOTAL_WEEKS = "total_weeks";
     private static final String KEY_CURRENT_WEEK = "current_week";
+    private static final String KEY_SEMESTER_START = "semester_start";
     /** 旧版本只保存了每节课分钟数，读取时迁移后删除。 */
     private static final String KEY_LEGACY_PERIOD_MINUTES = "period_minutes";
 
@@ -69,6 +72,30 @@ public final class StudyTimetableStore {
         int total = loadTotalWeeks(context);
         int value = Math.max(1, Math.min(total, week));
         prefs(context).edit().putInt(KEY_CURRENT_WEEK, value).apply();
+    }
+
+    /** 学期第 1 周开始日期；未设置时返回 null，课表不标注「本周」。 */
+    @Nullable
+    public static LocalDate loadSemesterStart(Context context) {
+        long epochDay = prefs(context).getLong(KEY_SEMESTER_START, Long.MIN_VALUE);
+        if (epochDay == Long.MIN_VALUE) {
+            return null;
+        }
+        return LocalDate.ofEpochDay(epochDay);
+    }
+
+    public static void saveSemesterStart(Context context, @NonNull LocalDate date) {
+        prefs(context).edit().putLong(KEY_SEMESTER_START, date.toEpochDay()).apply();
+    }
+
+    public static void clearSemesterStart(Context context) {
+        prefs(context).edit().remove(KEY_SEMESTER_START).apply();
+    }
+
+    /** 今天所在的教学周；未设置开学日期或不在学期内时为 0。 */
+    public static int currentTeachingWeek(Context context) {
+        return SemesterCalendar.teachingWeek(loadSemesterStart(context), LocalDate.now(),
+                loadTotalWeeks(context));
     }
 
     /** 未手动选择时按当前月份推断：5-10 月夏令时，其余冬令时。 */
