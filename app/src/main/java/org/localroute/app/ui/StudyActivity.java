@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
@@ -30,6 +31,7 @@ import org.localroute.app.databinding.ItemStudyHomeworkBinding;
 import org.localroute.app.study.ChaoxingClient;
 import org.localroute.app.study.HomeworkFilter;
 import org.localroute.app.study.HomeworkItem;
+import org.localroute.app.study.SemesterCalendar;
 import org.localroute.app.study.StudyHomeworkCache;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudySession;
@@ -40,6 +42,7 @@ import org.localroute.app.study.TimetableText;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -58,6 +61,10 @@ public class StudyActivity extends AppCompatActivity {
 
     /** 作业自动刷新间隔；逐课程读取请求较多，缩短间隔容易触发学习通安全验证。 */
     private static final long AUTO_REFRESH_INTERVAL_MS = 30L * 60L * 1000L;
+    /** 横向滑动超过这个距离才翻到相邻周，避免误触课程卡片。 */
+    private static final float WEEK_SWIPE_DP = 56f;
+    /** 纵向移动超过这个距离就视为在滚动课表，不再判定为翻周。 */
+    private static final float WEEK_SWIPE_VERTICAL_DP = 24f;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -70,6 +77,10 @@ public class StudyActivity extends AppCompatActivity {
     private boolean loginLaunched;
     private int totalWeeks = StudyTimetableStore.DEFAULT_TOTAL_WEEKS;
     private int currentWeek = 1;
+    private int lastTeachingWeek;
+    private boolean weekSwipeTracking;
+    private float weekSwipeStartX;
+    private float weekSwipeStartY;
 
     private ActivityResultLauncher<Intent> loginLauncher;
     private ActivityResultLauncher<Intent> settingsLauncher;
@@ -132,6 +143,11 @@ public class StudyActivity extends AppCompatActivity {
                     String previousUid = session == null ? null : session.uid();
                     session = StudySessionStore.load(this);
                     renderAccount();
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null
+                            && result.getData().getBooleanExtra(
+                            StudySettingsActivity.EXTRA_WEEK_CHANGED, false)) {
+                        jumpToTeachingWeek();
+                    }
                     renderTimetable();
                     if (session == null) {
                         homework.clear();
@@ -151,6 +167,8 @@ public class StudyActivity extends AppCompatActivity {
 
         binding.buttonStudyBack.setOnClickListener(view -> finish());
         binding.buttonStudySettings.setOnClickListener(view ->
+                settingsLauncher.launch(new Intent(this, StudySettingsActivity.class)));
+        binding.bannerSemesterStart.setOnClickListener(view ->
                 settingsLauncher.launch(new Intent(this, StudySettingsActivity.class)));
         binding.tabHomework.setOnClickListener(view -> selectTab(false));
         binding.tabTimetable.setOnClickListener(view -> selectTab(true));
@@ -173,12 +191,13 @@ public class StudyActivity extends AppCompatActivity {
         binding.timetableGrid.setOnCourseClickListener(course ->
                 StudyDialogs.showCourseEditor(this, course,
                         updated -> renderTimetable(), this::renderTimetable));
-        binding.buttonPrevWeek.setOnClickListener(view -> selectWeek(currentWeek - 1));
-        binding.buttonNextWeek.setOnClickListener(view -> selectWeek(currentWeek + 1));
+        binding.buttonPrevWeek.setOnClickListener(view -> shiftWeek(-1));
+        binding.buttonNextWeek.setOnClickListener(view -> shiftWeek(1));
         binding.weekPicker.setOnClickListener(view -> showWeekPicker());
 
         session = StudySessionStore.load(this);
         renderAccount();
+        initializeWeek();
         renderTimetable();
         boolean openTimetable = getIntent().getBooleanExtra(EXTRA_TIMETABLE, false);
         selectTab(openTimetable);
@@ -216,6 +235,7 @@ public class StudyActivity extends AppCompatActivity {
             session = latest;
             renderAccount();
         }
+        followTeachingWeek();
         renderTimetable();
     }
 
@@ -611,7 +631,9 @@ public class StudyActivity extends AppCompatActivity {
         int season = StudyTimetableStore.loadSeason(this);
 
         totalWeeks = StudyTimetableStore.loadTotalWeeks(this);
-        currentWeek = StudyTimetableStore.loadWeek(this);
+        int teachingWeek = StudyTimetableStore.currentTeachingWeek(this);
+        lastTeachingWeek = teachingWeek;
+        currentWeek = Math.max(1, Math.min(totalWeeks, currentWeek));
         List<TimetableCourse> weekCourses = new ArrayList<>();
         for (TimetableCourse course : courses) {
             if (TimetableText.activeInWeek(course.weeks(), currentWeek)) {
@@ -619,14 +641,31 @@ public class StudyActivity extends AppCompatActivity {
             }
         }
 
-        binding.textWeekLabel.setText(getString(R.string.study_week_current, currentWeek));
+        boolean viewingCurrentWeek = teachingWeek > 0 && currentWeek == teachingWeek;
+        binding.textWeekLabel.setText(getString(viewingCurrentWeek
+                ? R.string.study_week_current_this : R.string.study_week_current,
+                currentWeek));
         binding.textWeekRange.setText(getString(R.string.study_week_total, totalWeeks));
-        boolean canPrev = currentWeek > 1;
-        boolean canNext = currentWeek < totalWeeks;
-        binding.buttonPrevWeek.setEnabled(canPrev);
-        binding.buttonPrevWeek.setAlpha(canPrev ? 1f : 0.3f);
-        binding.buttonNextWeek.setEnabled(canNext);
-        binding.buttonNextWeek.setAlpha(canNext ? 1f : 0.3f);
+        // 边界也允许继续翻：满周后回到第 1 周，避免卡在两头。
+        binding.buttonPrevWeek.setEnabled(true);
+        binding.buttonPrevWeek.setAlpha(1f);
+        binding.buttonNextWeek.setEnabled(true);
+        binding.buttonNextWeek.setAlpha(1f);
+
+        LocalDate today = LocalDate.now();
+        LocalDate semesterStart = StudyTimetableStore.loadSemesterStart(this);
+        binding.bannerSemesterStart.setVisibility(
+                semesterStart == null ? View.VISIBLE : View.GONE);
+        LocalDate weekStart = semesterStart == null ? null
+                : SemesterCalendar.mondayOf(semesterStart).plusWeeks(currentWeek - 1L);
+        int todayWeekday;
+        if (weekStart == null) {
+            // 没设置开学日期时不知道真实周次，沿用旧行为：高亮今天的星期。
+            todayWeekday = today.getDayOfWeek().getValue();
+        } else {
+            todayWeekday = SemesterCalendar.mondayOf(today).equals(weekStart)
+                    ? today.getDayOfWeek().getValue() : 0;
+        }
 
         binding.textTimetableSummary.setText(
                 getString(R.string.study_timetable_summary,
@@ -640,17 +679,120 @@ public class StudyActivity extends AppCompatActivity {
                 schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_AFTERNOON)),
                 schedule.startLabel(schedule.firstPeriod(StudySchedule.SEGMENT_EVENING)),
                 schedule.endLabel(schedule.lastPeriod(StudySchedule.SEGMENT_EVENING))));
-        binding.timetableGrid.setData(weekCourses, schedule);
+        binding.timetableGrid.setData(weekCourses, schedule, weekStart, todayWeekday);
 
         boolean empty = courses.isEmpty();
         binding.timetableGrid.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.textTimetableEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
     }
 
+    /** 打开页面时定位到本学期真实教学周；没有开学日期时沿用上次查看的周。 */
+    private void initializeWeek() {
+        int teaching = StudyTimetableStore.currentTeachingWeek(this);
+        currentWeek = teaching > 0 ? teaching : StudyTimetableStore.loadWeek(this);
+        StudyTimetableStore.saveWeek(this, currentWeek);
+    }
+
+    /** 设置开学日期后跳到新的本周。 */
+    private void jumpToTeachingWeek() {
+        int teaching = StudyTimetableStore.currentTeachingWeek(this);
+        if (teaching > 0) {
+            currentWeek = teaching;
+            StudyTimetableStore.saveWeek(this, currentWeek);
+        }
+    }
+
+    /** 停留在「本周」时跨周后自动跟到新教学周；手动翻到其他周则不打扰。 */
+    private void followTeachingWeek() {
+        int teaching = StudyTimetableStore.currentTeachingWeek(this);
+        if (teaching > 0 && teaching != currentWeek && currentWeek == lastTeachingWeek) {
+            currentWeek = teaching;
+            StudyTimetableStore.saveWeek(this, currentWeek);
+        }
+    }
+
     private void selectWeek(int week) {
         currentWeek = Math.max(1, Math.min(totalWeeks, week));
         StudyTimetableStore.saveWeek(this, currentWeek);
         renderTimetable();
+    }
+
+    /** 左右翻周，越过第一/最后一周年时绕回另一端。 */
+    private void shiftWeek(int delta) {
+        if (binding == null || isFinishing() || isDestroyed()) {
+            return;
+        }
+        int next = SemesterCalendar.wrapWeek(currentWeek, delta, totalWeeks);
+        if (next == currentWeek) {
+            return;
+        }
+        currentWeek = next;
+        StudyTimetableStore.saveWeek(this, currentWeek);
+        renderTimetable();
+        animateWeekChange(delta);
+    }
+
+    private void animateWeekChange(int delta) {
+        View grid = binding.timetableGrid;
+        if (grid.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        grid.setTranslationX(dp(18f) * (delta < 0 ? -1f : 1f));
+        grid.setAlpha(0.4f);
+        grid.animate().translationX(0f).alpha(1f).setDuration(160L).start();
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        handleWeekSwipe(event);
+        return super.dispatchTouchEvent(event);
+    }
+
+    /** 在课表页监听横向滑动；纵向滚动和普通点击保持原样。 */
+    private void handleWeekSwipe(@NonNull MotionEvent event) {
+        if (binding == null || binding.timetableScreen.getVisibility() != View.VISIBLE) {
+            weekSwipeTracking = false;
+            return;
+        }
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                weekSwipeStartX = event.getX();
+                weekSwipeStartY = event.getY();
+                weekSwipeTracking = true;
+                break;
+            case MotionEvent.ACTION_MOVE: {
+                if (!weekSwipeTracking) {
+                    return;
+                }
+                float dx = Math.abs(event.getX() - weekSwipeStartX);
+                float dy = Math.abs(event.getY() - weekSwipeStartY);
+                if (dy > dp(WEEK_SWIPE_VERTICAL_DP) && dy > dx) {
+                    weekSwipeTracking = false;
+                }
+                break;
+            }
+            case MotionEvent.ACTION_UP: {
+                if (!weekSwipeTracking) {
+                    return;
+                }
+                weekSwipeTracking = false;
+                float dx = event.getX() - weekSwipeStartX;
+                float dy = event.getY() - weekSwipeStartY;
+                if (Math.abs(dx) >= dp(WEEK_SWIPE_DP)
+                        && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    int direction = dx < 0 ? 1 : -1;
+                    // 等这次触摸分发结束再重绘课表，避免在事件中途替换内容。
+                    binding.getRoot().post(() -> shiftWeek(direction));
+                }
+                break;
+            }
+            case MotionEvent.ACTION_CANCEL:
+            case MotionEvent.ACTION_POINTER_DOWN:
+                weekSwipeTracking = false;
+                break;
+            default:
+                break;
+        }
     }
 
     /** 选周弹窗：可直接跳到某一周，也可在这里调整学期总周数。 */

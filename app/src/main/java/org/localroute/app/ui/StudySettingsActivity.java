@@ -1,5 +1,7 @@
 package org.localroute.app.ui;
 
+import android.app.DatePickerDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -26,23 +28,28 @@ import org.localroute.app.study.StudySessionStore;
 import org.localroute.app.study.StudyTimetableStore;
 
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.Date;
 import java.util.Locale;
 
 /** 作业查询的独立设置页：学习通账户、课表导入与冬夏令时作息。 */
 public class StudySettingsActivity extends AppCompatActivity {
 
+    /** 开学日期改过时带回课表页，让它跳到新的本周。 */
+    public static final String EXTRA_WEEK_CHANGED = "week_changed";
+
     private ActivityStudySettingsBinding binding;
     private StudySession session;
     private int season = StudySchedule.SEASON_WINTER;
     private StudySchedule schedule = StudySchedule.winterDefault();
+    private boolean weekChanged;
 
     private final ActivityResultLauncher<Intent> loginLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
                     result -> {
                         if (result.getResultCode() == RESULT_OK) {
                             renderAccount();
-                            setResult(RESULT_OK);
+                            notifyChanged();
                         }
                     });
 
@@ -62,6 +69,7 @@ public class StudySettingsActivity extends AppCompatActivity {
 
         binding.buttonSettingsBack.setOnClickListener(view -> finish());
         binding.buttonSwitchAccount.setOnClickListener(view -> onSwitchAccount());
+        binding.rowSemesterStart.setOnClickListener(view -> pickSemesterStart());
         binding.rowReimport.setOnClickListener(view ->
                 jwLauncher.launch(new Intent(this, JwImportActivity.class)));
         binding.rowAddCourse.setOnClickListener(view ->
@@ -201,11 +209,57 @@ public class StudySettingsActivity extends AppCompatActivity {
     private void renderTimetableCount() {
         binding.textTimetableCount.setText(getString(R.string.study_settings_timetable_count,
                 StudyTimetableStore.loadCourses(this).size()));
+        renderSemesterStart();
+    }
+
+    private void renderSemesterStart() {
+        LocalDate start = StudyTimetableStore.loadSemesterStart(this);
+        if (start == null) {
+            binding.textSemesterStartValue.setText(R.string.study_semester_start_unset);
+            return;
+        }
+        int week = StudyTimetableStore.currentTeachingWeek(this);
+        binding.textSemesterStartValue.setText(week > 0
+                ? getString(R.string.study_semester_start_value, start.toString(), week)
+                : getString(R.string.study_semester_start_outside, start.toString()));
+    }
+
+    private void pickSemesterStart() {
+        LocalDate stored = StudyTimetableStore.loadSemesterStart(this);
+        LocalDate initial = stored != null ? stored : LocalDate.now();
+        DatePickerDialog dialog = new DatePickerDialog(this,
+                (view, year, month, dayOfMonth) -> {
+                    StudyTimetableStore.saveSemesterStart(this,
+                            LocalDate.of(year, month + 1, dayOfMonth));
+                    markWeekChanged();
+                },
+                initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
+        dialog.setTitle(R.string.study_semester_start_pick_title);
+        if (stored != null) {
+            dialog.setButton(DialogInterface.BUTTON_NEUTRAL,
+                    getString(R.string.study_semester_start_clear), (d, which) -> {
+                        StudyTimetableStore.clearSemesterStart(this);
+                        markWeekChanged();
+                    });
+        }
+        dialog.show();
+    }
+
+    private void markWeekChanged() {
+        weekChanged = true;
+        notifyChanged();
+        renderSemesterStart();
+    }
+
+    /** 把「开学日期是否改过」一并带回课表页。 */
+    private void notifyChanged() {
+        setResult(RESULT_OK, weekChanged
+                ? new Intent().putExtra(EXTRA_WEEK_CHANGED, true) : null);
     }
 
     private void onTimetableChanged() {
         renderTimetableCount();
-        setResult(RESULT_OK);
+        notifyChanged();
     }
 
     private void confirmClearTimetable() {
@@ -324,7 +378,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         schedule = StudyTimetableStore.loadSchedule(this, target);
         fillScheduleValues();
         binding.textScheduleWarning.setVisibility(View.GONE);
-        setResult(RESULT_OK);
+        notifyChanged();
     }
 
     private void pickStartTime(int segment) {
@@ -368,7 +422,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         schedule = candidate;
         fillScheduleValues();
         binding.textScheduleWarning.setVisibility(View.GONE);
-        setResult(RESULT_OK);
+        notifyChanged();
     }
 
     @Nullable
