@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fm_home_section">校园服务</string>
+    <string name="fm_run_status_ready">未开始</string>
+    <string name="fm_run_starting">启动中</string>
+    <string name="fm_run_running">运行中</string>
+    <string name="fm_run_paused">已暂停</string>
+    <string name="fm_run_hold">单点保持</string>
+    <string name="fm_run_completed">已完成</string>
+    <string name="fm_run_stopped">已停止</string>
+    <string name="fm_run_error">运行出错</string>
+    <string name="fm_run_action">打开地图　→</string>
+    <string name="fm_timetable">课程表</string>
+    <string name="fm_timetable_description">查看本周课程</string>
+    <string name="fm_home">首页</string>
+    <string name="fm_study_short">学习</string>
+    <string name="fm_today">当前课表</string>
+</resources>

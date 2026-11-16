@@ -1,6 +1,7 @@
 package org.localroute.app.ui;
 
 import android.content.SharedPreferences;
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.MenuItem;
@@ -48,6 +49,7 @@ public class AppSettingsActivity extends AppCompatActivity {
         }
         prefs = getSharedPreferences(PresetUnlock.PREFS_NAME, MODE_PRIVATE);
         PresetUnlock.migrate(prefs);
+        binding.rowUpdate.setOnClickListener(v -> startActivity(new Intent(this, UpdatesActivity.class)));
         binding.rowActivation.setOnClickListener(v -> showActivationDialog());
     }
 
@@ -70,7 +72,7 @@ public class AppSettingsActivity extends AppCompatActivity {
         container.setPadding(padding, dp(8), padding, 0);
         container.addView(input);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.app_settings_activation_dialog_title)
                 .setView(container)
                 .setPositiveButton(R.string.app_settings_activation_confirm, null)

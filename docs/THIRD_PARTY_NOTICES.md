@@ -2,6 +2,10 @@
 
 本项目仅本地自用，仍按许可证要求列明第三方来源。
 
+## 视觉设计参考
+
+- Finmori UI Kit：采用其色彩令牌与列表、导航组件的视觉模式；原始设计 Zoey Do，代码及令牌参考 [Finmori](https://github.com/KhoaSuperman/Finmori)（MIT）。许可全文见 [Finmori-MIT.txt](licenses/Finmori-MIT.txt)。
+
 ## 代码依赖
 
 | 组件 | 版本 | 许可证 | 用途 | 说明 |

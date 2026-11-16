@@ -33,6 +33,7 @@ import org.localroute.app.campus.CampusGeo;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.SpeedPresets;
+import org.localroute.app.settings.RunSpeedPreferences;
 import org.localroute.app.ui.CampusRunActivity;
 import org.localroute.app.ui.MainActivity;
 import org.localroute.core.GeoPoint;
@@ -451,6 +452,8 @@ public final class OverlayPanel {
 
     private void update(RunSnapshot value) {
         snapshot = value == null ? RunSnapshot.idle() : value;
+        gear = RunSpeedPreferences.selectedSport(context, gear);
+        updateGearStyles();
         if (pauseButton == null) {
             return;
         }
@@ -577,6 +580,7 @@ public final class OverlayPanel {
         }
         double kmh = presets.get(gear);
         // 路线跑圈中立即改速；手动移动时下一次摇杆命令就按新档位计算速度。
+        RunSpeedPreferences.setTarget(context, kmh);
         SimulationService.setSpeedKmh(context, kmh);
         toast(context.getString(R.string.overlay_gear_toast,
                 context.getString(gearLabelRes(gear)), SpeedPresets.format(kmh)));

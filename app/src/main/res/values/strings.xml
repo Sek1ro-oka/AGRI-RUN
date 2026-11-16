@@ -194,7 +194,7 @@
     <string name="home_quick_services">快捷服务</string>
     <string name="home_settings_title">设置</string>
     <string name="home_settings_subtitle">模拟定位与权限检查</string>
-    <string name="home_first_use_hint">首次使用请进入「校园快跑」，在「设置」完成模拟定位检查后再开始跑圈。</string>
+    <string name="home_first_use_hint">进入校园快跑后选择路线，调整配速与圈数即可开始；运行设置中可检查权限。</string>
     <string name="home_app_settings_title">设置</string>
 
     <!-- 应用设置 -->
@@ -312,7 +312,7 @@
     <string name="campus_routes_empty">还没有路线。点下方「新增路线」在地图上绘制一条。</string>
     <string name="campus_routes_draw">＋ 新增路线</string>
     <string name="campus_routes_close">关闭</string>
-    <string name="campus_routes_swipe_hint">左右滑动列表；向左滑动路线可修改或删除</string>
+    <string name="campus_routes_swipe_hint">点选路线可在地图预览；向左滑动可修改或删除</string>
     <string name="campus_route_name_title">给路线命名</string>
     <string name="campus_route_name_hint">路线名称</string>
     <string name="campus_route_name_default">我的路线 %1$d</string>
@@ -587,4 +587,35 @@
     <string name="home_update_verify_checksum">安装包校验值不一致，可能下载不完整或被篡改</string>
     <string name="home_update_verify_unreadable">安装包无法读取或已损坏</string>
     <string name="home_update_verify_dismiss">知道了</string>
+    <!-- 地图主页与精确输入 -->
+    <string name="run_settings">运行设置</string>
+    <string name="run_return_map">返回地图</string>
+    <string name="run_status_idle">未开始 · 本机模拟定位</string>
+    <string name="run_choose_route">选择或绘制一条路线</string>
+    <string name="run_start">开始跑圈</string>
+    <string name="run_pace_edit">调整配速 / 速度</string>
+    <string name="run_pace_mode">配速（分:秒 / km）</string>
+    <string name="run_speed_mode">速度（km/h）</string>
+    <string name="run_laps_edit">设置圈数</string>
+    <string name="run_laps_value">%1$d 圈</string>
+    <string name="run_plan_summary">目标 %1$d 圈 · %2$s km · 预计 %3$s</string>
+    <string name="run_pace_hint">直接输入，或拖动滑条快速调整。保存为当前运动类型的预设。</string>
+    <string name="run_apply_now">保存并立即调整</string>
+    <string name="run_settings_hint">配速与圈数可在地图页直接调整。运行中修改配速立即生效，圈数在开始前设定。</string>
+    <string name="run_vary_next">路线扰动 · 下次开始时生效</string>
+    <string name="run_state_running">运行中 · 本机模拟定位</string>
+    <string name="run_state_paused">已暂停 · 可继续或结束</string>
+    <string name="run_state_starting">正在启动模拟定位…</string>
+    <string name="run_state_done">本次运行已结束</string>
+    <string name="run_state_error">运行出错 · 查看结果了解原因</string>
+    <string name="run_state_drawing">绘制路线 · 点击地图添加节点</string>
+    <string name="run_state_hold">单点保持中</string>
+    <string name="run_active_home">校园快跑 · %1$s</string>
+    <string name="run_active_detail">%1$s km · %2$s · 点此返回地图</string>
+    <string name="route_preview_description">%1$s路线预览，圆点表示起点</string>
+    <string name="run_laps_locked">运行中的圈数已固定</string>
+    <string name="run_speed_value">配速 %1$s/km</string>
+    <string name="run_route_select">选择路线</string>
+    <string name="run_pace_input">例如 6:30</string>
+    <string name="run_speed_input">例如 9.5</string>
 </resources>

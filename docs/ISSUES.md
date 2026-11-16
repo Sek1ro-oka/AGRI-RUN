@@ -1,6 +1,6 @@
 # 本地 Issue 清单
 
-本项目为单人开发；2026-10-27 起代码镜像到 <https://github.com/Sek1ro-oka/AGRI-RUN>（公开仓库，私钥、`local.properties` 与高德 Key 均不入库）。Issue 仍以本文件记录，按 agent 规则用本文件代替 GitHub Issues：
+本项目为单人开发；2026-10-27 起代码镜像到 <https://github.com/Sek1ro-oka/AGRI-RUN>（公开仓库，私钥、`local.properties` 与高德 Key 均不入库）。历史 Issue 记录在本文件；2026-11-16 起按用户要求将本轮产品体验问题同步到上游 GitHub Issues。
 每条 Issue 记录编号、初始状态、解决方式与验证证据。状态只写“已关闭/未关闭”，不写没有证据的“已验证”。
 
 ## 已关闭
@@ -108,3 +108,21 @@
 | I-114 | 保存 A 期间切到 B，B 被误标已保存（R32-06） | 新增 `DraftSaveToken`（routeId + draftGeneration + editRevision）；`load/newDraft/markDeleted` 递增代次；`markSavedIfCurrent` 三者全等才清 dirty | `DraftSaveTokenTest` 8 例通过 |
 | I-115 | `docs/12` 自相矛盾地声称已实现 `GOGOGO_REFERENCE`；首帧日志给出结论式建议（R32-07） | 修正 `docs/12` 改动表与 §7/§8；`logFirstFixProfile()` 改为只报观测值并说明「一次只改一个变量」 | 文档核对 + 代码 review |
 | I-116 | 交付文档版本漂移（README/手册/ISSUES/TEST_REPORT/VERSION/SHA256SUMS 停在 0.3.2） | 全部升到 0.3.3 / 0.1.4，新增 `docs/15`；0.3.2 成功包移入 `delivery/baseline-0.3.2/` 作对照 | 见 `delivery/SHA256SUMS.txt`（逐项复核 0 不匹配） |
+
+
+## 2026-11-16 产品体验改造
+
+本轮按用户要求在上游创建 GitHub Issues，以下链接与本地记录对应。
+
+| 上游 | 审查项 | 本轮处理 |
+| --- | --- | --- |
+| [#25](https://github.com/Sek1ro-oka/AGRI-RUN/issues/25) | 5 自然变速覆盖浮窗改速 | 共用运行目标速度，增加真实浮窗切档后的连续周期检查 |
+| [#26](https://github.com/Sek1ro-oka/AGRI-RUN/issues/26) | 6 传送确认 | 待后续实现 |
+| [#27](https://github.com/Sek1ro-oka/AGRI-RUN/issues/27) | 7 扰动范围文案 | 待后续实现 |
+| [#28](https://github.com/Sek1ro-oka/AGRI-RUN/issues/28) | 8 课表独立使用 | 待后续实现 |
+| [#29](https://github.com/Sek1ro-oka/AGRI-RUN/issues/29) | 10 路线节点编辑与闭合选项 | 待后续实现 |
+| [#30](https://github.com/Sek1ro-oka/AGRI-RUN/issues/30) | 11 精确输入 | 已实现，配速/速度、圈数、运动类型预设与浮窗共用 |
+| [#31](https://github.com/Sek1ro-oka/AGRI-RUN/issues/31) | 12 浮窗标签与传送 | 待后续实现 |
+| [#32](https://github.com/Sek1ro-oka/AGRI-RUN/issues/32) | 14 地图主页与信息层级 | 已实现，更新入口迁移、首页当前任务入口 |
+
+A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页的实现和验证见 [本轮记录](16_地图主页与精确输入.md)。

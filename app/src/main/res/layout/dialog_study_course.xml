@@ -33,7 +33,7 @@
             android:paddingHorizontal="12dp"
             android:paddingVertical="10dp"
             android:textColor="@color/campus_ink"
-            android:textColorHint="#B4C2BC"
+            android:textColorHint="@color/fm_muted"
             android:textSize="14sp" />
 
         <LinearLayout
@@ -63,7 +63,7 @@
                     android:layout_marginTop="4dp"
                     android:background="@drawable/bg_study_input"
                     android:paddingHorizontal="10dp"
-                    android:popupBackground="#FFFFFF" />
+                    android:popupBackground="@color/fm_surface" />
             </LinearLayout>
 
             <Space
@@ -96,7 +96,7 @@
                     android:maxLines="1"
                     android:paddingHorizontal="12dp"
                     android:textColor="@color/campus_ink"
-                    android:textColorHint="#B4C2BC"
+                    android:textColorHint="@color/fm_muted"
                     android:textSize="14sp" />
             </LinearLayout>
         </LinearLayout>
@@ -142,7 +142,7 @@
                     android:maxLines="1"
                     android:paddingHorizontal="12dp"
                     android:textColor="@color/campus_ink"
-                    android:textColorHint="#B4C2BC"
+                    android:textColorHint="@color/fm_muted"
                     android:textSize="14sp" />
             </LinearLayout>
 
@@ -176,7 +176,7 @@
                     android:maxLines="1"
                     android:paddingHorizontal="12dp"
                     android:textColor="@color/campus_ink"
-                    android:textColorHint="#B4C2BC"
+                    android:textColorHint="@color/fm_muted"
                     android:textSize="14sp" />
             </LinearLayout>
         </LinearLayout>
@@ -203,7 +203,7 @@
             android:maxLines="1"
             android:paddingHorizontal="12dp"
             android:textColor="@color/campus_ink"
-            android:textColorHint="#B4C2BC"
+            android:textColorHint="@color/fm_muted"
             android:textSize="14sp" />
     </LinearLayout>
 </ScrollView>

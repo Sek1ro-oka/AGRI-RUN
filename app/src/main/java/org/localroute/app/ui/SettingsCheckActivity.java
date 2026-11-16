@@ -96,7 +96,7 @@ public class SettingsCheckActivity extends AppCompatActivity {
             binding.checkContainer.addView(row(checks.get(i)));
             if (i < checks.size() - 1) {
                 View divider = new View(this);
-                divider.setBackgroundColor(Color.parseColor("#EFF5F2"));
+                divider.setBackgroundColor(ContextCompat.getColor(this, R.color.fm_border));
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
                 binding.checkContainer.addView(divider, params);
@@ -124,11 +124,11 @@ public class SettingsCheckActivity extends AppCompatActivity {
         TextView chip = new TextView(this);
         chip.setText(statusLabel(check.status()));
         chip.setTextSize(11f);
-        chip.setTextColor(Color.parseColor(textColorFor(check.status())));
+        chip.setTextColor(ContextCompat.getColor(this, textColorFor(check.status())));
         chip.setPadding(dp(8), dp(2), dp(8), dp(3));
         GradientDrawable chipBackground = new GradientDrawable();
         chipBackground.setCornerRadius(dp(8));
-        chipBackground.setColor(Color.parseColor(backgroundFor(check.status())));
+        chipBackground.setColor(ContextCompat.getColor(this, backgroundFor(check.status())));
         chip.setBackground(chipBackground);
         head.addView(chip);
         row.addView(head);
@@ -156,27 +156,27 @@ public class SettingsCheckActivity extends AppCompatActivity {
         }
     }
 
-    private String textColorFor(SettingsInspector.Status status) {
+    private int textColorFor(SettingsInspector.Status status) {
         switch (status) {
             case OK:
-                return "#1B7A52";
+                return R.color.fm_success;
             case FAIL:
-                return "#B3261E";
+                return R.color.fm_error;
             case WARN:
             default:
-                return "#8D6E00";
+                return R.color.fm_warning;
         }
     }
 
-    private String backgroundFor(SettingsInspector.Status status) {
+    private int backgroundFor(SettingsInspector.Status status) {
         switch (status) {
             case OK:
-                return "#E7F7EF";
+                return R.color.campus_mint_pale;
             case FAIL:
-                return "#FCE9E7";
+                return R.color.study_state_expired_fill;
             case WARN:
             default:
-                return "#FFF6E0";
+                return R.color.study_state_pending_fill;
         }
     }
 
@@ -215,7 +215,7 @@ public class SettingsCheckActivity extends AppCompatActivity {
                 break;
         }
         DiagnosticLog.info("设置检查页探测结果：" + result);
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(title)
                 .setMessage(message)
                 .setPositiveButton("去开发者选项", (d, w) -> openDeveloperOptions())

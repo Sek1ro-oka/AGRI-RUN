@@ -4,7 +4,7 @@ import android.Manifest;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -29,6 +29,9 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
+import android.widget.RadioGroup;
+import android.widget.RadioButton;
+import android.widget.SeekBar;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -71,6 +74,9 @@ import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.SettingsInspector;
+import org.localroute.app.settings.RunInputs;
+import org.localroute.app.settings.RunSpeedPreferences;
+import org.localroute.app.settings.SpeedPresets;
 import org.localroute.app.storage.RouteRepository;
 import org.localroute.core.CompiledRoute;
 import org.localroute.core.EndBehavior;
@@ -90,8 +96,8 @@ import java.util.List;
 /**
  * 校园快跑：虚拟定位跑圈。
  *
- * <p>设置页负责运动类型、每公里配速、圈数与两个开关；跑圈地图页负责
- * 开始/暂停/继续/结束、切换目标路线、绘制自定义路线与地图传送。
+ * <p>地图主页负责路线预览、精确参数输入与运行控制；运行设置收纳自然变速、
+ * 路线扰动、悬浮窗和环境检查。
  * 所有实际定位提交都走 {@link SimulationService}，本页面不自行伪造位置。
  */
 public final class CampusRunActivity extends AppCompatActivity {
@@ -192,6 +198,8 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private String sport = SPORT_RUN;
     private int paceSeconds = DEFAULT_PACE_RUN;
+    private double configuredSpeedKmh = 9d;
+    private SpeedPresets speedPresets;
     private int laps = 5;
     private boolean naturalEnabled = true;
     /** 路线扰动程度 0..1，0 表示关闭。 */
@@ -239,14 +247,16 @@ public final class CampusRunActivity extends AppCompatActivity {
             if (!naturalRunning) {
                 return;
             }
-            RunSnapshot current = snapshot;
+            RunSnapshot current = SimulationStateRepo.get().current();
             if (naturalEnabled && claimOwnSession && current.state() == RunState.RUNNING
                     && !current.singlePoint()) {
+                baseSpeedKmh = RunSpeedPreferences.target(CampusRunActivity.this, baseSpeedKmh);
                 double elapsed = current.activeElapsedMs();
                 double factor = 1d
                         + 0.035d * Math.sin(elapsed / 38000d + naturalPhase1)
                         + 0.015d * Math.sin(elapsed / 9500d + naturalPhase2);
-                double speed = Math.max(0.6d, Math.min(59.5d, baseSpeedKmh * factor));
+                double speed = Math.max(SpeedPresets.MIN_KMH,
+                        Math.min(SpeedPresets.MAX_KMH, baseSpeedKmh * factor));
                 SimulationService.setSpeedKmh(CampusRunActivity.this, speed);
                 handler.postDelayed(this, NATURAL_INTERVAL_MS);
                 return;
@@ -273,8 +283,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         });
         WindowInsetsControllerCompat controller =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        controller.setAppearanceLightStatusBars(true);
-        controller.setAppearanceLightNavigationBars(true);
+        controller.setAppearanceLightStatusBars(getResources().getBoolean(R.bool.fm_light_bars));
+        controller.setAppearanceLightNavigationBars(getResources().getBoolean(R.bool.fm_light_bars));
 
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissionResult);
@@ -296,7 +306,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             applyResultSnapshot(current);
         } else {
             resultRequested = false;
-            showSetupScreen();
+            showRunScreen();
         }
         SimulationStateRepo.get().snapshot().observe(this, this::onSnapshot);
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -316,6 +326,9 @@ public final class CampusRunActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         if (!intent.getBooleanExtra(EXTRA_SHOW_RUN_RESULT, false)) {
+            snapshot = SimulationStateRepo.get().current();
+            restoreActiveSession(snapshot);
+            showRunScreen();
             return;
         }
         intent.removeExtra(EXTRA_SHOW_RUN_RESULT);
@@ -355,6 +368,13 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         paceSeconds = clamp(prefs.getInt(KEY_PACE, defaultPaceSeconds(sport)),
                 PACE_MIN_SECONDS, PACE_MAX_SECONDS);
+        speedPresets = RunSpeedPreferences.presets(this);
+        if (!prefs.getBoolean("speed_presets_migrated", false)) {
+            if (prefs.contains(KEY_PACE)) RunSpeedPreferences.migrate(this, sportIndex(), paceSeconds);
+            prefs.edit().putBoolean("speed_presets_migrated", true).apply();
+        }
+        configuredSpeedKmh = speedPresets.get(sportIndex());
+        paceSeconds = (int) Math.round(3600d / configuredSpeedKmh);
         laps = clamp(prefs.getInt(KEY_LAPS, RunConfig.DEFAULT_LOOPS),
                 RunConfig.MIN_LOOPS, RunConfig.MAX_LOOPS);
         naturalEnabled = prefs.getBoolean(KEY_NATURAL, true);
@@ -372,6 +392,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             boolean matchId = !activeRunId.isEmpty() && activeRunId.equals(current.runId());
             if (owned && (matchId || current.singlePoint())) {
                 claimOwnSession = true;
+                baseSpeedKmh = RunSpeedPreferences.target(this, current.speedKmh());
                 activeRunId = current.runId();
                 if (current.singlePoint() && activeLapMeters <= 0d) {
                     activeLapMeters = 0d;
@@ -554,7 +575,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         message.setText(getString(R.string.campus_preset_conflict_message, conflict.preset.name()));
 
         final boolean[] handled = {false};
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.campus_preset_conflict_title)
                 .setView(content)
                 .setPositiveButton(R.string.campus_preset_conflict_replace, (d, which) -> {
@@ -643,10 +664,10 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     /**
      * 从其它页面（设置里激活预设）回到本页时刷新路线列表；
-     * 正在跑圈或已经进入地图页时不打扰当前状态。
+     * 正在跑圈或绘制时保留当前状态。
      */
     private void refreshPresetRoutesIfIdle() {
-        if (runScreenVisible || snapshot.isActive()) {
+        if (drawMode || snapshot.isActive()) {
             return;
         }
         if (!applyPresetActivation()) {
@@ -655,6 +676,13 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (route == null || indexOfRoute(route.id()) < 0) {
             route = customRoutes.isEmpty() ? null : customRoutes.get(0);
             persistSelectedRoute(route);
+        } else {
+            route = customRoutes.get(indexOfRoute(route.id()));
+        }
+        renderedRoute = null;
+        if (runScreenVisible) {
+            syncMapRoute(true);
+            requestMapFit();
         }
         renderSetupValues();
     }
@@ -708,31 +736,13 @@ public final class CampusRunActivity extends AppCompatActivity {
     // ---------------------------------------------------------------- 控件
 
     private void wireViews() {
-        binding.buttonSetupBack.setOnClickListener(v -> handleBack());
+        binding.buttonSetupBack.setOnClickListener(v -> showRunScreen());
         binding.buttonRunBack.setOnClickListener(v -> handleBack());
-        binding.buttonSport.setOnClickListener(this::showSportMenu);
         binding.buttonRunSport.setOnClickListener(this::showSportMenu);
 
-        binding.seekPace.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
-                paceSeconds = PACE_MIN_SECONDS + progress;
-                renderPaceValue();
-                if (fromUser) {
-                    prefs.edit().putInt(KEY_PACE, paceSeconds).apply();
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
-            }
-
-            @Override
-            public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
-            }
-        });
-        binding.buttonLapMinus.setOnClickListener(v -> changeLaps(-1));
-        binding.buttonLapPlus.setOnClickListener(v -> changeLaps(1));
+        binding.textPaceValue.setOnClickListener(v -> showPaceDialog());
+        binding.textLaps.setOnClickListener(v -> showLapsDialog());
+        binding.buttonAdvanced.setOnClickListener(v -> showSetupScreen());
         binding.switchNatural.setOnCheckedChangeListener((button, checked) -> {
             naturalEnabled = checked;
             prefs.edit().putBoolean(KEY_NATURAL, checked).apply();
@@ -772,8 +782,10 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.rowAppSettings.setOnClickListener(v ->
                 startActivity(new Intent(this, SettingsCheckActivity.class)));
         binding.buttonGoal.setOnClickListener(v -> showRouteSheet());
-        binding.buttonGo.setOnClickListener(v -> onGoClicked());
+        binding.buttonGo.setOnClickListener(v -> showRunScreen());
         binding.buttonRunMain.setOnClickListener(v -> onMainControl());
+        FinmoriMotion.press(binding.buttonGoal);
+        FinmoriMotion.press(binding.buttonRunMain);
         binding.buttonEndRun.setOnClickListener(v -> requestStop());
         binding.buttonTeleport.setOnClickListener(this::showMapActionsMenu);
 
@@ -786,7 +798,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         });
         binding.buttonDrawCancel.setOnClickListener(v -> {
             exitDrawMode();
-            showSetupScreen();
+            showRunScreen();
         });
         binding.buttonDrawDone.setOnClickListener(v -> finishDrawMode());
 
@@ -796,7 +808,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         });
         binding.buttonDoneBack.setOnClickListener(v -> {
             binding.doneOverlay.setVisibility(View.GONE);
-            showSetupScreen();
+            showRunScreen();
         });
     }
 
@@ -860,7 +872,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 getString(R.string.campus_map_layer_standard),
                 getString(R.string.campus_map_layer_satellite)};
         int checked = mapHost.baseLayer() == RouteMapHost.BaseLayer.SATELLITE ? 1 : 0;
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.campus_map_layer_title)
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     RouteMapHost.BaseLayer layer = which == 1
@@ -1010,27 +1022,16 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void changeSport(String next) {
         sport = next;
-        paceSeconds = defaultPaceSeconds(next);
-        prefs.edit()
-                .putString(KEY_SPORT, sport)
-                .putInt(KEY_PACE, paceSeconds)
-                .apply();
-        renderSport();
-        renderPaceValue();
-        toast(getString(R.string.campus_sport_changed, sportLabel(), CampusFormat.pace(paceSeconds)));
-    }
-
-    private void changeLaps(int delta) {
-        laps = clamp(laps + delta, RunConfig.MIN_LOOPS, RunConfig.MAX_LOOPS);
-        binding.textLaps.setText(String.valueOf(laps));
-        prefs.edit().putInt(KEY_LAPS, laps).apply();
+        RunSpeedPreferences.selectSport(this, sportIndex());
+        configuredSpeedKmh = speedPresets.get(sportIndex());
+        paceSeconds = (int) Math.round(3600d / configuredSpeedKmh);
+        prefs.edit().putString(KEY_SPORT, sport).putInt(KEY_PACE, paceSeconds).apply();
+        renderSport(); renderPaceValue(); updateRunUi();
     }
 
     private void renderSport() {
         String label = sportLabel();
-        binding.buttonSport.setText(label);
         binding.buttonRunSport.setText(label);
-        binding.textGoSport.setText(label);
     }
 
     private String sportLabel() {
@@ -1043,17 +1044,149 @@ public final class CampusRunActivity extends AppCompatActivity {
         return getString(R.string.campus_sport_run);
     }
 
-    private void renderPaceValue() {
-        binding.textPaceValue.setText(getString(R.string.campus_pace_value, CampusFormat.pace(paceSeconds)));
-        int progress = paceSeconds - PACE_MIN_SECONDS;
-        if (binding.seekPace.getProgress() != progress) {
-            binding.seekPace.setProgress(progress);
+    private int sportIndex() {
+        return SPORT_WALK.equals(sport) ? 0 : SPORT_RIDE.equals(sport) ? 2 : 1;
+    }
+
+    private void renderPlanSummary() {
+        if (route == null) {
+            binding.textPlanSummary.setVisibility(View.GONE);
+        } else {
+            binding.textPlanSummary.setVisibility(View.VISIBLE);
+            int target = snapshot.isActive() && claimOwnSession ? snapshot.targetLoops() : laps;
+            if (target <= 0) target = laps;
+            double meters = route.lapMeters() * target;
+            long millis = (long) (meters / configuredSpeedKmh * 3600d);
+            binding.textPlanSummary.setText(getString(R.string.run_plan_summary, target,
+                    CampusFormat.kilometers(meters), CampusFormat.time(millis)));
         }
+        if (!snapshot.isActive() && !showResult) binding.textLapInfo.setText(R.string.run_choose_route);
+    }
+
+    private LinearLayout inputContainer() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(24), dp(8), dp(24), dp(4));
+        return box;
+    }
+
+    private void showLapsDialog() {
+        if (snapshot.isActive()) { toast(getString(R.string.run_laps_locked)); return; }
+        LinearLayout box = inputContainer();
+        EditText input = new EditText(this);
+        input.setId(R.id.inputRunValue);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setSingleLine(true); input.setText(String.valueOf(laps)); input.selectAll();
+        input.setContentDescription(getString(R.string.run_laps_edit));
+        LinearLayout stepper = new LinearLayout(this);
+        stepper.setGravity(Gravity.CENTER_VERTICAL);
+        android.widget.Button minus = new android.widget.Button(this);
+        minus.setId(R.id.buttonLapMinus); minus.setText("−");
+        minus.setContentDescription(getString(R.string.campus_laps_minus));
+        android.widget.Button plus = new android.widget.Button(this);
+        plus.setId(R.id.buttonLapPlus); plus.setText("+");
+        plus.setContentDescription(getString(R.string.campus_laps_plus));
+        stepper.addView(minus, new LinearLayout.LayoutParams(dp(56), dp(48)));
+        stepper.addView(input, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        stepper.addView(plus, new LinearLayout.LayoutParams(dp(56), dp(48)));
+        minus.setOnClickListener(v -> stepLapInput(input, -1));
+        plus.setOnClickListener(v -> stepLapInput(input, 1));
+        box.addView(stepper);
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.run_laps_edit)
+                .setView(box).setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.campus_save, null).create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (snapshot.isActive()) { dialog.dismiss(); return; }
+            try {
+                laps = RunInputs.laps(input.getText().toString());
+                prefs.edit().putInt(KEY_LAPS, laps).apply();
+                renderSetupValues(); updateRunUi(); dialog.dismiss();
+            } catch (IllegalArgumentException error) { input.setError(error.getMessage()); }
+        }));
+        dialog.show();
+    }
+
+    private void stepLapInput(EditText input, int delta) {
+        try {
+            int value = RunInputs.laps(input.getText().toString());
+            input.setText(String.valueOf(clamp(value + delta, RunConfig.MIN_LOOPS, RunConfig.MAX_LOOPS)));
+        } catch (IllegalArgumentException error) { input.setError(error.getMessage()); }
+    }
+
+    private void showPaceDialog() {
+        LinearLayout box = inputContainer();
+        TextView hint = new TextView(this);
+        hint.setText(R.string.run_pace_hint); hint.setTextSize(13); box.addView(hint);
+        RadioGroup modes = new RadioGroup(this);
+        RadioButton pace = new RadioButton(this); pace.setId(R.id.inputModePace);
+        pace.setText(R.string.run_pace_mode); modes.addView(pace);
+        RadioButton speed = new RadioButton(this); speed.setId(R.id.inputModeSpeed);
+        speed.setText(R.string.run_speed_mode); modes.addView(speed);
+        modes.check(pace.getId()); box.addView(modes);
+        EditText input = new EditText(this); input.setId(R.id.inputRunValue);
+        input.setSingleLine(true); input.setInputType(InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+        input.setText(RunInputs.pace(configuredSpeedKmh)); input.selectAll();
+        input.setContentDescription(getString(R.string.run_pace_edit)); box.addView(input);
+        SeekBar slider = new SeekBar(this); slider.setId(R.id.seekRunSpeed); slider.setMax(595);
+        slider.setProgress((int) Math.round((configuredSpeedKmh - 0.5d) * 10));
+        box.addView(slider, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+        final boolean[] wasPace = {true};
+        final double[] draftSpeed = {configuredSpeedKmh};
+        modes.setOnCheckedChangeListener((group, id) -> {
+            String displayed = wasPace[0] ? RunInputs.pace(draftSpeed[0]) : RunInputs.speedText(draftSpeed[0]);
+            try {
+                if (!displayed.equals(input.getText().toString().trim())) {
+                    draftSpeed[0] = RunInputs.speed(input.getText().toString(), wasPace[0]);
+                }
+            }
+            catch (IllegalArgumentException ignored) { }
+            wasPace[0] = id == pace.getId();
+            input.setInputType(wasPace[0] ? InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME
+                    : InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            input.setText(wasPace[0] ? RunInputs.pace(draftSpeed[0]) : RunInputs.speedText(draftSpeed[0])); input.selectAll();
+        });
+        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    double value = 0.5d + progress / 10d;
+                    draftSpeed[0] = value;
+                    input.setText(wasPace[0] ? RunInputs.pace(value) : RunInputs.speedText(value));
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) { }
+            @Override public void onStopTrackingTouch(SeekBar bar) { }
+        });
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.run_pace_edit)
+                .setView(box).setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(snapshot.isActive() ? R.string.run_apply_now : R.string.campus_save, null).create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            try {
+                String displayed = wasPace[0] ? RunInputs.pace(draftSpeed[0]) : RunInputs.speedText(draftSpeed[0]);
+                double kmh = input.getText().toString().trim().equals(displayed)
+                        ? draftSpeed[0] : RunInputs.speed(input.getText().toString(), wasPace[0]);
+                configuredSpeedKmh = kmh; paceSeconds = (int) Math.round(3600d / kmh);
+                speedPresets.set(sportIndex(), kmh);
+                prefs.edit().putInt(KEY_PACE, paceSeconds).apply();
+                if (claimOwnSession && snapshot.isActive() && !snapshot.singlePoint()) {
+                    baseSpeedKmh = kmh; RunSpeedPreferences.setTarget(this, kmh);
+                    SimulationService.setSpeedKmh(this, kmh);
+                }
+                renderPaceValue(); renderPlanSummary(); dialog.dismiss();
+            } catch (IllegalArgumentException error) { input.setError(error.getMessage()); }
+        }));
+        dialog.show();
+    }
+
+    private void renderPaceValue() {
+        binding.textPaceValue.setText(getString(R.string.run_speed_value, RunInputs.pace(configuredSpeedKmh)));
+        binding.textPaceValue.setContentDescription(getString(R.string.run_pace_edit) + " "
+                + RunInputs.speedText(configuredSpeedKmh) + " km/h");
     }
 
     private void renderSetupValues() {
         renderPaceValue();
-        binding.textLaps.setText(String.valueOf(laps));
+        binding.textLaps.setText(getString(R.string.run_laps_value, laps));
+        if (runScreenVisible) renderPlanSummary();
         binding.switchNatural.setChecked(naturalEnabled);
         varySeekGuard = true;
         binding.seekVary.setProgress((int) Math.round(varyStrength * 100d));
@@ -1062,13 +1195,10 @@ public final class CampusRunActivity extends AppCompatActivity {
         updateBackDescriptions();
     }
 
-    /** 运行中两个左上角按钮的含义互换：设置页回跑圈地图，跑圈地图回设置页。 */
+    /** 地图返回上级，运行设置返回地图。 */
     private void updateBackDescriptions() {
-        boolean running = claimOwnSession && snapshot.isActive();
-        binding.buttonSetupBack.setContentDescription(getString(
-                running ? R.string.campus_back_to_run : R.string.campus_back));
-        binding.buttonRunBack.setContentDescription(getString(
-                running ? R.string.campus_back_to_setup : R.string.campus_back));
+        binding.buttonSetupBack.setContentDescription(getString(R.string.run_return_map));
+        binding.buttonRunBack.setContentDescription(getString(R.string.campus_back));
     }
 
     /** 扰动滑条的档位文案与百分比。 */
@@ -1103,26 +1233,10 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void showSetupScreen() {
         runScreenVisible = false;
-        // 离开跑圈地图：运行中的虚拟定位不再遮挡设置页，悬浮窗按需出现。
         OverlayHost.get(this).setRunMapVisible(false);
-        drawMode = false;
-        editingRouteId = null;
-        teleportArmed = false;
-        draftPoints.clear();
-        showResult = false;
-        resultRequested = false;
         binding.setupScreen.setVisibility(View.VISIBLE);
         binding.runScreen.setVisibility(View.GONE);
         binding.doneOverlay.setVisibility(View.GONE);
-        binding.drawBar.setVisibility(View.GONE);
-        binding.textTeleportHint.setVisibility(View.GONE);
-        binding.root.setBackgroundColor(getColor(R.color.campus_setup_bg));
-        teleportTarget = null;
-        deviceLocation = null;
-        renderedRoute = null;
-        pendingFit = false;
-        pendingCameraFocus = null;
-        showRunnerNow(null);
         renderSetupValues();
     }
 
@@ -1133,7 +1247,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.setupScreen.setVisibility(View.GONE);
         binding.runScreen.setVisibility(View.VISIBLE);
         binding.doneOverlay.setVisibility(View.GONE);
-        binding.root.setBackgroundColor(Color.WHITE);
+        binding.root.setBackgroundColor(getColor(R.color.fm_background));
         if (drawMode) {
             renderMapDraft();
         } else {
@@ -1166,46 +1280,15 @@ public final class CampusRunActivity extends AppCompatActivity {
         updateRunUi();
     }
 
-    private void onGoClicked() {
-        if (snapshot.isActive() && !snapshot.singlePoint()) {
-            if (claimOwnSession) {
-                showRunScreen();
-            } else {
-                toast(getString(R.string.campus_toast_existing));
-            }
-            return;
-        }
-        // 悬浮摇杆留下的单点保持不算跑圈任务：照常进入跑圈页，开始后由服务端就地替换。
-        showRunScreen();
-        toast(getString(route == null
-                ? R.string.campus_route_required
-                : R.string.campus_click_start_hint));
-    }
-
     private void handleBack() {
         if (binding.doneOverlay.getVisibility() == View.VISIBLE) {
-            binding.doneOverlay.setVisibility(View.GONE);
-            showSetupScreen();
-            return;
+            binding.doneOverlay.setVisibility(View.GONE); showRunScreen(); return;
         }
-        if (drawMode) {
-            exitDrawMode();
-            showSetupScreen();
-            return;
-        }
-        if (runScreenVisible) {
-            if (claimOwnSession && snapshot.isActive()) {
-                // 运行中不把任务丢到后台：回到设置页，顶部左上角再点一次即可回来。
-                showSetupScreen();
-                toast(getString(R.string.campus_running_keep));
-                return;
-            }
-            showSetupScreen();
-            return;
-        }
+        if (drawMode) { exitDrawMode(); showRunScreen(); return; }
+        if (!runScreenVisible) { showRunScreen(); return; }
         if (claimOwnSession && snapshot.isActive()) {
-            // 运行中设置页的左上角不再退出应用，直接回到跑圈地图。
-            showRunScreen();
+            startActivity(new Intent(this, MainActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP));
             return;
         }
         finish();
@@ -1239,6 +1322,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             toast(getString(R.string.campus_toast_existing));
             return;
         }
+        if (route == null) { showRouteSheet(); return; }
         startRouteFlow();
     }
 
@@ -1257,7 +1341,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             toast(getString(R.string.campus_route_required));
             return;
         }
-        double speedKmh = 3600d / paceSeconds;
+        double speedKmh = configuredSpeedKmh;
         requestPermissionsThenStart(planRoute, speedKmh, laps);
     }
 
@@ -1310,6 +1394,8 @@ public final class CampusRunActivity extends AppCompatActivity {
 
         activeLapMeters = compiled.lapLengthMeters();
         baseSpeedKmh = speedKmh;
+        RunSpeedPreferences.setTarget(this, speedKmh);
+        RunSpeedPreferences.selectSport(this, sportIndex());
         naturalPhase1 = Math.random() * Math.PI * 2d;
         naturalPhase2 = Math.random() * Math.PI * 2d;
         teleportTarget = null;
@@ -1640,7 +1726,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         } else {
             message = "无法访问定位服务，请确认系统定位开关已打开。";
         }
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("还不能开始校园快跑")
                 .setMessage(message)
                 .setPositiveButton("去设置检查", (dialog, which) ->
@@ -1685,6 +1771,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
         boolean wasSinglePoint = next.singlePoint() || previous.singlePoint();
+        showResult = !wasSinglePoint;
         boolean showResultNow = resultRequested;
         claimOwnSession = false;
         activeRunId = "";
@@ -1697,7 +1784,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             CampusRoute target = pendingRouteSwitch;
             pendingRouteSwitch = null;
             applyRoute(target);
-            showSetupScreen();
+            showRunScreen();
             return;
         }
 
@@ -1723,7 +1810,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         if (wasSinglePoint) {
-            showSetupScreen();
+            showRunScreen();
             toast(getString(R.string.campus_hold_stopped));
             return;
         }
@@ -1832,7 +1919,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
 
         boolean starting = ours && snapshot.state() == RunState.STARTING;
-        binding.buttonRunMain.setEnabled(!drawMode && !starting && (route != null || active));
+        binding.buttonRunMain.setEnabled(!drawMode && !starting);
         if (starting) {
             binding.buttonRunMain.setText(getString(R.string.campus_starting));
             tintMainButton(R.color.campus_track);
@@ -1846,7 +1933,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             binding.buttonRunMain.setText(getString(R.string.campus_action_resume));
             tintMainButton(R.color.campus_mint);
         } else {
-            binding.buttonRunMain.setText(getString(R.string.campus_action_start));
+            binding.buttonRunMain.setText(getString(route == null ? R.string.run_route_select : R.string.run_start));
             tintMainButton(R.color.campus_mint);
         }
 
@@ -1857,6 +1944,28 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.buttonGoal.setAlpha(drawMode ? 0.45f : 1f);
         binding.buttonTeleport.setAlpha(drawMode ? 0.45f : 1f);
         binding.buttonRunSport.setEnabled(!active);
+        binding.runStats.setVisibility(active || showResult ? View.VISIBLE : View.GONE);
+        binding.buttonAdvanced.setEnabled(!drawMode);
+        binding.textPaceValue.setEnabled(!drawMode && !starting && !single);
+        binding.textLaps.setEnabled(!drawMode && !active);
+        binding.selectedRoutePreview.setRoute(route);
+        int status = drawMode ? R.string.run_state_drawing : starting ? R.string.run_state_starting
+                : single ? R.string.run_state_hold : active && snapshot.state() == RunState.PAUSED
+                ? R.string.run_state_paused : active ? R.string.run_state_running
+                : showResult && snapshot.state() == RunState.ERROR ? R.string.run_state_error
+                : showResult ? R.string.run_state_done : R.string.run_status_idle;
+        if (!getString(status).contentEquals(binding.textRunStatus.getText())) binding.textRunStatus.setText(status);
+        if (active && !single) configuredSpeedKmh = RunSpeedPreferences.target(this, configuredSpeedKmh);
+        if (active && !single) {
+            int selected = RunSpeedPreferences.selectedSport(this, sportIndex());
+            String nextSport = selected == 0 ? SPORT_WALK : selected == 2 ? SPORT_RIDE : SPORT_RUN;
+            if (!sport.equals(nextSport)) {
+                sport = nextSport;
+                prefs.edit().putString(KEY_SPORT, sport).apply();
+                renderSport();
+            }
+        }
+        renderPaceValue(); renderPlanSummary();
         updateBackDescriptions();
     }
 
@@ -1966,7 +2075,14 @@ public final class CampusRunActivity extends AppCompatActivity {
             }
             // 路线多时列表内部滚动，底部的「新增路线」「关闭」始终露在外面。
             ViewGroup.LayoutParams scrollParams = sheet.routeScroll.getLayoutParams();
-            scrollParams.height = Math.min(customRoutes.size() * dp(68), dp(330));
+            int available = getResources().getDisplayMetrics().heightPixels;
+            WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(binding.getRoot());
+            if (windowInsets != null) {
+                Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+                available -= bars.top + bars.bottom;
+            }
+            int maxListHeight = Math.max(dp(100), Math.min(dp(380), available - dp(260)));
+            scrollParams.height = Math.min(customRoutes.size() * dp(100), maxListHeight);
             sheet.routeScroll.setLayoutParams(scrollParams);
         }
         sheet.buttonDrawRoute.setOnClickListener(v -> {
@@ -1978,8 +2094,23 @@ public final class CampusRunActivity extends AppCompatActivity {
             enterDrawMode(null);
         });
         sheet.buttonCloseRoutes.setOnClickListener(v -> dialog.dismiss());
+        WindowInsetsCompat activityInsets = ViewCompat.getRootWindowInsets(binding.getRoot());
+        final Insets activityBars = activityInsets == null ? Insets.NONE
+                : activityInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+        sheet.getRoot().setPadding(dp(20) + activityBars.left, dp(18),
+                dp(20) + activityBars.right, dp(12) + activityBars.bottom);
+        ViewCompat.setOnApplyWindowInsetsListener(sheet.getRoot(), (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(dp(20) + Math.max(bars.left, activityBars.left), dp(18),
+                    dp(20) + Math.max(bars.right, activityBars.right),
+                    dp(12) + Math.max(bars.bottom, activityBars.bottom));
+            return insets;
+        });
         dialog.setContentView(sheet.getRoot());
+        dialog.getBehavior().setSkipCollapsed(true);
+        dialog.getBehavior().setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
         dialog.show();
+        ViewCompat.requestApplyInsets(sheet.getRoot());
     }
 
     private void addRouteRow(LinearLayout list, CampusRoute candidate, BottomSheetDialog dialog) {
@@ -2014,6 +2145,12 @@ public final class CampusRunActivity extends AppCompatActivity {
         subtitle.setTextColor(getColor(R.color.campus_muted));
         subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
         texts.addView(subtitle);
+        RoutePreviewView preview = new RoutePreviewView(this);
+        preview.setRoute(candidate);
+        preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(dp(72), dp(64));
+        previewParams.setMarginEnd(dp(12));
+        content.addView(preview, previewParams);
         content.addView(texts);
 
         TextView check = new TextView(this);
@@ -2048,7 +2185,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void showRouteEditDialog(CampusRoute candidate, BottomSheetDialog sheet) {
         sheet.dismiss();
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.campus_route_edit_title) + " · " + candidate.name())
                 .setItems(new CharSequence[]{
                         getString(R.string.campus_route_edit_rename),
@@ -2065,7 +2202,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void promptRenameRoute(CampusRoute candidate) {
         EditText input = routeNameInput(candidate.name());
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.campus_route_rename_title)
                 .setView(input)
                 .setPositiveButton(R.string.campus_save, null)
@@ -2152,7 +2289,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 return;
             }
             String currentName = route == null ? getString(R.string.placeholder) : route.name();
-            new AlertDialog.Builder(this)
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.campus_sheet_switch_title)
                     .setMessage(getString(R.string.campus_sheet_switch_message,
                             currentName, candidate.name()))
@@ -2167,6 +2304,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         applyRoute(candidate);
+        showRunScreen();
     }
 
     private void applyRoute(@Nullable CampusRoute candidate) {
@@ -2280,7 +2418,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     /** 绘制完成后先命名再保存；取消命名则留在绘制状态，可以继续调整。 */
     private void promptRouteName(CampusRoute candidate, String suggestedName) {
         EditText input = routeNameInput(suggestedName);
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.campus_route_name_title)
                 .setView(input)
                 .setPositiveButton(R.string.campus_save, null)
@@ -2305,7 +2443,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                     dialog.dismiss();
                     exitDrawMode();
                     applyRoute(saved);
-                    showSetupScreen();
+                    showRunScreen();
                     toast(getString(R.string.campus_route_name_saved,
                             saved.name(), CampusFormat.lapMeters(saved.lapMeters())));
                 }));
@@ -2330,11 +2468,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (mapHost != null) {
             mapHost.onResume();
         }
-        if (runScreenVisible) {
-            updateRunUi();
-        } else {
-            refreshPresetRoutesIfIdle();
-        }
+        refreshPresetRoutesIfIdle();
+        if (runScreenVisible) updateRunUi();
         maybeShowPresetConflicts();
         if (pendingOverlayEnable) {
             if (OverlayPanel.canDrawOverlays(this)) {
@@ -2344,6 +2479,9 @@ public final class CampusRunActivity extends AppCompatActivity {
                 toast(getString(R.string.settings_overlay_denied_toast));
             }
         }
+        if (!snapshot.isActive()) configuredSpeedKmh = speedPresets.get(sportIndex());
+        renderPaceValue();
+        if (runScreenVisible) updateRunUi();
         refreshCampusOverlay();
     }
 
