@@ -209,7 +209,7 @@ public class JwImportActivity extends AppCompatActivity {
                     : item.name();
         }
         labels[schools.size()] = getString(R.string.study_jw_school_custom);
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.study_jw_school_title)
                 .setItems(labels, (ignored, which) -> {
                     if (which == schools.size()) {
@@ -239,7 +239,7 @@ public class JwImportActivity extends AppCompatActivity {
                 padding, 0);
         container.addView(input);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.study_jw_school_custom_title)
                 .setMessage(R.string.study_jw_school_custom_help)
                 .setView(container)

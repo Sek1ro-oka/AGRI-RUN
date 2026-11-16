@@ -1,47 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools">
-
+<resources>
     <style name="Theme.RouteWorkshop" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/brand_primary</item>
-        <item name="colorOnPrimary">@color/brand_on_primary</item>
-        <item name="colorPrimaryContainer">@color/brand_primary_container</item>
-        <item name="colorSecondary">@color/brand_secondary</item>
-        <item name="android:statusBarColor" tools:targetApi="21">?attr/colorSurface</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <item name="colorPrimary">@color/fm_brand</item><item name="colorOnPrimary">@color/fm_on_brand</item>
+        <item name="colorPrimaryContainer">@color/fm_surface_alt</item><item name="colorOnPrimaryContainer">@color/fm_text</item>
+        <item name="colorSecondary">@color/fm_link</item><item name="colorSecondaryContainer">@color/fm_surface_alt</item><item name="colorOnSecondaryContainer">@color/fm_link</item>
+        <item name="colorSurface">@color/fm_surface</item><item name="colorSurfaceContainerLow">@color/fm_background</item>
+        <item name="colorSurfaceContainer">@color/fm_surface</item>
+        <item name="colorSurfaceContainerHigh">@color/fm_surface</item>
+        <item name="colorSurfaceContainerHighest">@color/fm_surface</item>
+        <item name="colorSurfaceVariant">@color/fm_surface_alt</item>
+        <item name="colorOnSurface">@color/fm_text</item>
+        <item name="colorOnSurfaceVariant">@color/fm_text_secondary</item>
+        <item name="colorOutline">@color/fm_border</item>
+        <item name="android:colorBackground">@color/fm_background</item>
+        <item name="colorOnBackground">@color/fm_text</item>
+        <item name="android:windowBackground">@color/fm_background</item><item name="android:statusBarColor">@color/fm_background</item><item name="android:navigationBarColor">@color/fm_background</item>
+        <item name="android:windowLightStatusBar">@bool/fm_light_bars</item><item name="android:windowLightNavigationBar">@bool/fm_light_bars</item>
+        <item name="android:windowAnimationStyle">@style/Animation.Legion.Activity</item>
+        <item name="materialButtonStyle">@style/Widget.Legion.FinmoriButton</item>
     </style>
-
-    <!-- 主页固定浅色：与校园快跑的水绿色设计保持一致，不跟随系统深色模式变暗。 -->
-    <style name="Theme.RouteWorkshop.Home" parent="Theme.Material3.Light.NoActionBar">
-        <item name="colorPrimary">@color/campus_mint</item>
-        <item name="colorOnPrimary">@color/brand_on_primary</item>
-        <item name="colorPrimaryContainer">@color/campus_mint_pale</item>
-        <item name="colorOnPrimaryContainer">@color/campus_mint_dark</item>
-        <item name="colorSecondary">@color/campus_mint_dark</item>
-        <item name="colorSecondaryContainer">@color/campus_mint_pale</item>
-        <item name="colorSurface">@android:color/white</item>
-        <item name="colorSurfaceContainerLow">@color/campus_setup_bg</item>
-        <item name="colorOnSecondaryContainer">@color/campus_mint_dark</item>
-        <item name="android:windowBackground">@android:color/white</item>
-        <item name="android:statusBarColor">@android:color/white</item>
-        <item name="android:navigationBarColor">@android:color/white</item>
-        <item name="android:windowLightStatusBar">true</item>
-    </style>
-
-    <!-- 校园快跑固定浅色：原型是白底 + 水绿色，深色模式下也要保持同一套观感。 -->
-    <style name="Theme.RouteWorkshop.CampusRun" parent="Theme.Material3.Light.NoActionBar">
-        <item name="colorPrimary">@color/campus_mint</item>
-        <item name="colorOnPrimary">@color/brand_on_primary</item>
-        <item name="colorPrimaryContainer">@color/campus_mint_pale</item>
-        <item name="colorOnPrimaryContainer">@color/campus_mint_dark</item>
-        <item name="colorSecondary">@color/campus_mint_dark</item>
-        <item name="colorSecondaryContainer">@color/campus_mint_pale</item>
-        <item name="colorSurface">@android:color/white</item>
-        <item name="colorSurfaceContainerLow">@color/campus_setup_bg</item>
-        <item name="colorOnSecondaryContainer">@color/campus_mint_dark</item>
-        <item name="android:windowBackground">@color/campus_setup_bg</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
-    </style>
-
-</resources>
+    <style name="Theme.RouteWorkshop.Home" parent="Theme.RouteWorkshop"/>
+    <style name="Theme.RouteWorkshop.CampusRun" parent="Theme.RouteWorkshop"/>
+    <style name="Widget.Legion.FinmoriButton" parent="Widget.Material3.Button"><item name="cornerRadius">16dp</item><item name="android:minHeight">48dp</item></style>
+<style name="Animation.Legion.Activity" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/fm_fade_in</item>
+        <item name="android:activityOpenExitAnimation">@anim/fm_hold</item>
+        <item name="android:activityCloseEnterAnimation">@anim/fm_fade_in</item>
+        <item name="android:activityCloseExitAnimation">@anim/fm_fade_out</item>
+    </style></resources>

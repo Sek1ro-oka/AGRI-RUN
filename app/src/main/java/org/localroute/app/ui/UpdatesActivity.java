@@ -233,7 +233,7 @@ public class UpdatesActivity extends AppCompatActivity {
         }
         String message = getString(R.string.home_update_dialog_message,
                 BuildConfig.VERSION_NAME, release.versionName(), notes);
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+        AlertDialog.Builder builder = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.home_update_dialog_title, release.versionName()))
                 .setMessage(message)
                 .setNegativeButton(R.string.campus_cancel, null);
@@ -284,7 +284,7 @@ public class UpdatesActivity extends AppCompatActivity {
     private void promptInstall(@NonNull String version) {
         String label = version.isEmpty()
                 ? BuildConfig.VERSION_NAME : version;
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.home_update_ready_title)
                 .setMessage(getString(R.string.home_update_ready_message, label))
                 .setNegativeButton(R.string.home_update_later, null)
@@ -301,7 +301,7 @@ public class UpdatesActivity extends AppCompatActivity {
         }
         if (!UpdateManager.canInstall(this)) {
             awaitingInstallPermission = true;
-            new AlertDialog.Builder(this)
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.home_update_permission_title)
                     .setMessage(R.string.home_update_permission_message)
                     .setNegativeButton(R.string.campus_cancel, null)
@@ -332,7 +332,7 @@ public class UpdatesActivity extends AppCompatActivity {
         UpdateManager.discardDownload(this);
         updateUpdateCard();
         DiagnosticLog.warn("更新包校验未通过：" + issue.name());
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.home_update_verify_failed_title)
                 .setMessage(getString(R.string.home_update_verify_failed_message,
                         verifyIssueText(issue)))

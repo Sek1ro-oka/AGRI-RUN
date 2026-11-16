@@ -4,7 +4,7 @@ import android.Manifest;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -283,8 +283,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         });
         WindowInsetsControllerCompat controller =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        controller.setAppearanceLightStatusBars(true);
-        controller.setAppearanceLightNavigationBars(true);
+        controller.setAppearanceLightStatusBars(getResources().getBoolean(R.bool.fm_light_bars));
+        controller.setAppearanceLightNavigationBars(getResources().getBoolean(R.bool.fm_light_bars));
 
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissionResult);
@@ -575,7 +575,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         message.setText(getString(R.string.campus_preset_conflict_message, conflict.preset.name()));
 
         final boolean[] handled = {false};
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.campus_preset_conflict_title)
                 .setView(content)
                 .setPositiveButton(R.string.campus_preset_conflict_replace, (d, which) -> {
@@ -784,6 +784,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.buttonGoal.setOnClickListener(v -> showRouteSheet());
         binding.buttonGo.setOnClickListener(v -> showRunScreen());
         binding.buttonRunMain.setOnClickListener(v -> onMainControl());
+        FinmoriMotion.press(binding.buttonGoal);
+        FinmoriMotion.press(binding.buttonRunMain);
         binding.buttonEndRun.setOnClickListener(v -> requestStop());
         binding.buttonTeleport.setOnClickListener(this::showMapActionsMenu);
 
@@ -870,7 +872,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 getString(R.string.campus_map_layer_standard),
                 getString(R.string.campus_map_layer_satellite)};
         int checked = mapHost.baseLayer() == RouteMapHost.BaseLayer.SATELLITE ? 1 : 0;
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.campus_map_layer_title)
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     RouteMapHost.BaseLayer layer = which == 1
@@ -1090,7 +1092,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         minus.setOnClickListener(v -> stepLapInput(input, -1));
         plus.setOnClickListener(v -> stepLapInput(input, 1));
         box.addView(stepper);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.run_laps_edit)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.run_laps_edit)
                 .setView(box).setNegativeButton(R.string.campus_cancel, null)
                 .setPositiveButton(R.string.campus_save, null).create();
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
@@ -1154,7 +1156,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             @Override public void onStartTrackingTouch(SeekBar bar) { }
             @Override public void onStopTrackingTouch(SeekBar bar) { }
         });
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.run_pace_edit)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.run_pace_edit)
                 .setView(box).setNegativeButton(R.string.campus_cancel, null)
                 .setPositiveButton(snapshot.isActive() ? R.string.run_apply_now : R.string.campus_save, null).create();
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
@@ -1245,7 +1247,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         binding.setupScreen.setVisibility(View.GONE);
         binding.runScreen.setVisibility(View.VISIBLE);
         binding.doneOverlay.setVisibility(View.GONE);
-        binding.root.setBackgroundColor(Color.WHITE);
+        binding.root.setBackgroundColor(getColor(R.color.fm_background));
         if (drawMode) {
             renderMapDraft();
         } else {
@@ -1724,7 +1726,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         } else {
             message = "无法访问定位服务，请确认系统定位开关已打开。";
         }
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("还不能开始校园快跑")
                 .setMessage(message)
                 .setPositiveButton("去设置检查", (dialog, which) ->
@@ -2183,7 +2185,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void showRouteEditDialog(CampusRoute candidate, BottomSheetDialog sheet) {
         sheet.dismiss();
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.campus_route_edit_title) + " · " + candidate.name())
                 .setItems(new CharSequence[]{
                         getString(R.string.campus_route_edit_rename),
@@ -2200,7 +2202,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void promptRenameRoute(CampusRoute candidate) {
         EditText input = routeNameInput(candidate.name());
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.campus_route_rename_title)
                 .setView(input)
                 .setPositiveButton(R.string.campus_save, null)
@@ -2287,7 +2289,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 return;
             }
             String currentName = route == null ? getString(R.string.placeholder) : route.name();
-            new AlertDialog.Builder(this)
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.campus_sheet_switch_title)
                     .setMessage(getString(R.string.campus_sheet_switch_message,
                             currentName, candidate.name()))
@@ -2416,7 +2418,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     /** 绘制完成后先命名再保存；取消命名则留在绘制状态，可以继续调整。 */
     private void promptRouteName(CampusRoute candidate, String suggestedName) {
         EditText input = routeNameInput(suggestedName);
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.campus_route_name_title)
                 .setView(input)
                 .setPositiveButton(R.string.campus_save, null)

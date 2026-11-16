@@ -72,7 +72,7 @@ public class AppSettingsActivity extends AppCompatActivity {
         container.setPadding(padding, dp(8), padding, 0);
         container.addView(input);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.app_settings_activation_dialog_title)
                 .setView(container)
                 .setPositiveButton(R.string.app_settings_activation_confirm, null)

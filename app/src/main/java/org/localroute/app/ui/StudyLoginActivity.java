@@ -141,7 +141,7 @@ public class StudyLoginActivity extends AppCompatActivity {
     }
 
     private void confirmExit() {
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.study_login_cancel_title)
                 .setMessage(R.string.study_login_cancel_message)
                 .setNegativeButton(R.string.study_login_continue, null)

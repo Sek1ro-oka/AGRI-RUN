@@ -106,8 +106,8 @@ public class TimetableGridView extends View {
         labelPaint.setTextAlign(Paint.Align.CENTER);
 
         titlePaint.setFakeBoldText(true);
-        titlePaint.setTextSize(sp(10f));
-        detailPaint.setTextSize(sp(8f));
+        titlePaint.setTextSize(sp(11f));
+        detailPaint.setTextSize(sp(9f));
 
         blockFills = new int[]{
                 ContextCompat.getColor(context, R.color.study_block_mint_fill),
@@ -306,7 +306,7 @@ public class TimetableGridView extends View {
             rect.set(left, top, right, bottom);
 
             fillPaint.setColor(block.fillColor);
-            canvas.drawRoundRect(rect, 8 * density, 8 * density, fillPaint);
+            canvas.drawRoundRect(rect, 10 * density, 10 * density, fillPaint);
 
             canvas.save();
             canvas.clipRect(rect);

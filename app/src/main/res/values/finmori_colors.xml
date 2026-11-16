@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fm_background">#F5F6FA</color>
+    <color name="fm_surface">#FFFFFF</color>
+    <color name="fm_surface_alt">#E5F5EB</color>
+    <color name="fm_text">#182130</color>
+    <color name="fm_text_secondary">#66717F</color>
+    <color name="fm_muted">#687480</color>
+    <color name="fm_border">#E1E6E5</color>
+    <color name="fm_brand">#147C4B</color>
+    <color name="fm_link">#147C4B</color>
+    <color name="fm_on_brand">#FFFFFF</color>
+    <color name="fm_nav">#F5F6FA</color>
+    <color name="fm_on_nav">#147C4B</color>
+    <color name="fm_nav_idle">#8994A5</color>
+    <color name="fm_success">#147C4B</color>
+    <color name="fm_warning">#995707</color>
+    <color name="fm_error">#B42318</color>
+    <color name="fm_map_chip">#F5FFFFFF</color>
+    <color name="fm_ripple">#24147C4B</color>
+    <color name="fm_go_start">#36A56A</color>
+    <color name="fm_go_end">#147C4B</color>
+    <color name="fm_tab_selected">#DDEFE4</color>
+    <color name="fm_dark_map_chip">#E612151C</color>
+</resources>

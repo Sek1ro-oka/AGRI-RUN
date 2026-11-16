@@ -34,6 +34,7 @@
             android:orientation="vertical">
 
             <TextView
+                android:id="@+id/textStudyTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/study_title"
@@ -293,9 +294,11 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/buttonImportTimetable"
+                        android:paddingHorizontal="4dp"
+                        android:singleLine="true"
                         style="@style/Widget.Material3.Button"
                         android:layout_width="0dp"
-                        android:layout_height="42dp"
+                        android:layout_height="48dp"
                         android:layout_weight="1"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
@@ -318,9 +321,11 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/buttonAddCourse"
+                        android:paddingHorizontal="4dp"
+                        android:singleLine="true"
                         style="@style/Widget.Material3.Button"
                         android:layout_width="0dp"
-                        android:layout_height="42dp"
+                        android:layout_height="48dp"
                         android:layout_weight="1"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
@@ -375,13 +380,15 @@
     <!-- 底部切换：作业 / 课表 -->
     <View
         android:layout_width="match_parent"
-        android:layout_height="1dp"
+        android:layout_height="0dp"
         android:background="@color/campus_card_stroke" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="64dp"
-        android:background="#FFFFFF"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_fm_nav"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="20dp">

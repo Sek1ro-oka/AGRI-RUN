@@ -34,6 +34,16 @@ public class MainActivity extends AppCompatActivity {
         binding.cardCampusRun.setOnClickListener(v -> openRun());
         binding.cardActiveRun.setOnClickListener(v -> openRun());
         binding.cardStudy.setOnClickListener(v -> startActivity(new Intent(this, StudyActivity.class)));
+        binding.cardTimetable.setOnClickListener(v -> startActivity(new Intent(this, StudyActivity.class)
+                .putExtra(StudyActivity.EXTRA_TIMETABLE, true)));
+        binding.navRun.setOnClickListener(v -> openRun());
+        binding.navStudy.setOnClickListener(v -> startActivity(new Intent(this, StudyActivity.class)));
+        FinmoriMotion.press(binding.cardCampusRun);
+        FinmoriMotion.press(binding.cardActiveRun);
+        FinmoriMotion.press(binding.cardStudy);
+        FinmoriMotion.press(binding.cardTimetable);
+        FinmoriMotion.press(binding.navRun);
+        FinmoriMotion.press(binding.navStudy);
         binding.toolbar.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.action_settings) {
                 startActivity(new Intent(this, AppSettingsActivity.class)); return true;
@@ -48,11 +58,20 @@ public class MainActivity extends AppCompatActivity {
                 .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP));
     }
     private void renderRun(RunSnapshot snapshot) {
+        boolean justStarted = snapshot.isActive() && binding.cardActiveRun.getVisibility() != View.VISIBLE;
         binding.cardActiveRun.setVisibility(snapshot.isActive() ? View.VISIBLE : View.GONE);
+        if (justStarted) FinmoriMotion.reveal(binding.cardActiveRun);
         int state = snapshot.state() == RunState.STARTING ? R.string.run_state_starting
                 : snapshot.state() == RunState.PAUSED ? R.string.run_state_paused
                 : snapshot.singlePoint() ? R.string.run_state_hold : R.string.run_state_running;
         binding.textActiveRunTitle.setText(getString(R.string.run_active_home, getString(state)));
+        int status = snapshot.state() == RunState.STARTING ? R.string.fm_run_starting
+                : snapshot.state() == RunState.PAUSED ? R.string.fm_run_paused
+                : snapshot.state() == RunState.RUNNING ? (snapshot.singlePoint() ? R.string.fm_run_hold : R.string.fm_run_running)
+                : snapshot.state() == RunState.COMPLETED ? R.string.fm_run_completed
+                : snapshot.state() == RunState.STOPPED ? R.string.fm_run_stopped
+                : snapshot.state() == RunState.ERROR ? R.string.fm_run_error : R.string.fm_run_status_ready;
+        binding.textRunStatus.setText(status);
         binding.textActiveRunDetail.setText(getString(R.string.run_active_detail,
                 CampusFormat.kilometers(snapshot.distanceMeters()), CampusFormat.time(snapshot.activeElapsedMs())));
     }

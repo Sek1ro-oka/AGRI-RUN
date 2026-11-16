@@ -31,6 +31,14 @@ import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class CampusWorkspaceTest {
     private Context context;
+    @Test public void homeTimetableShortcutOpensWeekView() {
+        try (ActivityScenario<MainActivity> home = ActivityScenario.launch(MainActivity.class)) {
+            onView(withId(R.id.cardTimetable)).perform(click());
+            onView(withId(R.id.timetableScreen)).check(matches(isDisplayed()));
+            onView(withId(R.id.tabTimetable)).check(matches(isSelected()));
+            onView(withId(R.id.textStudyTitle)).check(matches(withText(R.string.fm_timetable)));
+        }
+    }
     @Before public void prepare() throws Exception {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         android.app.UiAutomation automation = InstrumentationRegistry.getInstrumentation().getUiAutomation();
@@ -181,6 +189,7 @@ public class CampusWorkspaceTest {
             await(() -> SimulationStateRepo.get().current().state() == RunState.PAUSED);
             pressBack();
             onView(withId(R.id.cardActiveRun)).check(matches(isDisplayed()));
+            onView(withId(R.id.textRunStatus)).check(matches(withText(R.string.fm_run_paused)));
             capture("05-home-paused-task");
             onView(withId(R.id.cardActiveRun)).perform(click());
             assertEquals(runId, SimulationStateRepo.get().current().runId());

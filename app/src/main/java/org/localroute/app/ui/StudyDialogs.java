@@ -57,7 +57,7 @@ public final class StudyDialogs {
         binding.checkImportAppend.setOnCheckedChangeListener(
                 (button, checked) -> updateImportHint(activity, binding, existing));
 
-        AlertDialog dialog = new AlertDialog.Builder(activity)
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
                 .setTitle(R.string.study_import_title)
                 .setView(binding.getRoot())
                 .setNegativeButton(R.string.campus_cancel, null)
@@ -215,7 +215,7 @@ public final class StudyDialogs {
             }
         });
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(activity)
+        AlertDialog.Builder builder = new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
                 .setTitle(existing == null ? R.string.study_course_add_title
                         : R.string.study_course_edit_title)
                 .setView(binding.getRoot())
@@ -308,7 +308,7 @@ public final class StudyDialogs {
     public static void confirmDeleteCourse(@NonNull Activity activity,
                                            @NonNull TimetableCourse course,
                                            @NonNull Runnable onDeleted) {
-        new AlertDialog.Builder(activity)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
                 .setTitle(R.string.study_course_delete_title)
                 .setMessage(activity.getString(R.string.study_course_delete_message,
                         course.name()))

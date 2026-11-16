@@ -168,7 +168,7 @@ public class StudySettingsActivity extends AppCompatActivity {
             loginLauncher.launch(new Intent(this, StudyLoginActivity.class));
             return;
         }
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.study_logout_confirm_title)
                 .setMessage(R.string.study_logout_confirm_message)
                 .setNegativeButton(R.string.campus_cancel, null)
@@ -209,7 +209,7 @@ public class StudySettingsActivity extends AppCompatActivity {
     }
 
     private void confirmClearTimetable() {
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.study_timetable_clear_confirm_title)
                 .setMessage(R.string.study_timetable_clear_confirm_message)
                 .setNegativeButton(R.string.campus_cancel, null)

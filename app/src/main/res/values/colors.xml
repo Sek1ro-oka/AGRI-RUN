@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand_primary">#2E6B3E</color>
-    <color name="brand_on_primary">#FFFFFF</color>
-    <color name="brand_primary_container">#B5F2BB</color>
-    <color name="brand_secondary">#52634F</color>
-    <color name="state_running">#1B5E20</color>
-    <color name="state_paused">#8D6E00</color>
-    <color name="state_error">#B3261E</color>
+    <color name="brand_primary">@color/fm_brand</color>
+    <color name="brand_on_primary">@color/fm_on_brand</color>
+    <color name="brand_primary_container">@color/fm_surface_alt</color>
+    <color name="brand_secondary">@color/fm_link</color>
+    <color name="state_running">@color/fm_success</color>
+    <color name="state_paused">@color/fm_warning</color>
+    <color name="state_error">@color/fm_error</color>
 
     <!-- 校园快跑：与原型一致的水绿色系 -->
-    <color name="campus_mint">#12CFA9</color>
-    <color name="campus_mint_dark">#0E9E82</color>
-    <color name="campus_mint_pale">#E8FAF5</color>
-    <color name="campus_orange">#F2994A</color>
-    <color name="campus_blue">#2F7EE5</color>
-    <color name="campus_ink">#1F2A26</color>
-    <color name="campus_muted">#7C8B85</color>
-    <color name="campus_setup_bg">#F3FBF9</color>
-    <color name="campus_track">#E3EDE8</color>
-    <color name="campus_card_stroke">#E4F0EA</color>
-    <color name="campus_row_bg">#FFFFFFFF</color>
-    <color name="campus_danger">#D64545</color>
+    <color name="campus_mint">@color/fm_brand</color>
+    <color name="campus_mint_dark">@color/fm_link</color>
+    <color name="campus_mint_pale">@color/fm_surface_alt</color>
+    <color name="campus_orange">@color/fm_warning</color>
+    <color name="campus_blue">@color/fm_link</color>
+    <color name="campus_ink">@color/fm_text</color>
+    <color name="campus_muted">@color/fm_muted</color>
+    <color name="campus_setup_bg">@color/fm_background</color>
+    <color name="campus_track">@color/fm_border</color>
+    <color name="campus_card_stroke">@color/fm_border</color>
+    <color name="campus_row_bg">@color/fm_surface</color>
+    <color name="campus_danger">@color/fm_error</color>
 
     <!-- 悬浮摇杆控制台：深色半透明圆盘 + 薄荷绿描边（参考图配色） -->
     <color name="overlay_button_fill">#F2242A33</color>
@@ -48,8 +48,8 @@
     <color name="study_block_violet_text">#5B4BC4</color>
     <color name="study_block_rose_fill">#FBE8EE</color>
     <color name="study_block_rose_text">#B03A60</color>
-    <color name="study_weekend_bg">#F7FAF8</color>
-    <color name="study_today_bg">#EEFBF6</color>
+    <color name="study_weekend_bg">@color/fm_background</color>
+    <color name="study_today_bg">@color/fm_surface_alt</color>
     <color name="study_state_pending_fill">#FDF0E6</color>
     <color name="study_state_expired_fill">#EEF2F0</color>
     <color name="study_state_other_fill">#EAF1FC</color>

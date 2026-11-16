@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="study_block_mint_fill">#243C3A</color>
+    <color name="study_block_mint_text">#9EE8CE</color>
+    <color name="study_block_blue_fill">#283962</color>
+    <color name="study_block_blue_text">#C1D5FF</color>
+    <color name="study_block_orange_fill">#543A29</color>
+    <color name="study_block_orange_text">#FFCE9B</color>
+    <color name="study_block_violet_fill">#3E3459</color>
+    <color name="study_block_violet_text">#E0D1FF</color>
+    <color name="study_block_rose_fill">#543344</color>
+    <color name="study_block_rose_text">#FFD0E3</color>
+    <color name="study_state_pending_fill">#4E321D</color>
+    <color name="study_state_expired_fill">#353D46</color>
+    <color name="study_state_other_fill">#263E38</color>
+</resources>

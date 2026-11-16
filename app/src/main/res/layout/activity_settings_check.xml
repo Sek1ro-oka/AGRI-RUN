@@ -3,14 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
+    android:background="@color/fm_surface"
     android:orientation="vertical">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/white"
+        android:background="@color/fm_surface"
         android:minHeight="?attr/actionBarSize"
         app:title="@string/settings_title"
         app:titleTextColor="@color/campus_ink" />
@@ -44,10 +44,10 @@
                 android:layout_marginStart="12dp"
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="12dp"
-                app:cardBackgroundColor="@android:color/white"
+                app:cardBackgroundColor="@color/fm_surface"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:strokeColor="#D8EEE6"
+                app:strokeColor="@color/fm_border"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -106,10 +106,10 @@
                 android:layout_marginStart="12dp"
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="12dp"
-                app:cardBackgroundColor="@android:color/white"
+                app:cardBackgroundColor="@color/fm_surface"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:strokeColor="#D8EEE6"
+                app:strokeColor="@color/fm_border"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -150,7 +150,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/white"
+        android:background="@color/fm_surface"
         android:orientation="vertical"
         android:paddingHorizontal="12dp"
         android:paddingTop="6dp"
@@ -169,7 +169,7 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="@string/settings_recheck"
-                android:textColor="@android:color/white"
+                android:textColor="@color/brand_on_primary"
                 android:textSize="13sp"
                 app:backgroundTint="@color/campus_mint_dark"
                 app:cornerRadius="12dp" />

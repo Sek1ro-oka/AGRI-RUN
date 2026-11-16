@@ -54,6 +54,7 @@ import java.util.concurrent.Executors;
  * 不生成模拟数据。抓取结果按截止时间缓存，换账号后不会串数据。
  */
 public class StudyActivity extends AppCompatActivity {
+    public static final String EXTRA_TIMETABLE = "open_timetable";
 
     /** 作业自动刷新间隔；逐课程读取请求较多，缩短间隔容易触发学习通安全验证。 */
     private static final long AUTO_REFRESH_INTERVAL_MS = 30L * 60L * 1000L;
@@ -153,6 +154,8 @@ public class StudyActivity extends AppCompatActivity {
                 settingsLauncher.launch(new Intent(this, StudySettingsActivity.class)));
         binding.tabHomework.setOnClickListener(view -> selectTab(false));
         binding.tabTimetable.setOnClickListener(view -> selectTab(true));
+        FinmoriMotion.press(binding.tabHomework);
+        FinmoriMotion.press(binding.tabTimetable);
         binding.buttonHomeworkRefresh.setOnClickListener(view -> {
             if (session == null) {
                 openLogin(false);
@@ -177,7 +180,8 @@ public class StudyActivity extends AppCompatActivity {
         session = StudySessionStore.load(this);
         renderAccount();
         renderTimetable();
-        selectTab(false);
+        boolean openTimetable = getIntent().getBooleanExtra(EXTRA_TIMETABLE, false);
+        selectTab(openTimetable);
 
         if (session != null) {
             loadCachedHomework();
@@ -185,7 +189,7 @@ public class StudyActivity extends AppCompatActivity {
                     || System.currentTimeMillis() - cache.fetchedAt > AUTO_REFRESH_INTERVAL_MS) {
                 startFetch();
             }
-        } else if (savedInstanceState == null) {
+        } else if (savedInstanceState == null && !openTimetable) {
             openLogin(false);
         } else {
             showUnbound();
@@ -381,7 +385,7 @@ public class StudyActivity extends AppCompatActivity {
             if (cache != null) {
                 updateSummary(cache);
             }
-            new AlertDialog.Builder(this)
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.study_antispider_title)
                     .setMessage(R.string.study_antispider_verify_hint)
                     .setNegativeButton(R.string.campus_cancel, null)
@@ -422,7 +426,7 @@ public class StudyActivity extends AppCompatActivity {
         if (cache != null) {
             updateSummary(cache);
         }
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.study_account_expired)
                 .setMessage(R.string.study_account_expired_message)
                 .setNegativeButton(R.string.campus_cancel, null)
@@ -659,7 +663,7 @@ public class StudyActivity extends AppCompatActivity {
         int padding = Math.round(20 * getResources().getDisplayMetrics().density);
         container.setPadding(padding, 0, padding, 0);
         container.addView(picker);
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.study_week_pick_title)
                 .setView(container)
                 .setPositiveButton(R.string.study_week_confirm,
@@ -679,7 +683,7 @@ public class StudyActivity extends AppCompatActivity {
         int padding = Math.round(20 * getResources().getDisplayMetrics().density);
         container.setPadding(padding, 0, padding, 0);
         container.addView(picker);
-        new AlertDialog.Builder(this)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.study_week_total_title)
                 .setMessage(R.string.study_week_total_message)
                 .setView(container)
@@ -692,13 +696,14 @@ public class StudyActivity extends AppCompatActivity {
     }
 
     private void selectTab(boolean timetable) {
+        binding.textStudyTitle.setText(timetable ? R.string.fm_timetable : R.string.study_title);
         binding.homeworkScreen.setVisibility(timetable ? View.GONE : View.VISIBLE);
         binding.timetableScreen.setVisibility(timetable ? View.VISIBLE : View.GONE);
         binding.tabHomework.setSelected(!timetable);
         binding.tabTimetable.setSelected(timetable);
 
-        int active = ContextCompat.getColor(this, R.color.campus_mint_dark);
-        int idle = ContextCompat.getColor(this, R.color.campus_muted);
+        int active = ContextCompat.getColor(this, R.color.fm_on_nav);
+        int idle = ContextCompat.getColor(this, R.color.fm_nav_idle);
         binding.iconTabHomework.setColorFilter(timetable ? idle : active);
         binding.iconTabTimetable.setColorFilter(timetable ? active : idle);
         binding.textTabHomework.setTextColor(timetable ? idle : active);
@@ -706,6 +711,7 @@ public class StudyActivity extends AppCompatActivity {
         if (timetable) {
             renderTimetable();
         }
+        FinmoriMotion.reveal(timetable ? binding.timetableScreen : binding.homeworkScreen);
     }
 
     private float dp(float value) {

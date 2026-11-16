@@ -4,7 +4,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF"
+    android:background="@color/fm_surface"
     android:orientation="vertical">
 
     <LinearLayout
@@ -78,7 +78,7 @@
             android:id="@+id/loginLoading"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#FFFFFF"
+            android:background="@color/fm_surface"
             android:gravity="center"
             android:orientation="vertical">
 
