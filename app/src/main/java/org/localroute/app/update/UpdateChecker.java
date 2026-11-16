@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -153,17 +154,22 @@ public final class UpdateChecker {
             thread.setDaemon(true);
             return thread;
         });
-        List<Future<Release>> futures = new ArrayList<>(sources.size());
+        // 谁先成功就用谁：直连 GitHub 不通时，镜像结果不必排在它后面等超时。
+        ExecutorCompletionService<Release> completion =
+                new ExecutorCompletionService<>(pool);
         for (String source : sources) {
-            futures.add(pool.submit(() -> fetchFrom(source)));
+            completion.submit(() -> fetchFrom(source));
         }
         IOException lastError = null;
         boolean sawNoRelease = false;
         try {
-            // 按「直连 → 镜像」顺序取结果：直连能用时优先直连，镜像请求同时进行不会额外等待。
-            for (Future<Release> future : futures) {
+            for (int remaining = sources.size(); remaining > 0; remaining--) {
                 try {
+                    Future<Release> future = completion.take();
                     return future.get();
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("更新检查被中断", error);
                 } catch (ExecutionException error) {
                     Throwable cause = error.getCause();
                     if (cause instanceof NoReleaseException) {
@@ -173,9 +179,6 @@ public final class UpdateChecker {
                     } else if (cause != null) {
                         lastError = new IOException(cause.getMessage(), cause);
                     }
-                } catch (InterruptedException error) {
-                    Thread.currentThread().interrupt();
-                    throw new IOException("更新检查被中断", error);
                 }
             }
         } finally {
