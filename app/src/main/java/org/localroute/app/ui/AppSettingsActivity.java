@@ -1,6 +1,7 @@
 package org.localroute.app.ui;
 
 import android.content.SharedPreferences;
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.MenuItem;
@@ -48,6 +49,7 @@ public class AppSettingsActivity extends AppCompatActivity {
         }
         prefs = getSharedPreferences(PresetUnlock.PREFS_NAME, MODE_PRIVATE);
         PresetUnlock.migrate(prefs);
+        binding.rowUpdate.setOnClickListener(v -> startActivity(new Intent(this, UpdatesActivity.class)));
         binding.rowActivation.setOnClickListener(v -> showActivationDialog());
     }
 

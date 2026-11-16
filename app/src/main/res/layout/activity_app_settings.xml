@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/white"
     android:orientation="vertical">
-
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -14,19 +14,16 @@
         android:minHeight="?attr/actionBarSize"
         app:title="@string/app_settings_title"
         app:titleTextColor="@color/campus_ink" />
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingBottom="16dp">
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -37,7 +34,6 @@
                 android:textColor="@color/campus_muted"
                 android:textSize="12sp"
                 android:textStyle="bold" />
-
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -49,14 +45,11 @@
                 app:cardElevation="0dp"
                 app:strokeColor="@color/campus_card_stroke"
                 app:strokeWidth="1dp">
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:paddingHorizontal="14dp">
-
-                    <!-- 语言：本期只展示入口，切换能力尚未实现。 -->
                     <LinearLayout
                         android:id="@+id/rowLanguage"
                         android:layout_width="match_parent"
@@ -64,13 +57,11 @@
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:paddingVertical="14dp">
-
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
-
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
@@ -78,7 +69,6 @@
                                 android:textColor="@color/campus_ink"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
-
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
@@ -87,7 +77,6 @@
                                 android:textColor="@color/campus_muted"
                                 android:textSize="11sp" />
                         </LinearLayout>
-
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -98,13 +87,10 @@
                             android:textColor="@color/campus_mint_dark"
                             android:textSize="10sp" />
                     </LinearLayout>
-
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="#EFF5F2" />
-
-                    <!-- 激活码：输入正确后解锁 A操 / B操 预设路线。 -->
                     <LinearLayout
                         android:id="@+id/rowActivation"
                         android:layout_width="match_parent"
@@ -115,13 +101,11 @@
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:paddingVertical="14dp">
-
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
-
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
@@ -130,7 +114,6 @@
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
-
                         <ImageView
                             android:id="@+id/imageActivationChevron"
                             android:layout_width="20dp"
@@ -140,6 +123,14 @@
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/rowUpdate"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_margin="16dp"
+                android:text="@string/home_update_title"
+                app:icon="@drawable/ic_campus_update" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/white"
     android:orientation="vertical">
-
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -14,18 +14,49 @@
         android:minHeight="?attr/actionBarSize"
         app:menu="@menu/menu_main"
         app:title="@string/app_name" />
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
-
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardActiveRun"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/campus_mint_pale"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/textActiveRunTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/campus_ink"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:id="@+id/textActiveRunDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textColor="@color/campus_mint_dark"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -36,8 +67,6 @@
                 android:textColor="@color/campus_muted"
                 android:textSize="12sp"
                 android:textStyle="bold" />
-
-            <!-- 校园快跑入口：独立页面（设置与地图）都在 CampusRunActivity。 -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardCampusRun"
                 android:layout_width="match_parent"
@@ -54,7 +83,6 @@
                 app:cardElevation="0dp"
                 app:strokeColor="#D8EEE6"
                 app:strokeWidth="1dp">
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -62,7 +90,6 @@
                     android:orientation="horizontal"
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="12dp">
-
                     <ImageView
                         android:layout_width="36dp"
                         android:layout_height="36dp"
@@ -71,31 +98,27 @@
                         android:padding="8dp"
                         android:src="@drawable/ic_campus_run"
                         app:tint="@color/campus_mint_dark" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/campus_entry_title"
                             android:textColor="@color/campus_ink"
-                            android:textSize="14sp"
+                            android:textSize="18sp"
                             android:textStyle="bold" />
-
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="1dp"
                             android:text="@string/campus_entry_subtitle_short"
                             android:textColor="@color/campus_muted"
-                            android:textSize="11sp" />
+                            android:textSize="13sp" />
                     </LinearLayout>
-
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
@@ -103,8 +126,6 @@
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <!-- 作业查询：学习通作业与手动课表，独立页面（含绑定与设置）。 -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardStudy"
                 android:layout_width="match_parent"
@@ -121,7 +142,6 @@
                 app:cardElevation="0dp"
                 app:strokeColor="@color/campus_card_stroke"
                 app:strokeWidth="1dp">
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -129,7 +149,6 @@
                     android:orientation="horizontal"
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="12dp">
-
                     <ImageView
                         android:layout_width="36dp"
                         android:layout_height="36dp"
@@ -137,31 +156,27 @@
                         android:contentDescription="@string/study_title"
                         android:padding="8dp"
                         android:src="@drawable/ic_study_homework" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/study_title"
                             android:textColor="@color/campus_ink"
-                            android:textSize="14sp"
+                            android:textSize="18sp"
                             android:textStyle="bold" />
-
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="1dp"
                             android:text="@string/study_entry_subtitle_short"
                             android:textColor="@color/campus_muted"
-                            android:textSize="11sp" />
+                            android:textSize="13sp" />
                     </LinearLayout>
-
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
@@ -169,74 +184,6 @@
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <!-- 检查更新：从 GitHub Releases 读取版本并下载 APK。 -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardUpdate"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginEnd="12dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                android:minHeight="68dp"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeColor="@color/campus_card_stroke"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="12dp">
-
-                    <ImageView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="@drawable/bg_campus_entry_icon"
-                        android:contentDescription="@string/home_update_title"
-                        android:padding="8dp"
-                        android:src="@drawable/ic_campus_update" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/home_update_title"
-                            android:textColor="@color/campus_ink"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/textUpdateSubtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="1dp"
-                            android:text="@string/home_update_idle"
-                            android:textColor="@color/campus_muted"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:contentDescription="@null"
-                        android:src="@drawable/ic_campus_chevron_right" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -244,7 +191,7 @@
                 android:layout_marginTop="12dp"
                 android:text="@string/home_first_use_hint"
                 android:textColor="@color/campus_muted"
-                android:textSize="11sp" />
+                android:textSize="13sp" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

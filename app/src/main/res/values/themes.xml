@@ -17,6 +17,10 @@
         <item name="colorPrimaryContainer">@color/campus_mint_pale</item>
         <item name="colorOnPrimaryContainer">@color/campus_mint_dark</item>
         <item name="colorSecondary">@color/campus_mint_dark</item>
+        <item name="colorSecondaryContainer">@color/campus_mint_pale</item>
+        <item name="colorSurface">@android:color/white</item>
+        <item name="colorSurfaceContainerLow">@color/campus_setup_bg</item>
+        <item name="colorOnSecondaryContainer">@color/campus_mint_dark</item>
         <item name="android:windowBackground">@android:color/white</item>
         <item name="android:statusBarColor">@android:color/white</item>
         <item name="android:navigationBarColor">@android:color/white</item>
@@ -30,6 +34,10 @@
         <item name="colorPrimaryContainer">@color/campus_mint_pale</item>
         <item name="colorOnPrimaryContainer">@color/campus_mint_dark</item>
         <item name="colorSecondary">@color/campus_mint_dark</item>
+        <item name="colorSecondaryContainer">@color/campus_mint_pale</item>
+        <item name="colorSurface">@android:color/white</item>
+        <item name="colorSurfaceContainerLow">@color/campus_setup_bg</item>
+        <item name="colorOnSecondaryContainer">@color/campus_mint_dark</item>
         <item name="android:windowBackground">@color/campus_setup_bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>

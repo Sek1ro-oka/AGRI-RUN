@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="inputRunValue" type="id" />
+    <item name="inputModePace" type="id" />
+    <item name="inputModeSpeed" type="id" />
+    <item name="seekRunSpeed" type="id" />
+    <item name="buttonLapMinus" type="id" />
+    <item name="buttonLapPlus" type="id" />
+</resources>
