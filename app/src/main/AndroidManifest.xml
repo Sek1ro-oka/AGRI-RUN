@@ -79,7 +79,8 @@
             android:exported="false"
             android:label="@string/virtual_title"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.RouteWorkshop.CampusRun" />
+            android:theme="@style/Theme.RouteWorkshop.CampusRun"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.SettingsCheckActivity"

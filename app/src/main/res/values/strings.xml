@@ -378,6 +378,16 @@
     <string name="virtual_mock_unsupported">当前设备不支持添加测试 provider，无法伪造位置。</string>
     <string name="virtual_mock_unavailable">无法访问定位服务，请确认系统定位开关已打开。</string>
     <string name="virtual_settings_check">去设置检查</string>
+    <string name="virtual_search_hint">搜索地点，例如：浙江农林大学</string>
+    <string name="virtual_search_searching">正在搜索…</string>
+    <string name="virtual_search_empty">没有找到匹配地点</string>
+    <string name="virtual_search_failed">搜索失败，请检查网络后重试</string>
+    <string name="virtual_distance">距离 %1$s</string>
+    <string name="virtual_locate_now">回到实际位置</string>
+    <string name="virtual_locate_cached">已回到上次真实位置</string>
+    <string name="virtual_locate_moved">已移动到实际位置</string>
+    <string name="virtual_locate_unavailable">模拟定位中读不到真实位置，请先结束定位</string>
+    <string name="virtual_locate_failed">没有获取到真实位置，请稍后重试</string>
     <string name="campus_route_invalid">路线无效</string>
     <string name="campus_stopping">正在结束…</string>
     <string name="campus_hold_stopped">单点保持已结束</string>
