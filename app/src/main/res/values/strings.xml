@@ -382,6 +382,7 @@
     <string name="virtual_search_searching">正在搜索…</string>
     <string name="virtual_search_empty">没有找到匹配地点</string>
     <string name="virtual_search_failed">搜索失败，请检查网络后重试</string>
+    <string name="virtual_search_attribution">搜索数据 © OpenStreetMap contributors</string>
     <string name="virtual_distance">距离 %1$s</string>
     <string name="virtual_locate_now">回到实际位置</string>
     <string name="virtual_locate_cached">已回到上次真实位置</string>

@@ -20,6 +20,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -83,6 +84,8 @@ public final class VirtualLocationActivity extends AppCompatActivity {
     private boolean pendingStart;
     private boolean pendingLocate;
     private boolean startRequested;
+    /** 搜索模式：地图与选点信息让位，结果列表占满剩余空间，键盘弹出时仍可见。 */
+    private boolean searchMode;
     private ActivityResultLauncher<String[]> permissionLauncher;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -117,7 +120,23 @@ public final class VirtualLocationActivity extends AppCompatActivity {
 
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(), this::onPermissionResult);
-        binding.buttonVirtualBack.setOnClickListener(v -> finish());
+        binding.buttonVirtualBack.setOnClickListener(v -> {
+            if (searchMode) {
+                dismissSearchMode();
+            } else {
+                finish();
+            }
+        });
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (searchMode) {
+                    dismissSearchMode();
+                    return;
+                }
+                finish();
+            }
+        });
         binding.textMapLayer.setOnClickListener(v -> showMapLayerDialog());
         binding.buttonVirtualMain.setOnClickListener(v -> onMainAction());
         binding.buttonLocateNow.setOnClickListener(v -> locateNow());
@@ -311,8 +330,9 @@ public final class VirtualLocationActivity extends AppCompatActivity {
     }
 
     private void renderSearchResults(List<PhotonSearch.Place> places) {
-        binding.cardSearchResults.setVisibility(View.VISIBLE);
+        enterSearchMode();
         binding.textSearchStatus.setVisibility(View.GONE);
+        binding.textSearchAttribution.setVisibility(View.VISIBLE);
         LinearLayout container = binding.searchResultsContainer;
         container.removeAllViews();
         GeoPoint origin = cachedDeviceLocation != null ? cachedDeviceLocation
@@ -370,16 +390,55 @@ public final class VirtualLocationActivity extends AppCompatActivity {
     }
 
     private void showSearchStatus(String message) {
-        binding.cardSearchResults.setVisibility(View.VISIBLE);
+        enterSearchMode();
         binding.textSearchStatus.setVisibility(View.VISIBLE);
         binding.textSearchStatus.setText(message);
+        binding.textSearchAttribution.setVisibility(View.GONE);
         binding.searchResultsContainer.removeAllViews();
     }
 
-    private void hideSearchResults() {
+    /** 进入搜索模式：收起地图与选点信息，把纵向空间留给结果列表。 */
+    private void enterSearchMode() {
+        if (searchMode) {
+            return;
+        }
+        searchMode = true;
+        binding.mapContainer.setVisibility(View.GONE);
+        binding.textVirtualStatus.setVisibility(View.GONE);
+        binding.textVirtualTarget.setVisibility(View.GONE);
+        binding.textVirtualHintInfo.setVisibility(View.GONE);
+        binding.buttonVirtualMain.setVisibility(View.GONE);
+        binding.cardSearchResults.setVisibility(View.VISIBLE);
+    }
+
+    private void exitSearchMode() {
+        if (!searchMode) {
+            return;
+        }
+        searchMode = false;
         binding.cardSearchResults.setVisibility(View.GONE);
+        binding.mapContainer.setVisibility(View.VISIBLE);
+        binding.textVirtualStatus.setVisibility(View.VISIBLE);
+        binding.textVirtualTarget.setVisibility(View.VISIBLE);
+        binding.textVirtualHintInfo.setVisibility(View.VISIBLE);
+        binding.buttonVirtualMain.setVisibility(View.VISIBLE);
+        render();
+    }
+
+    private void hideSearchResults() {
+        // 让在途搜索的结果失效，避免用户离开搜索态后结果又被重新弹回。
+        ++searchGeneration;
+        exitSearchMode();
         binding.textSearchStatus.setVisibility(View.GONE);
+        binding.textSearchAttribution.setVisibility(View.GONE);
         binding.searchResultsContainer.removeAllViews();
+    }
+
+    /** 返回键/左上角返回：先退出搜索态，再回到地图，不直接离开页面。 */
+    private void dismissSearchMode() {
+        hideSearchResults();
+        hideKeyboard();
+        binding.inputPlaceSearch.clearFocus();
     }
 
     // ---------------------------------------------------------------- 回到实际位置

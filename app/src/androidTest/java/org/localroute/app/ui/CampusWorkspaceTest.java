@@ -189,7 +189,8 @@ public class CampusWorkspaceTest {
             await(() -> SimulationStateRepo.get().current().state() == RunState.PAUSED);
             pressBack();
             onView(withId(R.id.cardActiveRun)).check(matches(isDisplayed()));
-            onView(withId(R.id.textRunStatus)).check(matches(withText(R.string.fm_run_paused)));
+            onView(withId(R.id.textActiveRunTitle))
+                    .check(matches(withText(containsString(context.getString(R.string.run_state_paused)))));
             capture("05-home-paused-task");
             onView(withId(R.id.cardActiveRun)).perform(click());
             assertEquals(runId, SimulationStateRepo.get().current().runId());

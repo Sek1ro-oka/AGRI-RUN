@@ -143,45 +143,66 @@
             app:maxImageSize="24dp"
             app:srcCompat="@drawable/ic_campus_locate_now"
             app:tint="@color/fm_link" />
+    </FrameLayout>
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardSearchResults"
+    <!-- 搜索模式：地图与选点信息让位，结果列表在键盘弹出时也保持可见。 -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardSearchResults"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="8dp"
+        android:layout_weight="1"
+        android:visibility="gone"
+        app:cardBackgroundColor="@color/fm_surface"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:strokeColor="@color/fm_border"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:layout_margin="8dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="@color/fm_surface"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="4dp"
-            app:strokeColor="@color/fm_border"
-            app:strokeWidth="1dp">
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp">
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/textSearchStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="6dp">
+                android:paddingHorizontal="4dp"
+                android:paddingVertical="10dp"
+                android:textColor="@color/campus_muted"
+                android:textSize="12sp"
+                android:visibility="gone" />
 
-                <TextView
-                    android:id="@+id/textSearchStatus"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingHorizontal="4dp"
-                    android:paddingVertical="10dp"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
+            <ScrollView
+                android:id="@+id/searchResultsScroll"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fillViewport="true">
 
                 <LinearLayout
                     android:id="@+id/searchResultsContainer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-    </FrameLayout>
+            </ScrollView>
+
+            <TextView
+                android:id="@+id/textSearchAttribution"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="4dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="2dp"
+                android:text="@string/virtual_search_attribution"
+                android:textColor="@color/campus_muted"
+                android:textSize="10sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -202,6 +223,7 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/textVirtualHintInfo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
