@@ -11,6 +11,7 @@ import android.os.Build;
 import androidx.core.content.ContextCompat;
 
 import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.app.overlay.OverlayPanel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,6 +77,12 @@ public final class SettingsInspector {
         } else {
             checks.add(new Check("通知权限", Status.OK, "当前系统版本无需单独授权"));
         }
+
+        boolean overlay = OverlayPanel.canDrawOverlays(context);
+        checks.add(new Check("悬浮窗权限（显示在其他应用上层）", overlay ? Status.OK : Status.WARN,
+                overlay ? "已授权：运行中切到其他应用仍可暂停/继续/结束"
+                        : "未授权：切到其他应用后没有悬浮控制台；只影响悬浮窗，不影响跑圈本身。"
+                        + "可点下方「去授权悬浮窗」"));
 
         LocationManager manager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         if (manager == null) {
