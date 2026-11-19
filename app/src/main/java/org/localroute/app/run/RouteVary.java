@@ -23,8 +23,9 @@ import java.util.Random;
 public final class RouteVary {
 
     /**
-     * 扰动幅度上限（米）。最大档接近参考轨迹的摆动幅度；实际横向范围还受路线中心与
-     * 强度比例影响，这里只是算法上限，不代表跑道边界约束。
+     * 扰动幅度上限（米）。最大档接近参考轨迹的摆动幅度；实际幅度 = 上限 × 强度 ×
+     * 起终点淡出 × 波形，路线中心只决定朝哪一侧偏移，这里只是算法上限，
+     * 不代表跑道边界约束。
      */
     public static final double MAX_OFFSET_METERS = 6d;
 

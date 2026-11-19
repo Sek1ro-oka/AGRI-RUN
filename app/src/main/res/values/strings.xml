@@ -157,6 +157,7 @@
     <string name="campus_overlay_permission_message">悬浮控制台已开启，但系统还没有授予「显示在其他应用上层」权限。切到其他应用后将看不到暂停/继续/结束按钮。只影响悬浮窗，不影响跑圈本身。</string>
     <string name="campus_overlay_permission_grant">去授权</string>
     <string name="campus_overlay_permission_skip">仍然开始</string>
+    <string name="campus_overlay_permission_not_granted">未获得悬浮窗权限，本次未开始；可重新操作</string>
 
     <!-- 悬浮摇杆控制台 -->
     <string name="overlay_home">返回主界面</string>

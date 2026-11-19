@@ -212,6 +212,8 @@ public final class CampusRunActivity extends AppCompatActivity {
     private boolean overlayPermissionPrompted;
     /** 用户想打开悬浮窗但还在等系统授权页返回。 */
     private boolean pendingOverlayEnable;
+    /** 悬浮窗提示里选了「去授权」，授权页返回后继续原来的开始动作。 */
+    private Runnable pendingOverlayProceed;
 
     private boolean runScreenVisible;
     private boolean drawMode;
@@ -1648,6 +1650,11 @@ public final class CampusRunActivity extends AppCompatActivity {
         focusMapOn(target);
 
         if (snapshot.isActive()) {
+            // 确认弹窗期间会话所有权可能已被释放或接管，下发前再查一次。
+            if (!claimOwnSession) {
+                toast(getString(R.string.campus_toast_existing));
+                return;
+            }
             if (expectRouteSwitch) {
                 awaitingTeleportAck = true;
                 handler.removeCallbacks(teleportAckTimeout);
@@ -1754,7 +1761,8 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     private void ensureMockReady(Runnable onReady) {
-        if (promptOverlayPermissionIfNeeded(onReady)) {
+        // 悬浮窗提示的「仍然开始」只放行悬浮窗，模拟位置检查仍要走完。
+        if (promptOverlayPermissionIfNeeded(() -> ensureMockReady(onReady))) {
             return;
         }
         SettingsInspector.MockProbeResult probe = SettingsInspector.probeMockProvider(this);
@@ -1799,8 +1807,10 @@ public final class CampusRunActivity extends AppCompatActivity {
                 .setTitle(R.string.campus_overlay_permission_title)
                 .setMessage(R.string.campus_overlay_permission_message)
                 .setCancelable(false)
-                .setPositiveButton(R.string.campus_overlay_permission_grant,
-                        (dialog, which) -> OverlayPanel.requestPermission(this))
+                .setPositiveButton(R.string.campus_overlay_permission_grant, (dialog, which) -> {
+                    pendingOverlayProceed = proceed;
+                    OverlayPanel.requestPermission(this);
+                })
                 .setNegativeButton(R.string.campus_overlay_permission_skip,
                         (dialog, which) -> proceed.run())
                 .show();
@@ -1896,12 +1906,16 @@ public final class CampusRunActivity extends AppCompatActivity {
         return state == RunState.COMPLETED || state == RunState.STOPPED || state == RunState.ERROR;
     }
 
-    /** 跑圈传送的确认结果只认服务快照：单点运行中才算成功，错误/终止都按失败反馈。 */
+    /**
+     * 跑圈传送的确认结果只认服务快照：单点运行/保持中才算成功，错误/终止都按失败反馈。
+     * 暂停中的跑圈传送后按 PAUSED 发布新任务（TaskModeSwitch），所以 PAUSED 同样是成功。
+     */
     private void handleTeleportAck(RunSnapshot next, boolean ours) {
         if (!awaitingTeleportAck || !ours) {
             return;
         }
-        if (next.state() == RunState.RUNNING && next.singlePoint()) {
+        if ((next.state() == RunState.RUNNING || next.state() == RunState.PAUSED)
+                && next.singlePoint()) {
             awaitingTeleportAck = false;
             handler.removeCallbacks(teleportAckTimeout);
             toast(getString(R.string.campus_teleport_route_ended));
@@ -2575,6 +2589,15 @@ public final class CampusRunActivity extends AppCompatActivity {
                 toast(getString(R.string.settings_overlay_denied_toast));
             }
         }
+        if (pendingOverlayProceed != null) {
+            Runnable proceed = pendingOverlayProceed;
+            pendingOverlayProceed = null;
+            if (OverlayPanel.canDrawOverlays(this)) {
+                proceed.run();
+            } else {
+                toast(getString(R.string.campus_overlay_permission_not_granted));
+            }
+        }
         if (!snapshot.isActive()) configuredSpeedKmh = speedPresets.get(sportIndex());
         renderPaceValue();
         if (runScreenVisible) updateRunUi();
@@ -2605,6 +2628,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         handler.removeCallbacks(naturalTicker);
         handler.removeCallbacks(teleportAckTimeout);
         awaitingTeleportAck = false;
+        pendingOverlayProceed = null;
         cancelRunnerAnimation();
         if (mapHost != null) {
             mapHost.onDestroy();
