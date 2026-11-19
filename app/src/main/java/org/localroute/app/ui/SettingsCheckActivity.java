@@ -30,6 +30,7 @@ import org.localroute.app.R;
 import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivitySettingsCheckBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.app.overlay.OverlayPanel;
 import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.settings.SettingsInspector;
 
@@ -41,7 +42,7 @@ import java.util.List;
  * <p>环境检查只读，权限探测由用户主动触发，不修改任何系统设置；
  * 唯一会写入的是应用自己的「预设重名询问」开关，与激活码导入共用
  * {@link PresetUnlock} 的本地偏好。悬浮窗开关统一放在「校园快跑」页，
- * 避免两处入口状态不一致。
+ * 这里只展示授权状态并提供跳转，避免两处开关状态不一致。
  */
 public class SettingsCheckActivity extends AppCompatActivity {
 
@@ -72,10 +73,20 @@ public class SettingsCheckActivity extends AppCompatActivity {
 
         binding.buttonRecheck.setOnClickListener(v -> renderChecks());
         binding.buttonProbe.setOnClickListener(v -> runProbe());
+        binding.buttonOverlayGrant.setOnClickListener(v -> OverlayPanel.requestPermission(this));
         binding.buttonDevOptions.setOnClickListener(v -> openDeveloperOptions());
         binding.buttonAppDetails.setOnClickListener(v -> openAppDetails());
 
         renderChecks();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (binding != null) {
+            // 从系统授权页返回后刷新状态，与模拟位置探测返回后的处理保持一致。
+            renderChecks();
+        }
     }
 
     @Override

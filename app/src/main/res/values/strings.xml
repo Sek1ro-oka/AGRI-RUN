@@ -152,6 +152,11 @@
     <string name="settings_overlay_disable_toast">悬浮控制台已关闭</string>
     <string name="settings_overlay_need_permission_toast">需要「显示在其他应用上层」权限，授权后回来再打开开关</string>
     <string name="settings_overlay_denied_toast">还没获得悬浮窗权限，开关保持关闭</string>
+    <string name="settings_overlay_grant">去授权悬浮窗</string>
+    <string name="campus_overlay_permission_title">悬浮窗权限未授予</string>
+    <string name="campus_overlay_permission_message">悬浮控制台已开启，但系统还没有授予「显示在其他应用上层」权限。切到其他应用后将看不到暂停/继续/结束按钮。只影响悬浮窗，不影响跑圈本身。</string>
+    <string name="campus_overlay_permission_grant">去授权</string>
+    <string name="campus_overlay_permission_skip">仍然开始</string>
 
     <!-- 悬浮摇杆控制台 -->
     <string name="overlay_home">返回主界面</string>
@@ -234,7 +239,7 @@
     <string name="campus_natural_title">自然变速</string>
     <string name="campus_natural_hint">配速在设定值附近小幅波动，每次不同</string>
     <string name="campus_vary_title">路线扰动</string>
-    <string name="campus_vary_hint">扰动越大，每圈轨迹越不重合；偏移始终限制在跑道内</string>
+    <string name="campus_vary_hint">扰动越大，每圈轨迹越不重合；横向偏移按强度缩放、最大约 6 米，不保证贴合跑道边界</string>
     <string name="campus_vary_value_placeholder">中等 · 50%</string>
     <string name="campus_vary_value">%1$s · %2$d%%</string>
     <string name="campus_vary_level_off">关闭</string>
@@ -289,7 +294,14 @@
     <string name="campus_action_resume">继续</string>
     <string name="campus_action_stop">结束</string>
     <string name="campus_end_run">结束</string>
-    <string name="campus_teleport_hint">点击地图任意位置，立即传送</string>
+    <string name="campus_teleport_hint">点击地图任意位置选择传送目标</string>
+    <string name="campus_teleport_confirm_title">结束当前跑圈并传送？</string>
+    <string name="campus_teleport_confirm_message">传送会结束当前跑圈，位置改为单点保持。\n目标：%1$s</string>
+    <string name="campus_teleport_confirm_action">结束并传送</string>
+    <string name="campus_teleport_sending">正在结束跑圈并传送到目标点…</string>
+    <string name="campus_teleport_failed">传送失败，当前运行状态未确认</string>
+    <string name="campus_teleport_failed_detail">传送失败：%1$s</string>
+    <string name="campus_teleport_no_ack">未收到传送确认，请查看运行状态</string>
     <string name="campus_teleport_started">已传送到 %1$s</string>
     <string name="campus_teleport_route_ended">跑圈已结束，当前位置保持为单点</string>
     <string name="campus_teleport_started_short">已传送到新位置，单点保持中</string>

@@ -209,6 +209,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     /** 程序化勾选悬浮窗开关时避免再次触发监听。 */
     private boolean overlaySwitchGuard;
+    private boolean overlayPermissionPrompted;
     /** 用户想打开悬浮窗但还在等系统授权页返回。 */
     private boolean pendingOverlayEnable;
 
@@ -240,6 +241,16 @@ public final class CampusRunActivity extends AppCompatActivity {
     private boolean resultRequested;
     /** 当前跑圈页正在展示刚结束的本次结果（即使会话所有权已经释放）。 */
     private boolean showResult;
+    /** 已确认"结束跑圈并传送"，等待服务快照确认；成功提示只在确认后出现。 */
+    private boolean awaitingTeleportAck;
+    private static final long TELEPORT_ACK_TIMEOUT_MS = 6000L;
+    private final Runnable teleportAckTimeout = () -> {
+        if (!awaitingTeleportAck) {
+            return;
+        }
+        awaitingTeleportAck = false;
+        toast(getString(R.string.campus_teleport_no_ack));
+    };
 
     private final Runnable naturalTicker = new Runnable() {
         @Override
@@ -1364,6 +1375,9 @@ public final class CampusRunActivity extends AppCompatActivity {
      */
     private void ensureMockReadyForRoute(CampusRoute planRoute, double speedKmh, int loops) {
         if (snapshot.isActive() && snapshot.singlePoint()) {
+            if (promptOverlayPermissionIfNeeded(() -> startRouteNow(planRoute, speedKmh, loops))) {
+                return;
+            }
             DiagnosticLog.info("已有单点会话：跳过模拟位置探测，直接切换到跑圈");
             startRouteNow(planRoute, speedKmh, loops);
             return;
@@ -1402,6 +1416,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         deviceLocation = null;
         activeRunId = request.runId();
         claimOwnSession = true;
+        awaitingTeleportAck = false;
+        handler.removeCallbacks(teleportAckTimeout);
         stopRequested = false;
         autoPauseNotifiedRunId = "";
         prefs.edit()
@@ -1599,6 +1615,32 @@ public final class CampusRunActivity extends AppCompatActivity {
     private void performTeleport(GeoPoint target) {
         teleportArmed = false;
         binding.textTeleportHint.setVisibility(View.GONE);
+
+        if (snapshot.isActive()) {
+            if (!claimOwnSession) {
+                toast(getString(R.string.campus_toast_existing));
+                return;
+            }
+            if (snapshot.singlePoint()) {
+                sendTeleport(target, false);
+                return;
+            }
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.campus_teleport_confirm_title)
+                    .setMessage(getString(R.string.campus_teleport_confirm_message,
+                            target.format()))
+                    .setPositiveButton(R.string.campus_teleport_confirm_action,
+                            (dialog, which) -> sendTeleport(target, true))
+                    .setNegativeButton(R.string.campus_cancel, null)
+                    .show();
+            return;
+        }
+
+        sendTeleport(target, false);
+    }
+
+    /** 真正下发传送；expectRouteSwitch 表示当前是跑圈，需等服务确认已切换成单点。 */
+    private void sendTeleport(GeoPoint target, boolean expectRouteSwitch) {
         teleportTarget = target;
         if (mapHost != null) {
             showRunnerNow(target);
@@ -1606,14 +1648,16 @@ public final class CampusRunActivity extends AppCompatActivity {
         focusMapOn(target);
 
         if (snapshot.isActive()) {
-            if (!claimOwnSession) {
-                toast(getString(R.string.campus_toast_existing));
-                return;
+            if (expectRouteSwitch) {
+                awaitingTeleportAck = true;
+                handler.removeCallbacks(teleportAckTimeout);
+                handler.postDelayed(teleportAckTimeout, TELEPORT_ACK_TIMEOUT_MS);
+                SimulationService.teleportTo(this, target);
+                toast(getString(R.string.campus_teleport_sending));
+            } else {
+                SimulationService.teleportTo(this, target);
+                toast(getString(R.string.campus_teleport_started_short));
             }
-            boolean routeMode = !snapshot.singlePoint();
-            SimulationService.teleportTo(this, target);
-            toast(getString(routeMode ? R.string.campus_teleport_route_ended
-                    : R.string.campus_teleport_started_short));
             return;
         }
 
@@ -1640,6 +1684,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         activeLapMeters = 0d;
         activeRunId = request.runId();
         claimOwnSession = true;
+        awaitingTeleportAck = false;
+        handler.removeCallbacks(teleportAckTimeout);
         stopRequested = false;
         autoPauseNotifiedRunId = "";
         prefs.edit()
@@ -1708,6 +1754,9 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     private void ensureMockReady(Runnable onReady) {
+        if (promptOverlayPermissionIfNeeded(onReady)) {
+            return;
+        }
         SettingsInspector.MockProbeResult probe = SettingsInspector.probeMockProvider(this);
         if (probe == SettingsInspector.MockProbeResult.ALLOWED) {
             onReady.run();
@@ -1735,6 +1784,29 @@ public final class CampusRunActivity extends AppCompatActivity {
                 .show();
     }
 
+    /**
+     * 悬浮窗开关已开但系统权限缺失时，开始跑圈前提示一次，可跳授权页。
+     * 只影响悬浮窗，不阻断跑圈本身；返回 true 表示已弹窗、等待用户选择。
+     */
+    private boolean promptOverlayPermissionIfNeeded(Runnable proceed) {
+        if (overlayPermissionPrompted
+                || !OverlayHost.get(this).isEnabled()
+                || OverlayPanel.canDrawOverlays(this)) {
+            return false;
+        }
+        overlayPermissionPrompted = true;
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.campus_overlay_permission_title)
+                .setMessage(R.string.campus_overlay_permission_message)
+                .setCancelable(false)
+                .setPositiveButton(R.string.campus_overlay_permission_grant,
+                        (dialog, which) -> OverlayPanel.requestPermission(this))
+                .setNegativeButton(R.string.campus_overlay_permission_skip,
+                        (dialog, which) -> proceed.run())
+                .show();
+        return true;
+    }
+
     // ---------------------------------------------------------------- 状态订阅
 
     private void onSnapshot(RunSnapshot next) {
@@ -1751,6 +1823,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                         .apply();
             }
         }
+        handleTeleportAck(next, ours);
         if (ours && next.state() == RunState.PAUSED && next.errorCode() != null
                 && !next.runId().equals(autoPauseNotifiedRunId)) {
             autoPauseNotifiedRunId = next.runId();
@@ -1770,6 +1843,8 @@ public final class CampusRunActivity extends AppCompatActivity {
     private void handleTerminal(RunSnapshot previous, RunSnapshot next) {
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
+        handler.removeCallbacks(teleportAckTimeout);
+        awaitingTeleportAck = false;
         boolean wasSinglePoint = next.singlePoint() || previous.singlePoint();
         showResult = !wasSinglePoint;
         boolean showResultNow = resultRequested;
@@ -1819,6 +1894,27 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private boolean isTerminal(RunState state) {
         return state == RunState.COMPLETED || state == RunState.STOPPED || state == RunState.ERROR;
+    }
+
+    /** 跑圈传送的确认结果只认服务快照：单点运行中才算成功，错误/终止都按失败反馈。 */
+    private void handleTeleportAck(RunSnapshot next, boolean ours) {
+        if (!awaitingTeleportAck || !ours) {
+            return;
+        }
+        if (next.state() == RunState.RUNNING && next.singlePoint()) {
+            awaitingTeleportAck = false;
+            handler.removeCallbacks(teleportAckTimeout);
+            toast(getString(R.string.campus_teleport_route_ended));
+            return;
+        }
+        if (isTerminal(next.state())) {
+            awaitingTeleportAck = false;
+            handler.removeCallbacks(teleportAckTimeout);
+            String detail = next.errorMessage();
+            toast(detail == null || detail.isEmpty()
+                    ? getString(R.string.campus_teleport_failed)
+                    : getString(R.string.campus_teleport_failed_detail, detail));
+        }
     }
 
     private void syncNaturalTicker() {
@@ -2507,6 +2603,8 @@ public final class CampusRunActivity extends AppCompatActivity {
     protected void onDestroy() {
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
+        handler.removeCallbacks(teleportAckTimeout);
+        awaitingTeleportAck = false;
         cancelRunnerAnimation();
         if (mapHost != null) {
             mapHost.onDestroy();
