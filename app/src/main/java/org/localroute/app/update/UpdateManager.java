@@ -277,7 +277,7 @@ public final class UpdateManager {
             connection.setReadTimeout(PROBE_READ_TIMEOUT_MS);
             connection.setInstanceFollowRedirects(true);
             connection.setRequestProperty("Range", "bytes=0-" + (PROBE_SAMPLE_BYTES - 1));
-            connection.setRequestProperty("User-Agent", "Legion-Android-Updater");
+            connection.setRequestProperty("User-Agent", "UNLOOP-Android-Updater");
             int code = connection.getResponseCode();
             if (code != HttpURLConnection.HTTP_OK && code != 206) {
                 return null;

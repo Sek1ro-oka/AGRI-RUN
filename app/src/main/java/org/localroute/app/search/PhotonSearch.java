@@ -25,7 +25,7 @@ import java.util.Locale;
 public final class PhotonSearch {
 
     private static final String ENDPOINT = "https://photon.komoot.io/api/";
-    private static final String USER_AGENT = "Legion-VirtualLocation/0.9 (Android; personal app)";
+    private static final String USER_AGENT = "UNLOOP-VirtualLocation/0.9 (Android; personal app)";
     private static final int LIMIT = 4;
     private static final int CONNECT_TIMEOUT_MS = 6_000;
     private static final int READ_TIMEOUT_MS = 8_000;

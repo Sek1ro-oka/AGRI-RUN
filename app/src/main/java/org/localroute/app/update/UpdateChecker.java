@@ -262,7 +262,7 @@ public final class UpdateChecker {
             connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
             connection.setReadTimeout(READ_TIMEOUT_MS);
             connection.setRequestProperty("Accept", "application/vnd.github+json");
-            connection.setRequestProperty("User-Agent", "Legion-Android-Updater");
+            connection.setRequestProperty("User-Agent", "UNLOOP-Android-Updater");
             connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
             int code = connection.getResponseCode();
             if (code == HttpURLConnection.HTTP_NOT_FOUND) {
@@ -298,7 +298,7 @@ public final class UpdateChecker {
                 ? tag.substring(1) : tag;
         String title = json.optString("name", "").trim();
         if (title.isEmpty()) {
-            title = "Legion " + version;
+            title = "UNLOOP " + version;
         }
         String notes = cleanNotes(json.optString("body", ""));
         String pageUrl = json.optString("html_url", RELEASES_PAGE);

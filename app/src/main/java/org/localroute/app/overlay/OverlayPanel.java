@@ -244,7 +244,7 @@ public final class OverlayPanel {
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = prefs(context).getInt(KEY_X, dp(10));
         params.y = prefs(context).getInt(KEY_Y, dp(88));
-        params.setTitle("Legion悬浮控制台");
+        params.setTitle("UNLOOP悬浮控制台");
         clampToScreen();
     }
 

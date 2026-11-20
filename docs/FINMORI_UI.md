@@ -1,4 +1,4 @@
-# Legion / Finmori 视觉规范
+# UNLOOP / Finmori 视觉规范
 
 布局参考 [Finmori](https://github.com/KhoaSuperman/Finmori) 的间距、圆角、列表与胶囊导航；深浅配色参考用户提供的应用截图，颜色定义于 `res/values*/finmori_colors.xml`。
 
