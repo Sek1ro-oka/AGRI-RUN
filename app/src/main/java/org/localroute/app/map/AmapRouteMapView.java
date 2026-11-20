@@ -164,8 +164,15 @@ public final class AmapRouteMapView implements RouteMapHost {
     @Override
     public void setStatusListener(@Nullable StatusListener listener) {
         this.statusListener = listener;
-        if (listener != null && !lastStatus.isEmpty()) {
+        if (listener == null) {
+            return;
+        }
+        if (!lastStatus.isEmpty()) {
             listener.onStatusChanged(lastStatus);
+        } else if (setupDone) {
+            // 高德 MapView 常在构造里就同步完成 setup，早于界面挂监听。这里补发一次「就绪」，
+            // 否则界面永远认为地图没准备好，首次取景和定位都不生效，镜头停在 SDK 默认的北京视角。
+            listener.onStatusChanged(null);
         }
     }
 

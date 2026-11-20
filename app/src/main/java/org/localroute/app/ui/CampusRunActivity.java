@@ -1431,6 +1431,9 @@ public final class CampusRunActivity extends AppCompatActivity {
                 .putFloat(KEY_ACTIVE_LAP, (float) activeLapMeters)
                 .apply();
 
+        // 开始时先把镜头对准本次跑圈起点（当前模拟位置），再交给跟随逻辑。
+        // 否则用户此前把地图拖到别处后，点开始仍停在原地。
+        focusMapOn(route.startGeo());
         SimulationService.start(this, request);
         showRunScreen();
         showRunnerNow(null);
@@ -1502,6 +1505,11 @@ public final class CampusRunActivity extends AppCompatActivity {
             toast(getString(R.string.campus_locate_permission));
             permissionLauncher.launch(new String[]{Manifest.permission.ACCESS_FINE_LOCATION});
             return;
+        }
+        // 已有设备位置时先立即回到红点，再尝试刷新；GPS 室内迟迟不返回也不会“点了没反应”。
+        if (deviceLocation != null) {
+            focusMapOn(deviceLocation);
+            toast(getString(R.string.campus_locate_done));
         }
         locateByDevice();
     }
@@ -1586,14 +1594,23 @@ public final class CampusRunActivity extends AppCompatActivity {
         DiagnosticLog.info("定位到设备当前位置：" + point.format() + " via " + provider);
     }
 
-    /** 设备定位不可用时退回路线起点，让「定位」至少回到本页可解释的位置。 */
+    /** 设备定位不可用时退回最近一次设备位置，再退回路线起点。 */
     private void locateFallback() {
-        GeoPoint start = route == null ? null : route.startGeo();
-        if (start == null || mapHost == null) {
+        if (mapHost == null) {
             toast(getString(R.string.campus_locate_missing));
             return;
         }
-        deviceLocation = null;
+        // 地图上已经画着红点时优先回到红点：定位偶发失败不应把用户甩到别处。
+        if (deviceLocation != null) {
+            focusMapOn(deviceLocation);
+            toast(getString(R.string.campus_locate_done));
+            return;
+        }
+        GeoPoint start = route == null ? null : route.startGeo();
+        if (start == null) {
+            toast(getString(R.string.campus_locate_missing));
+            return;
+        }
         focusMapOn(start);
         toast(getString(R.string.campus_locate_fallback));
     }
@@ -2417,6 +2434,9 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         applyRoute(candidate);
+        // 选好路线后地图直接对准本次跑圈起点，而不是只铺开整条路线；
+        // 起点就是接下来的当前模拟位置，用户点开始时不会还停在别处。
+        focusMapOn(candidate.startGeo());
         showRunScreen();
     }
 
