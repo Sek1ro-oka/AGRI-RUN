@@ -220,8 +220,15 @@ public final class RouteMapController implements RouteMapHost {
     @Override
     public void setStatusListener(@Nullable RouteMapHost.StatusListener listener) {
         this.statusListener = listener;
-        if (listener != null && !lastStatus.isEmpty()) {
+        if (listener == null) {
+            return;
+        }
+        if (!lastStatus.isEmpty()) {
             listener.onStatusChanged(lastStatus);
+        } else if (style != null) {
+            // 监听者挂得比样式加载还晚：补发一次「就绪」，否则界面会一直等不到 mapReady，
+            // 首次取景、定位当前位置都会被挂起。
+            listener.onStatusChanged(null);
         }
     }
 
