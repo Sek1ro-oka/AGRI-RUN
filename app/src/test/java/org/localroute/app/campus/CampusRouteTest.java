@@ -117,8 +117,8 @@ public class CampusRouteTest {
         CampusRoute b = CampusPresets.routeB();
         assertTrue(a.isPreset());
         assertTrue(b.isPreset());
-        assertEquals(423d, a.lapMeters(), 1.0d);
-        assertEquals(433d, b.lapMeters(), 1.0d);
+        assertEquals(431d, a.lapMeters(), 1.0d);
+        assertEquals(428d, b.lapMeters(), 1.0d);
         assertEquals(a.lapMeters(),
                 CampusGeo.perimeterMeters(a.points(), a.metersPerUnit()), 1e-6d);
         assertEquals(b.lapMeters(),

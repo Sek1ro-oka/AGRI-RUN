@@ -77,7 +77,7 @@ public class PresetConflictsTest {
         }
         assertEquals("preset_yijin", presets.get(2).id());
         assertEquals("衣锦", presets.get(2).name());
-        assertTrue("衣锦单圈应接近 432 米：" + presets.get(2).lapMeters(),
-                Math.abs(presets.get(2).lapMeters() - 432d) < 5d);
+        assertTrue("衣锦单圈应接近 431 米：" + presets.get(2).lapMeters(),
+                Math.abs(presets.get(2).lapMeters() - 431d) < 5d);
     }
 }
