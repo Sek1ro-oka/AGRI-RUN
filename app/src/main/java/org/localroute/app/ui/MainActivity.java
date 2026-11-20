@@ -32,6 +32,8 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
         binding.cardCampusRun.setOnClickListener(v -> openRun());
+        binding.cardVirtualLocation.setOnClickListener(v ->
+                startActivity(new Intent(this, VirtualLocationActivity.class)));
         binding.cardActiveRun.setOnClickListener(v -> openRun());
         binding.cardStudy.setOnClickListener(v -> startActivity(new Intent(this, StudyActivity.class)));
         binding.cardTimetable.setOnClickListener(v -> startActivity(new Intent(this, StudyActivity.class)
@@ -39,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
         binding.navRun.setOnClickListener(v -> openRun());
         binding.navStudy.setOnClickListener(v -> startActivity(new Intent(this, StudyActivity.class)));
         FinmoriMotion.press(binding.cardCampusRun);
+        FinmoriMotion.press(binding.cardVirtualLocation);
         FinmoriMotion.press(binding.cardActiveRun);
         FinmoriMotion.press(binding.cardStudy);
         FinmoriMotion.press(binding.cardTimetable);
@@ -65,13 +68,6 @@ public class MainActivity extends AppCompatActivity {
                 : snapshot.state() == RunState.PAUSED ? R.string.run_state_paused
                 : snapshot.singlePoint() ? R.string.run_state_hold : R.string.run_state_running;
         binding.textActiveRunTitle.setText(getString(R.string.run_active_home, getString(state)));
-        int status = snapshot.state() == RunState.STARTING ? R.string.fm_run_starting
-                : snapshot.state() == RunState.PAUSED ? R.string.fm_run_paused
-                : snapshot.state() == RunState.RUNNING ? (snapshot.singlePoint() ? R.string.fm_run_hold : R.string.fm_run_running)
-                : snapshot.state() == RunState.COMPLETED ? R.string.fm_run_completed
-                : snapshot.state() == RunState.STOPPED ? R.string.fm_run_stopped
-                : snapshot.state() == RunState.ERROR ? R.string.fm_run_error : R.string.fm_run_status_ready;
-        binding.textRunStatus.setText(status);
         binding.textActiveRunDetail.setText(getString(R.string.run_active_detail,
                 CampusFormat.kilometers(snapshot.distanceMeters()), CampusFormat.time(snapshot.activeElapsedMs())));
     }

@@ -75,6 +75,14 @@
             android:theme="@style/Theme.RouteWorkshop.CampusRun" />
 
         <activity
+            android:name=".ui.VirtualLocationActivity"
+            android:exported="false"
+            android:label="@string/virtual_title"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.RouteWorkshop.CampusRun"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".ui.SettingsCheckActivity"
             android:exported="false"
             android:label="@string/settings_title"
