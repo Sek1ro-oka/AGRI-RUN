@@ -120,9 +120,9 @@ public final class CampusRunActivity extends AppCompatActivity {
     private static final String KEY_CUSTOM_POINTS = "custom_points";
     private static final String KEY_CUSTOM_ROUTES = "custom_routes";
     private static final String KEY_SELECTED_ROUTE = "selected_route_id";
-    /** 预设路线几何版本：1 = 0.7.0 初版；2 = 弯道平滑并统一方向。 */
+    /** 预设路线几何版本：1 = 0.7.0 初版；2 = 弯道平滑并统一方向；3 = 按卫星图校准红带位置。 */
     private static final String KEY_PRESET_REVISION = "preset_revision";
-    private static final int PRESET_REVISION = 2;
+    private static final int PRESET_REVISION = 3;
     /**
      * 预设清单版本：3 = 增加「衣锦」。老用户升级时只补这一条新增预设，
      * 不补回已经删掉的 A操 / B操。
@@ -643,7 +643,8 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     /**
-     * 升级已保存的预设路线几何：0.7.0 的预设点是初版采样，0.7.1 平滑了弯道并统一了方向。
+     * 升级已保存的预设路线几何：0.7.1 平滑了弯道并统一方向，0.9.2 按卫星图校准了
+     * 三条路线相对红带的位置（A操顶部上移，B操 / 衣锦重新拟合）。
      * 只替换仍标记为预设的条目并保留用户改过的名称；重绘过的预设已变成自定义路线，
      * 不会被覆盖，删除过的预设也不会被补回。
      */
@@ -664,6 +665,8 @@ public final class CampusRunActivity extends AppCompatActivity {
                 updated = CampusPresets.routeA();
             } else if (CampusPresets.ID_B.equals(existing.id())) {
                 updated = CampusPresets.routeB();
+            } else if (CampusPresets.ID_YIJIN.equals(existing.id())) {
+                updated = CampusPresets.routeYijin();
             }
             if (updated != null) {
                 customRoutes.set(i,
