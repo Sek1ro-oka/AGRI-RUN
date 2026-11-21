@@ -5,7 +5,10 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
@@ -22,6 +25,8 @@ import com.google.android.material.timepicker.TimeFormat;
 
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityStudySettingsBinding;
+import org.localroute.app.study.ClassReminderPlanner;
+import org.localroute.app.study.ClassReminderScheduler;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
@@ -29,6 +34,7 @@ import org.localroute.app.study.StudyTimetableStore;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.Locale;
 
@@ -75,6 +81,18 @@ public class StudySettingsActivity extends AppCompatActivity {
         binding.rowAddCourse.setOnClickListener(view ->
                 StudyDialogs.showCourseEditor(this, null, course -> onTimetableChanged()));
         binding.rowClearTimetable.setOnClickListener(view -> confirmClearTimetable());
+
+        binding.switchClassReminder.setOnClickListener(view -> {
+            boolean enabled = binding.switchClassReminder.isChecked();
+            StudyTimetableStore.saveClassReminderEnabled(this, enabled);
+            Toast.makeText(this, enabled
+                            ? R.string.study_reminder_enabled_toast
+                            : R.string.study_reminder_disabled_toast,
+                    Toast.LENGTH_SHORT).show();
+            renderReminder();
+            notifyChanged();
+        });
+        binding.rowReminderLead.setOnClickListener(view -> pickReminderLead());
 
         binding.chipSeasonWinter.setOnClickListener(view ->
                 selectSeason(StudySchedule.SEASON_WINTER));
@@ -160,6 +178,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         renderAccount();
         renderTimetableCount();
         renderSchedule();
+        renderReminder();
     }
 
     @Override
@@ -168,6 +187,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         renderAccount();
         renderTimetableCount();
         renderSchedule();
+        renderReminder();
     }
 
     private void onSwitchAccount() {
@@ -460,5 +480,90 @@ public class StudySettingsActivity extends AppCompatActivity {
 
     private float dp(float value) {
         return value * getResources().getDisplayMetrics().density;
+    }
+
+    // ------------------------------------------------------------------ 课前提醒
+
+    private void renderReminder() {
+        boolean enabled = StudyTimetableStore.loadClassReminderEnabled(this);
+        binding.switchClassReminder.setChecked(enabled);
+        binding.textReminderLeadValue.setText(getString(R.string.study_reminder_lead_value,
+                StudyTimetableStore.loadClassReminderLeadMinutes(this)));
+        // 设置或课表可能已经变化，每次回到本页都按存储重排一次闹钟（幂等）。
+        ClassReminderScheduler.update(this);
+        if (!enabled) {
+            binding.textReminderWarning.setVisibility(View.GONE);
+            return;
+        }
+        LocalDate semesterStart = StudyTimetableStore.loadSemesterStart(this);
+        if (semesterStart == null) {
+            showReminderWarning(getString(R.string.study_reminder_need_semester), true);
+            return;
+        }
+        if (StudyTimetableStore.loadCourses(this).isEmpty()) {
+            showReminderWarning(getString(R.string.study_reminder_no_courses), true);
+            return;
+        }
+        ClassReminderPlanner.Reminder next = ClassReminderPlanner.next(
+                StudyTimetableStore.loadCourses(this),
+                StudyTimetableStore.loadSchedule(this),
+                semesterStart,
+                StudyTimetableStore.loadTotalWeeks(this),
+                LocalDateTime.now(),
+                StudyTimetableStore.loadClassReminderLeadMinutes(this),
+                ClassReminderPlanner.DEFAULT_HORIZON_DAYS);
+        if (next == null) {
+            showReminderWarning(getString(R.string.study_reminder_no_upcoming), true);
+            return;
+        }
+        binding.textReminderWarning.setText(getString(R.string.study_reminder_next_hint,
+                next.course.weekdayLabel(),
+                StudySchedule.formatMinutes(next.startMinutesOfDay),
+                next.course.name()));
+        binding.textReminderWarning.setTextColor(
+                ContextCompat.getColor(this, R.color.campus_muted));
+        binding.textReminderWarning.setVisibility(View.VISIBLE);
+    }
+
+    private void showReminderWarning(@NonNull String message, boolean danger) {
+        binding.textReminderWarning.setText(message);
+        binding.textReminderWarning.setTextColor(ContextCompat.getColor(this,
+                danger ? R.color.campus_danger : R.color.campus_muted));
+        binding.textReminderWarning.setVisibility(View.VISIBLE);
+    }
+
+    private void pickReminderLead() {
+        int current = StudyTimetableStore.loadClassReminderLeadMinutes(this);
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(String.valueOf(current));
+        input.setSelectAllOnFocus(true);
+        int padding = (int) dp(20);
+        FrameLayout container = new FrameLayout(this);
+        container.setPadding(padding, padding / 2, padding, 0);
+        container.addView(input);
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.study_reminder_lead_dialog_title)
+                .setView(container)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.campus_save, (dialog, which) -> {
+                    int minutes;
+                    try {
+                        minutes = Integer.parseInt(input.getText().toString().trim());
+                    } catch (NumberFormatException error) {
+                        minutes = -1;
+                    }
+                    if (minutes < ClassReminderPlanner.MIN_LEAD_MINUTES
+                            || minutes > ClassReminderPlanner.MAX_LEAD_MINUTES) {
+                        Toast.makeText(this, R.string.study_reminder_lead_invalid,
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    StudyTimetableStore.saveClassReminderLeadMinutes(this, minutes);
+                    ClassReminderScheduler.update(this);
+                    renderReminder();
+                    notifyChanged();
+                })
+                .show();
     }
 }

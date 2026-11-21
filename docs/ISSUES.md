@@ -126,3 +126,19 @@
 | [#32](https://github.com/Sek1ro-oka/AGRI-RUN/issues/32) | 14 地图主页与信息层级 | 已实现，更新入口迁移、首页当前任务入口 |
 
 A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页的实现和验证见 [本轮记录](16_地图主页与精确输入.md)。
+
+## 2026-11-22 课前提醒（新功能，已实现待验证）
+
+用户需求：课表设置页新增卡片，开关「按课表上课前提醒」，开启后可自定义提前分钟数（1–120，默认 10）。
+
+| 模块 | 内容 |
+| --- | --- |
+| `study/ClassReminderPlanner` | 纯 JVM 计划器：按学期起始日推算教学周，结合课表周次（含单/双周）与作息节次起点算提醒时刻；提前量跨天时回看前一天；未设开学日期或周次无效时无提醒 |
+| `study/ClassReminderScheduler` | 单只滚动闹钟（AlarmManager，7 天窗口）；有精确闹钟权限用 `setExactAndAllowWhileIdle`，否则降级 `setAndAllowWhileIdle`；无未来提醒时取消 |
+| `study/ClassReminderReceiver` | 闹钟回调按 [触发前 2 分钟, 触发后 10 分钟) 窗口补发全部到期通知（渠道 `class_reminder`，IMPORTANCE_HIGH），并滚动续排下一只；开机/改时/换时区/覆盖安装后重排 |
+| `StudySettingsActivity` + 布局 | 「课前提醒」卡片：开关、提前分钟数选择对话框、下一班提醒提示；未设开学日期/课表为空/7 天内无提醒时给出行内警告 |
+| `StudyTimetableStore` | 新增开关与提前分钟数持久化（默认关闭） |
+| `StudyActivity.onResume` | 回到课表页时重排闹钟，覆盖设置页/导入页对课表与作息的修改 |
+| Manifest | 声明 `RECEIVE_BOOT_COMPLETED`、`SCHEDULE_EXACT_ALARM`；注册 `.study.ClassReminderReceiver`（exported=false） |
+
+验证：`ClassReminderPlannerTest` 11 例通过（同日命中、跨天提前量、单双周、越界节次、到期窗口边界等）；全量 JVM 测试 248 例 0 失败；lint 0 error（281 warning 与基线一致）；`assembleDebug` 成功。通知实际弹出、省电策略下的准点性、模拟器/真机闹钟行为均未实测。

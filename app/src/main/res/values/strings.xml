@@ -593,11 +593,29 @@
     <string name="study_schedule_error_afternoon">下午 %1$d 节到 %2$s 结束，已晚于晚课时间 %3$s。</string>
     <string name="study_schedule_error_evening">晚课 %1$d 节到 %2$s 结束，已超过 24:00。</string>
     <string name="study_schedule_invalid">时间或时长不合理，未保存。</string>
+    <string name="study_reminder_title">课前提醒</string>
+    <string name="study_reminder_switch_label">上课前提醒</string>
+    <string name="study_reminder_switch_desc">按课表在每节课开始前发送通知</string>
+    <string name="study_reminder_lead_title">提前提醒时间</string>
+    <string name="study_reminder_lead_value">提前 %1$d 分钟</string>
+    <string name="study_reminder_lead_dialog_title">提前多少分钟提醒（1–120）</string>
+    <string name="study_reminder_lead_invalid">请输入 1–120 之间的分钟数。</string>
+    <string name="study_reminder_need_semester">还未设置开学第 1 周日期，无法确定本周课程；请先在上方「课表」里设置。</string>
+    <string name="study_reminder_no_courses">课表还是空的，添加或导入课程后即可按课表提醒。</string>
+    <string name="study_reminder_next_hint">下一个提醒：%1$s %2$s《%3$s》</string>
+    <string name="study_reminder_enabled_toast">课前提醒已开启</string>
+    <string name="study_reminder_disabled_toast">课前提醒已关闭</string>
+    <string name="study_reminder_channel_name">上课提醒</string>
+    <string name="study_reminder_channel_desc">按课表在课前发送上课提醒</string>
+    <string name="study_reminder_notification_title">%1$d 分钟后上课：%2$s</string>
+    <string name="study_reminder_notification_body">%1$s 开始 · %2$s · %3$s</string>
+    <string name="study_reminder_no_location">地点未填</string>
+    <string name="study_reminder_no_upcoming">未来 7 天内没有需要提醒的课程。</string>
     <string name="study_no_session_toast">请先绑定学习通</string>
     <string name="study_back">返回</string>
     <string name="study_entry_subtitle_short">学习通作业 · 课表</string>
     <string name="study_settings_entry">学习通与课表设置</string>
-    <string name="study_settings_entry_subtitle">切换账户 · 重新导入课表 · 作息时间</string>
+    <string name="study_settings_entry_subtitle">切换账户 · 重新导入课表 · 作息时间 · 课前提醒</string>
 
     <!-- 主页：检查更新（GitHub Releases） -->
     <string name="home_update_title">检查更新</string>
