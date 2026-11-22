@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 import android.widget.NumberPicker;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -30,8 +31,11 @@ import org.localroute.app.databinding.ActivityStudyBinding;
 import org.localroute.app.databinding.ItemStudyHomeworkBinding;
 import org.localroute.app.study.ClassReminderScheduler;
 import org.localroute.app.study.ChaoxingClient;
+import org.localroute.app.study.CustomHomework;
+import org.localroute.app.study.CustomHomeworkStore;
 import org.localroute.app.study.HomeworkFilter;
 import org.localroute.app.study.HomeworkItem;
+import org.localroute.app.study.HomeworkReminderScheduler;
 import org.localroute.app.study.SemesterCalendar;
 import org.localroute.app.study.StudyHomeworkCache;
 import org.localroute.app.study.StudySchedule;
@@ -70,6 +74,8 @@ public class StudyActivity extends AppCompatActivity {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<HomeworkItem> homework = new ArrayList<>();
+    /** 用户自建的作业：不进学习通缓存，只在本页展示并驱动截止提醒。 */
+    private final List<CustomHomework> customHomework = new ArrayList<>();
 
     private ActivityStudyBinding binding;
     private StudySession session;
@@ -194,6 +200,8 @@ public class StudyActivity extends AppCompatActivity {
                 startFetch();
             }
         });
+        binding.buttonAddHomework.setOnClickListener(view ->
+                StudyDialogs.showHomeworkEditor(this, null, this::onCustomHomeworkSaved));
         binding.buttonImportTimetable.setOnClickListener(view ->
                 jwLauncher.launch(new Intent(this, JwImportActivity.class)));
         binding.buttonAddCourse.setOnClickListener(view ->
@@ -209,6 +217,7 @@ public class StudyActivity extends AppCompatActivity {
         binding.weekPicker.setOnClickListener(view -> showWeekPicker());
 
         session = StudySessionStore.load(this);
+        loadCustomHomework();
         renderAccount();
         initializeWeek();
         renderTimetable();
@@ -252,6 +261,9 @@ public class StudyActivity extends AppCompatActivity {
         renderTimetable();
         // 课表或作息可能在设置页/导入页被改过，回到本页时重新排一次课前提醒。
         ClassReminderScheduler.update(this);
+        // 自建作业与「作业截止提醒」开关也可能在设置页改过，同样回来即刷新+重排。
+        loadCustomHomework();
+        HomeworkReminderScheduler.update(this);
     }
 
     @Override
@@ -294,7 +306,7 @@ public class StudyActivity extends AppCompatActivity {
         }
         applyHomework(cache.items);
         updateSummary(cache);
-        if (!homework.isEmpty()) {
+        if (hasHomeworkContent()) {
             showList();
         } else if (!cache.items.isEmpty()) {
             showRecentEmpty();
@@ -308,6 +320,55 @@ public class StudyActivity extends AppCompatActivity {
         renderHomeworkList();
     }
 
+    // ------------------------------------------------------------------ 自建作业
+
+    private void loadCustomHomework() {
+        // 自建作业不自动清理：这是用户手录的数据，过期了也留在列表里由本人删除。
+        customHomework.clear();
+        customHomework.addAll(CustomHomeworkStore.load(this));
+        renderHomeworkList();
+    }
+
+    /** 列表里只要有任何一条（学习通或自建）就不该显示空态。 */
+    private boolean hasHomeworkContent() {
+        return !homework.isEmpty() || !customHomework.isEmpty();
+    }
+
+    private void showListOrRecentEmpty() {
+        if (hasHomeworkContent()) {
+            showList();
+        } else {
+            showRecentEmpty();
+        }
+    }
+
+    /** 新增或改名后的落库点：保存、重排闹钟、刷新列表。 */
+    private void onCustomHomeworkSaved(CustomHomework homeworkItem) {
+        CustomHomeworkStore.upsert(this, homeworkItem);
+        HomeworkReminderScheduler.update(this);
+        loadCustomHomework();
+        if (hasHomeworkContent()) {
+            showList();
+        }
+        Toast.makeText(this, R.string.study_homework_saved, Toast.LENGTH_SHORT).show();
+    }
+
+    private void onCustomHomeworkDeleted(CustomHomework item) {
+        CustomHomeworkStore.remove(this, item.id());
+        HomeworkReminderScheduler.update(this);
+        loadCustomHomework();
+        if (hasHomeworkContent()) {
+            showList();
+        } else if (session == null) {
+            showUnbound();
+        } else {
+            showEmptyState(R.string.study_homework_empty_title,
+                    getString(R.string.study_homework_empty_hint),
+                    R.string.study_homework_retry, this::startFetch);
+        }
+        Toast.makeText(this, R.string.study_homework_deleted, Toast.LENGTH_SHORT).show();
+    }
+
     private void startFetch() {
         if (session == null || fetching) {
             return;
@@ -316,7 +377,7 @@ public class StudyActivity extends AppCompatActivity {
         binding.buttonHomeworkRefresh.setEnabled(false);
         binding.buttonHomeworkRefresh.setAlpha(0.5f);
         binding.textHomeworkSummary.setText(R.string.study_homework_summary_loading);
-        if (homework.isEmpty()) {
+        if (!hasHomeworkContent()) {
             showLoading(getString(R.string.study_homework_summary_loading));
         }
 
@@ -378,16 +439,14 @@ public class StudyActivity extends AppCompatActivity {
         binding.buttonHomeworkRefresh.setAlpha(1f);
         applyHomework(snapshot.items);
         updateSummary(snapshot);
-        if (homework.isEmpty()) {
-            if (snapshot.items.isEmpty()) {
-                showEmptyState(R.string.study_homework_empty_title,
-                        getString(R.string.study_homework_empty_hint),
-                        R.string.study_homework_retry, this::startFetch);
-            } else {
-                showRecentEmpty();
-            }
-        } else {
+        if (hasHomeworkContent()) {
             showList();
+        } else if (snapshot.items.isEmpty()) {
+            showEmptyState(R.string.study_homework_empty_title,
+                    getString(R.string.study_homework_empty_hint),
+                    R.string.study_homework_retry, this::startFetch);
+        } else {
+            showRecentEmpty();
         }
         if (blocked) {
             Toast.makeText(this, R.string.study_antispider_partial, Toast.LENGTH_LONG).show();
@@ -411,12 +470,8 @@ public class StudyActivity extends AppCompatActivity {
         fetching = false;
         binding.buttonHomeworkRefresh.setEnabled(true);
         binding.buttonHomeworkRefresh.setAlpha(1f);
-        if (!homework.isEmpty() || (cache != null && !cache.items.isEmpty())) {
-            if (homework.isEmpty()) {
-                showRecentEmpty();
-            } else {
-                showList();
-            }
+        if (hasHomeworkContent() || (cache != null && !cache.items.isEmpty())) {
+            showListOrRecentEmpty();
             if (cache != null) {
                 updateSummary(cache);
             }
@@ -433,7 +488,7 @@ public class StudyActivity extends AppCompatActivity {
     }
 
     private void showVerificationState() {
-        showEmptyState(R.string.study_antispider_title,
+        showHomeworkIssue(R.string.study_antispider_title,
                 getString(R.string.study_antispider_verify_hint),
                 R.string.study_antispider_verify_action, this::openVerification);
         binding.textHomeworkSummary.setText(R.string.study_antispider_title);
@@ -450,7 +505,7 @@ public class StudyActivity extends AppCompatActivity {
         fetching = false;
         binding.buttonHomeworkRefresh.setEnabled(true);
         binding.buttonHomeworkRefresh.setAlpha(1f);
-        if (homework.isEmpty()) {
+        if (!hasHomeworkContent()) {
             showEmptyState(R.string.study_account_expired,
                     getString(R.string.study_account_expired_message),
                     R.string.study_account_rebind, () -> openLogin(true));
@@ -478,21 +533,27 @@ public class StudyActivity extends AppCompatActivity {
         binding.buttonHomeworkRefresh.setEnabled(true);
         binding.buttonHomeworkRefresh.setAlpha(1f);
         // 有缓存时保留缓存视图；即使近一周过滤后为空，也显示「近一周暂无作业」而不是读取失败。
-        if (!homework.isEmpty() || (cache != null && !cache.items.isEmpty())) {
-            if (homework.isEmpty()) {
-                showRecentEmpty();
-            } else {
-                showList();
-            }
+        if (hasHomeworkContent() || (cache != null && !cache.items.isEmpty())) {
+            showListOrRecentEmpty();
             if (cache != null) {
                 updateSummary(cache);
             }
             Toast.makeText(this, message, Toast.LENGTH_LONG).show();
             return;
         }
-        showEmptyState(R.string.study_homework_error_title, message,
+        showHomeworkIssue(R.string.study_homework_error_title, message,
                 R.string.study_homework_retry, retryable ? this::startFetch : null);
         binding.textHomeworkSummary.setText(R.string.study_homework_error_title);
+    }
+
+    /** 失败/待验证时若还有内容可看（含自建作业），保留列表并用文案说明。 */
+    private void showHomeworkIssue(int titleRes, CharSequence hint, int actionLabelRes,
+                                   @Nullable Runnable action) {
+        if (hasHomeworkContent()) {
+            showList();
+            return;
+        }
+        showEmptyState(titleRes, hint, actionLabelRes, action);
     }
 
     private void renderHomeworkList() {
@@ -505,6 +566,15 @@ public class StudyActivity extends AppCompatActivity {
             ItemStudyHomeworkBinding itemBinding = ItemStudyHomeworkBinding.inflate(
                     inflater, binding.homeworkList, false);
             bindHomework(itemBinding, item);
+            binding.homeworkList.addView(itemBinding.getRoot());
+        }
+        for (CustomHomework item : sortedCustomHomework()) {
+            ItemStudyHomeworkBinding itemBinding = ItemStudyHomeworkBinding.inflate(
+                    inflater, binding.homeworkList, false);
+            bindCustomHomework(itemBinding, item);
+            itemBinding.getRoot().setOnClickListener(view ->
+                    StudyDialogs.showHomeworkEditor(this, item, this::onCustomHomeworkSaved,
+                            () -> onCustomHomeworkDeleted(item)));
             binding.homeworkList.addView(itemBinding.getRoot());
         }
         if (scrollY > 0) {
@@ -566,16 +636,43 @@ public class StudyActivity extends AppCompatActivity {
                 textColor = R.color.campus_blue;
                 break;
         }
-        itemBinding.textHomeworkStatus.setText(label);
-        itemBinding.textHomeworkStatus.setTextColor(
-                ContextCompat.getColor(this, textColor));
-        GradientDrawable chip = new GradientDrawable();
-        chip.setColor(ContextCompat.getColor(this, fill));
-        chip.setCornerRadius(dp(20));
-        itemBinding.textHomeworkStatus.setBackground(chip);
-
+        paintStatusChip(itemBinding.textHomeworkStatus, label, fill, textColor);
         itemBinding.textHomeworkTag.setVisibility(item.peerReview() ? View.VISIBLE : View.GONE);
         itemBinding.textHomeworkTag.setText(R.string.study_homework_peer_review);
+    }
+
+    /** 自建作业按截止时间升序排在列表尾部，与学习通作业分块显示。 */
+    private List<CustomHomework> sortedCustomHomework() {
+        List<CustomHomework> sorted = new ArrayList<>(customHomework);
+        sorted.sort((left, right) -> Long.compare(left.deadlineEpochMillis(),
+                right.deadlineEpochMillis()));
+        return sorted;
+    }
+
+    private void bindCustomHomework(ItemStudyHomeworkBinding itemBinding, CustomHomework item) {
+        boolean expired = item.deadlineEpochMillis() <= System.currentTimeMillis();
+        itemBinding.textHomeworkCourse.setText(R.string.study_homework_custom_course);
+        itemBinding.textHomeworkTitle.setText(item.title());
+        itemBinding.textHomeworkDeadline.setText(item.deadlineLabel());
+        paintStatusChip(itemBinding.textHomeworkStatus, getString(expired
+                        ? R.string.study_homework_status_custom_expired
+                        : R.string.study_homework_status_custom),
+                expired ? R.color.study_state_expired_fill : R.color.campus_mint_pale,
+                expired ? R.color.campus_muted : R.color.campus_mint_dark);
+        itemBinding.textHomeworkTag.setVisibility(
+                CustomHomeworkStore.loadReminderEnabled(this) ? View.VISIBLE : View.GONE);
+        itemBinding.textHomeworkTag.setText(
+                getString(R.string.study_homework_tag_lead, item.leadLabel()));
+    }
+
+    private void paintStatusChip(@NonNull TextView chipView, @NonNull String label,
+                                 int fillColorRes, int textColorRes) {
+        chipView.setText(label);
+        chipView.setTextColor(ContextCompat.getColor(this, textColorRes));
+        GradientDrawable chip = new GradientDrawable();
+        chip.setColor(ContextCompat.getColor(this, fillColorRes));
+        chip.setCornerRadius(dp(20));
+        chipView.setBackground(chip);
     }
 
     /** 缓存里仍标记待完成、但截止时间已经过去的，显示为已截止。 */
@@ -612,10 +709,15 @@ public class StudyActivity extends AppCompatActivity {
     }
 
     private void showUnbound() {
+        binding.textHomeworkSummary.setText(R.string.study_account_unbound);
+        if (!customHomework.isEmpty()) {
+            // 自建作业不依赖学习通账号：有内容就继续显示列表，绑定入口仍在设置页。
+            showList();
+            return;
+        }
         showEmptyState(R.string.study_homework_unbound_title,
                 getString(R.string.study_homework_unbound_hint),
                 R.string.study_account_bind, () -> openLogin(false));
-        binding.textHomeworkSummary.setText(R.string.study_account_unbound);
     }
 
     private void showEmptyState(int titleRes, CharSequence hint, int actionLabelRes,

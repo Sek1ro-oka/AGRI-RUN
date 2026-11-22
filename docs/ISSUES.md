@@ -142,3 +142,22 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 | Manifest | 声明 `RECEIVE_BOOT_COMPLETED`、`SCHEDULE_EXACT_ALARM`；注册 `.study.ClassReminderReceiver`（exported=false） |
 
 验证：`ClassReminderPlannerTest` 11 例通过（同日命中、跨天提前量、单双周、越界节次、到期窗口边界等）；全量 JVM 测试 248 例 0 失败；lint 0 error（281 warning 与基线一致）；`assembleDebug` 成功。通知实际弹出、省电策略下的准点性、模拟器/真机闹钟行为均未实测。
+
+## 2026-11-23 自建作业与截止提醒（新功能，已实现待验证）
+
+用户需求：查询作业页底部「新增作业」，可自定义作业名称、截止时间与截止前多少分钟提醒；到点弹通知告知「作业（名称）即将截止」；「作业截止提醒」开关放在查询作业的设置页。
+
+| 模块 | 内容 |
+| --- | --- |
+| `study/CustomHomework` | 纯 Java 模型：id + 名称 + 截止毫秒 + 每条自己的提前分钟数（1–10080，默认 60）；`remindEpochMillis()` 推算提醒点，无截止时间时无提醒点 |
+| `study/CustomHomeworkCodec` | 自建作业 JSON 编解码，坏条目跳过、整体损坏退回空列表；与学习通作业缓存分开存放，刷新不会冲掉手录数据 |
+| `study/CustomHomeworkStore` | SharedPreferences 存储（`custom_homework`）：列表增删改查 + 「作业截止提醒」总开关（默认关闭） |
+| `study/HomeworkReminderPlanner` | 纯 JVM 计划器：30 天窗口内按提醒点升序；`dueBetween` 给闹钟回调补发用，区间左闭右开 |
+| `study/HomeworkReminderScheduler` | 单只滚动闹钟（requestCode `0x4857`，与课前提醒互不干扰）；有精确闹钟权限用 `setExactAndAllowWhileIdle`，否则降级 `setAndAllowWhileIdle`；关闭开关或窗口内无提醒点时取消 |
+| `study/HomeworkReminderReceiver` | 按 [触发前 2 分钟, 触发后 10 分钟) 补发通知（渠道 `homework_reminder`，IMPORTANCE_HIGH），点通知进查询作业页；开机/改时/换时区/覆盖安装后重排 |
+| `StudyDialogs.showHomeworkEditor` | 自建作业编辑器：名称 + 截止日期/时间两级选择 + 提前分钟数，实时预览「将在 … 提醒你」；提醒点已过会给出行内提示且不允许保存过期截止；编辑态提供删除二次确认 |
+| `StudyActivity` | 作业页底部固定「新增作业」按钮；自建条目排在列表尾部（状态标签「自建」/「已截止」，右侧显示提前量），点击进入编辑；空态判定改为「学习通与自建都为空」（`hasHomeworkContent`），避免手录作业被空态遮住 |
+| `StudySettingsActivity` + 布局 | 「作业截止提醒」卡片：开关 + 下一个提醒提示；无自建作业、30 天内无提醒点时给出行内提示 |
+| Manifest | 注册 `.study.HomeworkReminderReceiver`（exported=false，复用已声明的 `SCHEDULE_EXACT_ALARM`/`RECEIVE_BOOT_COMPLETED`/通知权限） |
+
+验证：新增 `HomeworkReminderPlannerTest` 10 例、`CustomHomeworkCodecTest` 7 例，全量 JVM 测试 266 例 0 失败；lint 0 error（281 warning 与基线一致）；`assembleRelease` 出包并用 apksigner 核对签名证书 `CN=UNLOOP Release`。通知实际弹出、省电策略下的准点性、真机闹钟行为均未实测。

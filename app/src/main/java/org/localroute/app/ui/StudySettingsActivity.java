@@ -27,6 +27,10 @@ import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityStudySettingsBinding;
 import org.localroute.app.study.ClassReminderPlanner;
 import org.localroute.app.study.ClassReminderScheduler;
+import org.localroute.app.study.CustomHomework;
+import org.localroute.app.study.CustomHomeworkStore;
+import org.localroute.app.study.HomeworkReminderPlanner;
+import org.localroute.app.study.HomeworkReminderScheduler;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
@@ -36,6 +40,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 /** 作业查询的独立设置页：学习通账户、课表导入与冬夏令时作息。 */
@@ -93,6 +98,17 @@ public class StudySettingsActivity extends AppCompatActivity {
             notifyChanged();
         });
         binding.rowReminderLead.setOnClickListener(view -> pickReminderLead());
+
+        binding.switchHomeworkReminder.setOnClickListener(view -> {
+            boolean enabled = binding.switchHomeworkReminder.isChecked();
+            CustomHomeworkStore.saveReminderEnabled(this, enabled);
+            Toast.makeText(this, enabled
+                            ? R.string.study_homework_reminder_enabled_toast
+                            : R.string.study_homework_reminder_disabled_toast,
+                    Toast.LENGTH_SHORT).show();
+            renderHomeworkReminder();
+            notifyChanged();
+        });
 
         binding.chipSeasonWinter.setOnClickListener(view ->
                 selectSeason(StudySchedule.SEASON_WINTER));
@@ -179,6 +195,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         renderTimetableCount();
         renderSchedule();
         renderReminder();
+        renderHomeworkReminder();
     }
 
     @Override
@@ -188,6 +205,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         renderTimetableCount();
         renderSchedule();
         renderReminder();
+        renderHomeworkReminder();
     }
 
     private void onSwitchAccount() {
@@ -530,6 +548,44 @@ public class StudySettingsActivity extends AppCompatActivity {
         binding.textReminderWarning.setTextColor(ContextCompat.getColor(this,
                 danger ? R.color.campus_danger : R.color.campus_muted));
         binding.textReminderWarning.setVisibility(View.VISIBLE);
+    }
+
+    // ------------------------------------------------------------------ 作业截止提醒
+
+    private void renderHomeworkReminder() {
+        boolean enabled = CustomHomeworkStore.loadReminderEnabled(this);
+        binding.switchHomeworkReminder.setChecked(enabled);
+        // 自建作业或开关可能刚改过，每次回到本页按存储重排一次闹钟（幂等）。
+        HomeworkReminderScheduler.update(this);
+        if (!enabled) {
+            binding.textHomeworkReminderHint.setVisibility(View.GONE);
+            return;
+        }
+        List<CustomHomework> items = CustomHomeworkStore.load(this);
+        if (items.isEmpty()) {
+            showHomeworkReminderHint(getString(
+                    R.string.study_homework_reminder_no_items), true);
+            return;
+        }
+        HomeworkReminderPlanner.Reminder next = HomeworkReminderPlanner.next(items,
+                LocalDateTime.now(), HomeworkReminderPlanner.DEFAULT_HORIZON_DAYS);
+        if (next == null) {
+            showHomeworkReminderHint(getString(
+                    R.string.study_homework_reminder_no_upcoming), true);
+            return;
+        }
+        showHomeworkReminderHint(getString(R.string.study_homework_reminder_next_hint,
+                CustomHomework.formatShortDateTime(next.homework.remindEpochMillis()),
+                next.homework.title(),
+                getString(R.string.study_reminder_lead_value, next.homework.leadMinutes())),
+                false);
+    }
+
+    private void showHomeworkReminderHint(@NonNull String message, boolean danger) {
+        binding.textHomeworkReminderHint.setText(message);
+        binding.textHomeworkReminderHint.setTextColor(ContextCompat.getColor(this,
+                danger ? R.color.campus_danger : R.color.campus_muted));
+        binding.textHomeworkReminderHint.setVisibility(View.VISIBLE);
     }
 
     private void pickReminderLead() {

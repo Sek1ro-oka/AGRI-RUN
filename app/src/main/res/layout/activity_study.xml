@@ -197,6 +197,37 @@
                         android:textSize="12sp" />
                 </LinearLayout>
             </FrameLayout>
+
+            <!-- 底部固定入口：自建作业只在本机保存，用于「作业截止提醒」 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingHorizontal="20dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="12dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonAddHomework"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingHorizontal="4dp"
+                    android:singleLine="true"
+                    android:text="@string/study_homework_add"
+                    android:textColor="@color/campus_mint_dark"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/campus_mint_pale"
+                    app:cornerRadius="14dp"
+                    app:icon="@drawable/ic_study_add"
+                    app:iconGravity="textStart"
+                    app:iconPadding="4dp"
+                    app:iconSize="16dp"
+                    app:iconTint="@color/campus_mint_dark" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- ==================== 课表页 ==================== -->
