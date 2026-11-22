@@ -245,11 +245,11 @@
                         android:src="@drawable/ic_study_calendar" />
 
                     <TextView
+                        android:id="@+id/textBannerSemesterStart"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
-                        android:text="@string/study_semester_start_banner"
                         android:textColor="@color/campus_muted"
                         android:textSize="12sp" />
 

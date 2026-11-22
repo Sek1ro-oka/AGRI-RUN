@@ -169,8 +169,20 @@ public class StudyActivity extends AppCompatActivity {
         binding.buttonStudyBack.setOnClickListener(view -> finish());
         binding.buttonStudySettings.setOnClickListener(view ->
                 settingsLauncher.launch(new Intent(this, StudySettingsActivity.class)));
-        binding.bannerSemesterStart.setOnClickListener(view ->
-                settingsLauncher.launch(new Intent(this, StudySettingsActivity.class)));
+        binding.bannerSemesterStart.setOnClickListener(view -> {
+            int teaching = StudyTimetableStore.currentTeachingWeek(this);
+            if (teaching <= 0) {
+                if (StudyTimetableStore.loadSemesterStart(this) == null) {
+                    settingsLauncher.launch(new Intent(this, StudySettingsActivity.class));
+                }
+                return;
+            }
+            if (teaching != currentWeek) {
+                jumpToTeachingWeek();
+                renderTimetable();
+                animateWeekChange(teaching > currentWeek ? 1 : -1);
+            }
+        });
         binding.tabHomework.setOnClickListener(view -> selectTab(false));
         binding.tabTimetable.setOnClickListener(view -> selectTab(true));
         FinmoriMotion.press(binding.tabHomework);
@@ -657,8 +669,24 @@ public class StudyActivity extends AppCompatActivity {
 
         LocalDate today = LocalDate.now();
         LocalDate semesterStart = StudyTimetableStore.loadSemesterStart(this);
-        binding.bannerSemesterStart.setVisibility(
-                semesterStart == null ? View.VISIBLE : View.GONE);
+        // 周次上方常驻「定位本周」入口：已设开学日期可一键跳回本周，未设置时引导去设置。
+        binding.bannerSemesterStart.setVisibility(View.VISIBLE);
+        if (teachingWeek > 0) {
+            boolean atThisWeek = currentWeek == teachingWeek;
+            binding.textBannerSemesterStart.setText(getString(atThisWeek
+                    ? R.string.study_week_at_this : R.string.study_week_jump_this,
+                    teachingWeek));
+            binding.bannerSemesterStart.setEnabled(!atThisWeek);
+            binding.bannerSemesterStart.setAlpha(atThisWeek ? 0.55f : 1f);
+        } else if (semesterStart == null) {
+            binding.textBannerSemesterStart.setText(R.string.study_week_set_start);
+            binding.bannerSemesterStart.setEnabled(true);
+            binding.bannerSemesterStart.setAlpha(1f);
+        } else {
+            binding.textBannerSemesterStart.setText(R.string.study_week_out_of_term);
+            binding.bannerSemesterStart.setEnabled(false);
+            binding.bannerSemesterStart.setAlpha(0.55f);
+        }
         LocalDate weekStart = semesterStart == null ? null
                 : SemesterCalendar.mondayOf(semesterStart).plusWeeks(currentWeek - 1L);
         int todayWeekday;

@@ -110,6 +110,31 @@ public final class TimetableText {
         return max;
     }
 
+    /**
+     * 周次展示文本：把存储格式转成可读形式。
+     * 「1-16」→「1-16周」；「1-16单」→「1-16周·单周」；空或无法识别 →「每周」。
+     */
+    @NonNull
+    public static String weeksLabel(@Nullable String weeks) {
+        String value = weeks == null ? "" : weeks.trim().replace("第", "");
+        if (value.isEmpty()) {
+            return "每周";
+        }
+        if (value.endsWith("单")) {
+            return trimWeekSuffix(value.substring(0, value.length() - 1)) + "周·单周";
+        }
+        if (value.endsWith("双")) {
+            return trimWeekSuffix(value.substring(0, value.length() - 1)) + "周·双周";
+        }
+        return trimWeekSuffix(value) + "周";
+    }
+
+    @NonNull
+    private static String trimWeekSuffix(@NonNull String value) {
+        String trimmed = value.trim();
+        return trimmed.endsWith("周") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+    }
+
     @NonNull
     private static ParsedWeeks parseWeeks(@Nullable String raw) {
         String value = raw == null ? "" : raw.trim()
