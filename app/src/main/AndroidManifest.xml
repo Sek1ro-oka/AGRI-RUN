@@ -151,6 +151,19 @@
             </intent-filter>
         </receiver>
 
+        <!-- 作业截止提醒：自建作业的闹钟回调与开机/改时后的重新排期。 -->
+        <receiver
+            android:name=".study.HomeworkReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.localroute.app.action.HOMEWORK_REMINDER" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".ui.DiagnosticsActivity"
             android:exported="false"

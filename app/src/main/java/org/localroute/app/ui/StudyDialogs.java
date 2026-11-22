@@ -1,6 +1,8 @@
 package org.localroute.app.ui;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
@@ -16,13 +18,16 @@ import androidx.core.content.ContextCompat;
 
 import org.localroute.app.R;
 import org.localroute.app.databinding.DialogStudyCourseBinding;
+import org.localroute.app.databinding.DialogStudyHomeworkBinding;
 import org.localroute.app.databinding.DialogStudyImportBinding;
+import org.localroute.app.study.CustomHomework;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
 import org.localroute.app.study.TimetableText;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -335,5 +340,188 @@ public final class StudyDialogs {
         return course.name() + '|' + course.weekday() + '|' + course.startPeriod()
                 + '|' + course.endPeriod() + '|' + course.weeks() + '|'
                 + course.location() + '|' + course.teacher();
+    }
+
+    // ------------------------------------------------------------------ 自建作业
+
+    /**
+     * 自建作业编辑器：名称 + 截止时间（先选日期再选时间）+ 提前提醒分钟数。
+     *
+     * <p>这里只负责收集与校验，落库与闹钟重排由调用方在 {@code onSaved} 里做，
+     * 因为列表刷新和调度都归查询作业页管。
+     */
+    public static void showHomeworkEditor(@NonNull Activity activity,
+                                          @Nullable CustomHomework existing,
+                                          @NonNull Consumer<CustomHomework> onSaved) {
+        showHomeworkEditor(activity, existing, onSaved, null);
+    }
+
+    public static void showHomeworkEditor(@NonNull Activity activity,
+                                          @Nullable CustomHomework existing,
+                                          @NonNull Consumer<CustomHomework> onSaved,
+                                          @Nullable Runnable onDeleted) {
+        DialogStudyHomeworkBinding binding =
+                DialogStudyHomeworkBinding.inflate(LayoutInflater.from(activity));
+        Calendar initial = Calendar.getInstance();
+        if (existing != null) {
+            binding.inputHomeworkName.setText(existing.title());
+            binding.inputHomeworkLead.setText(String.valueOf(existing.leadMinutes()));
+            initial.setTimeInMillis(existing.deadlineEpochMillis());
+        } else {
+            binding.inputHomeworkLead.setText(
+                    String.valueOf(CustomHomework.DEFAULT_LEAD_MINUTES));
+            // 新建默认次日 23:59：作业绝大多数是「今晚之前交」。
+            initial.add(Calendar.DAY_OF_MONTH, 1);
+            initial.set(Calendar.HOUR_OF_DAY, 23);
+            initial.set(Calendar.MINUTE, 59);
+            initial.set(Calendar.SECOND, 0);
+            initial.set(Calendar.MILLISECOND, 0);
+        }
+        long[] deadline = {initial.getTimeInMillis()};
+        showDeadlineValue(activity, binding, deadline[0]);
+        binding.rowHomeworkDeadline.setOnClickListener(view ->
+                pickDeadline(activity, binding, deadline));
+        binding.inputHomeworkLead.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence text, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable text) {
+                updateRemindPreview(activity, binding, deadline[0], leadOf(binding));
+            }
+        });
+
+        AlertDialog.Builder builder =
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+                        .setTitle(existing == null ? R.string.study_homework_add_title
+                                : R.string.study_homework_edit_title)
+                        .setView(binding.getRoot())
+                        .setNegativeButton(R.string.campus_cancel, null)
+                        .setPositiveButton(R.string.campus_save, null);
+        if (existing != null && onDeleted != null) {
+            builder.setNeutralButton(R.string.study_course_delete, null);
+        }
+        AlertDialog dialog = builder.create();
+        dialog.setOnShowListener(ignored -> {
+            if (existing != null && onDeleted != null) {
+                Button delete = dialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+                if (delete != null) {
+                    delete.setTextColor(ContextCompat.getColor(activity, R.color.campus_danger));
+                    delete.setOnClickListener(view -> confirmDeleteHomework(activity,
+                            existing, () -> {
+                                dialog.dismiss();
+                                onDeleted.run();
+                            }));
+                }
+            }
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                String title = binding.inputHomeworkName.getText().toString().trim();
+                if (title.isEmpty()) {
+                    Toast.makeText(activity, R.string.study_homework_error_name,
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                int lead = leadOf(binding);
+                if (lead < CustomHomework.MIN_LEAD_MINUTES
+                        || lead > CustomHomework.MAX_LEAD_MINUTES) {
+                    Toast.makeText(activity, R.string.study_homework_error_lead,
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (deadline[0] <= System.currentTimeMillis()) {
+                    Toast.makeText(activity, R.string.study_homework_error_deadline,
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                CustomHomework saved = existing == null
+                        ? CustomHomework.create(title, deadline[0], lead)
+                        : new CustomHomework(existing.id(), title, deadline[0], lead);
+                dialog.dismiss();
+                onSaved.accept(saved);
+            });
+        });
+        dialog.show();
+    }
+
+    public static void confirmDeleteHomework(@NonNull Activity activity,
+                                             @NonNull CustomHomework homework,
+                                             @NonNull Runnable onDeleted) {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+                .setTitle(R.string.study_homework_delete_title)
+                .setMessage(activity.getString(R.string.study_homework_delete_message,
+                        homework.title()))
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.campus_route_delete,
+                        (dialog, which) -> onDeleted.run())
+                .show();
+    }
+
+    /** 日期选定后接着选时刻；两步都确认才写回 {@code deadline}。 */
+    private static void pickDeadline(@NonNull Activity activity,
+                                     @NonNull DialogStudyHomeworkBinding binding,
+                                     long[] deadline) {
+        Calendar current = Calendar.getInstance();
+        current.setTimeInMillis(deadline[0]);
+        int hour = current.get(Calendar.HOUR_OF_DAY);
+        int minute = current.get(Calendar.MINUTE);
+        DatePickerDialog dateDialog = new DatePickerDialog(activity,
+                (dateView, year, month, dayOfMonth) -> {
+                    TimePickerDialog timeDialog = new TimePickerDialog(activity,
+                            (timeView, hourOfDay, minuteOfHour) -> {
+                                Calendar picked = Calendar.getInstance();
+                                picked.set(year, month, dayOfMonth, hourOfDay, minuteOfHour, 0);
+                                picked.set(Calendar.MILLISECOND, 0);
+                                deadline[0] = picked.getTimeInMillis();
+                                showDeadlineValue(activity, binding, deadline[0]);
+                            }, hour, minute, true);
+                    timeDialog.setTitle(R.string.study_homework_pick_time);
+                    timeDialog.show();
+                },
+                current.get(Calendar.YEAR), current.get(Calendar.MONTH),
+                current.get(Calendar.DAY_OF_MONTH));
+        dateDialog.setTitle(R.string.study_homework_pick_date);
+        dateDialog.show();
+    }
+
+    private static void showDeadlineValue(@NonNull Activity activity,
+                                          @NonNull DialogStudyHomeworkBinding binding,
+                                          long deadlineMillis) {
+        binding.textHomeworkDeadlineValue.setText(CustomHomework.formatDateTime(deadlineMillis));
+        binding.textHomeworkDeadlineValue.setTextColor(
+                ContextCompat.getColor(activity, R.color.campus_ink));
+        updateRemindPreview(activity, binding, deadlineMillis, leadOf(binding));
+    }
+
+    private static void updateRemindPreview(@NonNull Activity activity,
+                                            @NonNull DialogStudyHomeworkBinding binding,
+                                            long deadlineMillis, int leadMinutes) {
+        long remindAt = deadlineMillis
+                - CustomHomework.clampLead(leadMinutes) * 60_000L;
+        if (remindAt <= System.currentTimeMillis()) {
+            // 提醒点已经过去：作业仍会保存，只是不再发通知，先说清楚免得用户以为会提醒。
+            binding.textHomeworkRemindPreview.setText(
+                    R.string.study_homework_remind_preview_past);
+            binding.textHomeworkRemindPreview.setTextColor(
+                    ContextCompat.getColor(activity, R.color.campus_danger));
+            return;
+        }
+        binding.textHomeworkRemindPreview.setText(activity.getString(
+                R.string.study_homework_remind_preview,
+                CustomHomework.formatShortDateTime(remindAt)));
+        binding.textHomeworkRemindPreview.setTextColor(
+                ContextCompat.getColor(activity, R.color.campus_muted));
+    }
+
+    private static int leadOf(@NonNull DialogStudyHomeworkBinding binding) {
+        try {
+            return Integer.parseInt(binding.inputHomeworkLead.getText().toString().trim());
+        } catch (NumberFormatException error) {
+            return CustomHomework.DEFAULT_LEAD_MINUTES;
+        }
     }
 }
