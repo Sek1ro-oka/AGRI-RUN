@@ -26,6 +26,8 @@ public final class StudyTimetableStore {
     private static final String KEY_TOTAL_WEEKS = "total_weeks";
     private static final String KEY_CURRENT_WEEK = "current_week";
     private static final String KEY_SEMESTER_START = "semester_start";
+    private static final String KEY_CLASS_REMINDER_ENABLED = "class_reminder_enabled";
+    private static final String KEY_CLASS_REMINDER_LEAD = "class_reminder_lead_minutes";
     /** 旧版本只保存了每节课分钟数，读取时迁移后删除。 */
     private static final String KEY_LEGACY_PERIOD_MINUTES = "period_minutes";
 
@@ -111,6 +113,27 @@ public final class StudyTimetableStore {
         int value = season == StudySchedule.SEASON_SUMMER
                 ? StudySchedule.SEASON_SUMMER : StudySchedule.SEASON_WINTER;
         prefs(context).edit().putInt(KEY_SEASON, value).apply();
+    }
+
+    /** 课前提醒开关，默认关闭。 */
+    public static boolean loadClassReminderEnabled(Context context) {
+        return prefs(context).getBoolean(KEY_CLASS_REMINDER_ENABLED, false);
+    }
+
+    public static void saveClassReminderEnabled(Context context, boolean enabled) {
+        prefs(context).edit().putBoolean(KEY_CLASS_REMINDER_ENABLED, enabled).apply();
+    }
+
+    /** 课前提醒的提前分钟数，收进合法范围。 */
+    public static int loadClassReminderLeadMinutes(Context context) {
+        return ClassReminderPlanner.clampLead(prefs(context)
+                .getInt(KEY_CLASS_REMINDER_LEAD, ClassReminderPlanner.DEFAULT_LEAD_MINUTES));
+    }
+
+    public static void saveClassReminderLeadMinutes(Context context, int minutes) {
+        prefs(context).edit()
+                .putInt(KEY_CLASS_REMINDER_LEAD, ClassReminderPlanner.clampLead(minutes))
+                .apply();
     }
 
     @NonNull

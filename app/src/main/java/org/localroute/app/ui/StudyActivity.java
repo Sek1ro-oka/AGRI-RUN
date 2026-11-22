@@ -28,6 +28,7 @@ import androidx.core.view.WindowInsetsCompat;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityStudyBinding;
 import org.localroute.app.databinding.ItemStudyHomeworkBinding;
+import org.localroute.app.study.ClassReminderScheduler;
 import org.localroute.app.study.ChaoxingClient;
 import org.localroute.app.study.HomeworkFilter;
 import org.localroute.app.study.HomeworkItem;
@@ -237,6 +238,8 @@ public class StudyActivity extends AppCompatActivity {
         }
         followTeachingWeek();
         renderTimetable();
+        // 课表或作息可能在设置页/导入页被改过，回到本页时重新排一次课前提醒。
+        ClassReminderScheduler.update(this);
     }
 
     @Override

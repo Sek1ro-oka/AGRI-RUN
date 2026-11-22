@@ -23,6 +23,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 课前提醒：开机后重新排期，以及在系统设置允许时精确唤醒。 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- 检查更新：下载完成后拉起系统安装器；是否允许仍由用户在系统设置里决定。 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!--
@@ -134,6 +137,19 @@
             android:label="@string/study_settings_title"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.RouteWorkshop.CampusRun" />
+
+        <!-- 课前提醒：闹钟回调与开机/改时/换时区/覆盖安装后的重新排期。 -->
+        <receiver
+            android:name=".study.ClassReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.localroute.app.action.CLASS_REMINDER" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".ui.DiagnosticsActivity"
