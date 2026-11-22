@@ -202,7 +202,8 @@ public class TimetableGridView extends View {
             if (detail.length() > 0) {
                 detail.append('\n');
             }
-            detail.append(course.weeks()).append("周");
+            detail.append(org.localroute.app.study.TimetableText
+                    .weeksLabel(course.weeks()));
             StaticLayout sub = layout(detail.toString(), detailPaint, textWidth,
                     span >= 2 ? 2 : 1);
             blocks.add(new Block(course, title, sub, blockFills[index]));

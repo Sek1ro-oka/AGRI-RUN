@@ -70,4 +70,15 @@ public class TimetableTextTest {
         assertEquals(0, TimetableText.maxWeek("待定"));
         assertEquals(0, TimetableText.maxWeek(null));
     }
+
+    @Test
+    public void formatsWeeksLabel() {
+        assertEquals("1-16周", TimetableText.weeksLabel("1-16"));
+        assertEquals("1-16周·单周", TimetableText.weeksLabel("1-16单"));
+        assertEquals("1-16周·双周", TimetableText.weeksLabel("1-16双"));
+        assertEquals("3-4,6-7周·单周", TimetableText.weeksLabel("3-4,6-7单"));
+        assertEquals("1-16周", TimetableText.weeksLabel("第1-16周"));
+        assertEquals("每周", TimetableText.weeksLabel(""));
+        assertEquals("每周", TimetableText.weeksLabel(null));
+    }
 }

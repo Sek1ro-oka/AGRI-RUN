@@ -560,7 +560,10 @@
     <string name="study_semester_start_pick_title">选择开学第 1 周的日期</string>
     <string name="study_semester_start_hint">按所选日期所在周的周一计算第 1 周；设置后课表默认打开本周，并在表头显示每天日期。</string>
     <string name="study_semester_start_clear">清除</string>
-    <string name="study_semester_start_banner">设置开学第 1 周日期，课表会自动定位本周并显示每天日期</string>
+    <string name="study_week_jump_this">一键定位本周：第 %1$d 周</string>
+    <string name="study_week_at_this">已在第 %1$d 周（本周）</string>
+    <string name="study_week_set_start">设置开学第 1 周日期后，可一键定位本周</string>
+    <string name="study_week_out_of_term">今天不在教学周内（第 1 周至最后一周之外）</string>
     <string name="study_settings_account_meta">UID %1$s · 绑定于 %2$s</string>
     <string name="study_schedule_title">上课时间</string>
     <string name="study_schedule_season_note">冬夏令时两套独立保存</string>
