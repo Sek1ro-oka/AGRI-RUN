@@ -107,49 +107,46 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical">
-                        <FrameLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="92dp"
-                            android:background="@color/campus_mint_pale">
-                            <ImageView
-                                android:layout_width="44dp"
-                                android:layout_height="44dp"
-                                android:layout_gravity="center"
-                                android:background="@drawable/bg_campus_soft_circle"
-                                android:contentDescription="@null"
-                                android:padding="10dp"
-                                android:src="@drawable/ic_campus_run"
-                                app:tint="@color/fm_link" />
-                        </FrameLayout>
+                        android:orientation="vertical"
+                        android:padding="14dp">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="14dp">
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+                            <ImageView
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
+                                android:background="@drawable/bg_campus_entry_icon"
+                                android:contentDescription="@null"
+                                android:padding="8dp"
+                                android:src="@drawable/ic_campus_run"
+                                app:tint="@color/fm_link" />
                             <TextView
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
+                                android:layout_marginStart="9dp"
+                                android:layout_weight="1"
                                 android:text="@string/campus_entry_title"
                                 android:textColor="@color/fm_text"
-                                android:textSize="18sp"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:text="@string/campus_entry_subtitle_short"
-                                android:textColor="@color/fm_text_secondary"
-                                android:textSize="12sp" />
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:text="@string/fm_run_action"
-                                android:textColor="@color/fm_link"
-                                android:textSize="12sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/campus_entry_subtitle_short"
+                            android:textColor="@color/fm_text_secondary"
+                            android:textSize="11sp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/fm_run_action"
+                            android:textColor="@color/fm_link"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -169,49 +166,46 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical">
-                        <FrameLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="92dp"
-                            android:background="@color/campus_mint_pale">
-                            <ImageView
-                                android:layout_width="44dp"
-                                android:layout_height="44dp"
-                                android:layout_gravity="center"
-                                android:background="@drawable/bg_campus_soft_circle"
-                                android:contentDescription="@null"
-                                android:padding="10dp"
-                                android:src="@drawable/ic_campus_teleport"
-                                app:tint="@color/fm_link" />
-                        </FrameLayout>
+                        android:orientation="vertical"
+                        android:padding="14dp">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="14dp">
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+                            <ImageView
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
+                                android:background="@drawable/bg_campus_entry_icon"
+                                android:contentDescription="@null"
+                                android:padding="8dp"
+                                android:src="@drawable/ic_campus_teleport"
+                                app:tint="@color/fm_link" />
                             <TextView
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
+                                android:layout_marginStart="9dp"
+                                android:layout_weight="1"
                                 android:text="@string/virtual_title"
                                 android:textColor="@color/fm_text"
-                                android:textSize="18sp"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:text="@string/virtual_entry_subtitle"
-                                android:textColor="@color/fm_text_secondary"
-                                android:textSize="12sp" />
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:text="@string/virtual_entry_action"
-                                android:textColor="@color/fm_link"
-                                android:textSize="12sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/virtual_entry_subtitle"
+                            android:textColor="@color/fm_text_secondary"
+                            android:textSize="11sp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/virtual_entry_action"
+                            android:textColor="@color/fm_link"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>

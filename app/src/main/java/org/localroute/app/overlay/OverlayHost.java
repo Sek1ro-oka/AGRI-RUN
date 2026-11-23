@@ -25,11 +25,18 @@ import org.localroute.app.run.SimulationStateRepo;
  * 跑圈地图上不遮挡地图；切到校园快跑设置页、主页、作业/课表等其它页面或系统后台时出现；
  * 任务结束立即收起。冷启动、只画路线或只浏览地图时不再提前弹出。是否显示由
  * {@link OverlayPolicy} 统一判断，{@code CampusRunActivity} 只负责上报跑圈地图是否可见。
+ *
+ * <p>0.9.9 起开关默认打开：悬浮控制台是跨应用传送/定位的主通道，默认收起反而没人发现。
+ * 默认值只影响从没手动切过开关的设备（用户关掉后写回的 false 会一直保留）；没有
+ * 「显示在其他应用上层」权限时依然什么都不画，只在开始跑圈前提示一次去授权。
  */
 public final class OverlayHost {
 
     private static final String PREFS = "ui";
     private static final String PREF_ENABLED = "overlay_enabled";
+
+    /** 悬浮窗开关的首次默认值：默认开启，用户关闭后按持久化的 false 走。 */
+    static final boolean DEFAULT_ENABLED = true;
 
     /** 离开跑圈地图后稍等再显示，避开页面切换 / Activity 重建的中间态。 */
     private static final long SHOW_DELAY_MS = 150L;
@@ -60,7 +67,7 @@ public final class OverlayHost {
     private OverlayHost(Context appContext) {
         this.app = appContext.getApplicationContext();
         this.prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        this.enabled = prefs.getBoolean(PREF_ENABLED, false);
+        this.enabled = prefs.getBoolean(PREF_ENABLED, DEFAULT_ENABLED);
         this.panel = new OverlayPanel(appContext, () -> setEnabled(false));
         this.snapshots = SimulationStateRepo.get().snapshot();
         this.observer = this::render;

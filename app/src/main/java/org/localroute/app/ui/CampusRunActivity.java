@@ -10,9 +10,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -62,7 +59,6 @@ import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivityCampusRunBinding;
 import org.localroute.app.databinding.DialogCampusRoutesBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
-import org.localroute.app.diagnostics.SystemLocationReader;
 import org.localroute.app.map.AmapRouteMapView;
 import org.localroute.app.map.MapBackendPolicy;
 import org.localroute.app.map.RouteMapController;
@@ -150,7 +146,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     /** 跑者标记在两次快照之间的滑动时长；略小于 500ms 的 tick 间隔，形成连续运动。 */
     private static final long RUNNER_ANIM_MS = 480L;
-    /** 单次位置跳变超过该距离时不再滑动，直接落点（传送、回前台、自动暂停恢复等）。 */
+    /** 单次位置跳变超过该距离时不再滑动，直接落点（回前台、自动暂停恢复等）。 */
     private static final double RUNNER_SNAP_METERS = 30d;
 
     /** 旧版单路线存储的迁移 ID；新路线使用 {@link RouteRepository#newRouteId()}。 */
@@ -159,8 +155,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     /** 权限弹窗期间 Activity 可能重建，用静态字段保存待执行动作（只含纯数据）。 */
     @Nullable
     private static PendingStart pendingStart;
-    @Nullable
-    private static GeoPoint pendingTeleport;
 
     private ActivityCampusRunBinding binding;
     private SharedPreferences prefs;
@@ -174,14 +168,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     /** 正在重新绘制的路线 ID；为 null 表示在新增路线。 */
     @Nullable
     private String editingRouteId;
-    /** 传送预览点；真实底图直接保存 WGS-84，不再经过设计坐标。 */
-    @Nullable
-    private GeoPoint teleportTarget;
-    /** 空闲时点「定位当前位置」读到的设备真实位置（WGS-84），用于画点与坐标显示。 */
-    @Nullable
-    private GeoPoint deviceLocation;
-    /** 用户是在「定位当前位置」时被要求授权，授权结果回来后继续定位。 */
-    private boolean pendingLocate;
     @Nullable
     private CampusRoute pendingRouteSwitch;
 
@@ -192,7 +178,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     private CampusRoute renderedRoute;
     private boolean mapReady;
     private boolean pendingFit;
-    /** 传送/定位后要居中的目标；地图或页面未就绪时等就绪回调再移动镜头。 */
+    /** 开始跑圈 / 回到地图后要居中的目标；地图或页面未就绪时等就绪回调再移动镜头。 */
     @Nullable
     private GeoPoint pendingCameraFocus;
 
@@ -218,7 +204,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     private boolean runScreenVisible;
     private boolean drawMode;
     private final List<CampusPoint> draftPoints = new ArrayList<>();
-    private boolean teleportArmed;
 
     /** 激活码导入中遇到重名、等页面可见后逐个询问的预设。 */
     private final List<PresetConflict> pendingPresetConflicts = new ArrayList<>();
@@ -243,16 +228,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     private boolean resultRequested;
     /** 当前跑圈页正在展示刚结束的本次结果（即使会话所有权已经释放）。 */
     private boolean showResult;
-    /** 已确认"结束跑圈并传送"，等待服务快照确认；成功提示只在确认后出现。 */
-    private boolean awaitingTeleportAck;
-    private static final long TELEPORT_ACK_TIMEOUT_MS = 6000L;
-    private final Runnable teleportAckTimeout = () -> {
-        if (!awaitingTeleportAck) {
-            return;
-        }
-        awaitingTeleportAck = false;
-        toast(getString(R.string.campus_teleport_no_ack));
-    };
 
     private final Runnable naturalTicker = new Runnable() {
         @Override
@@ -396,7 +371,6 @@ public final class CampusRunActivity extends AppCompatActivity {
         activeRunId = prefs.getString(KEY_ACTIVE_RUN_ID, "");
         activeLapMeters = prefs.getFloat(KEY_ACTIVE_LAP,
                 route == null ? 0f : (float) route.lapMeters());
-        teleportTarget = null;
     }
 
     private boolean restoreActiveSession(RunSnapshot current) {
@@ -803,7 +777,6 @@ public final class CampusRunActivity extends AppCompatActivity {
         FinmoriMotion.press(binding.buttonGoal);
         FinmoriMotion.press(binding.buttonRunMain);
         binding.buttonEndRun.setOnClickListener(v -> requestStop());
-        binding.buttonTeleport.setOnClickListener(this::showMapActionsMenu);
 
         binding.buttonDrawUndo.setOnClickListener(v -> {
             if (!draftPoints.isEmpty()) {
@@ -835,8 +808,6 @@ public final class CampusRunActivity extends AppCompatActivity {
             if (drawMode) {
                 // 自定义路线仍按固定比例存成设计坐标，底图显示的是真实地点。
                 addDraftPoint(CampusGeo.toDesign(point, CampusRoute.CUSTOM_METERS_PER_UNIT));
-            } else if (teleportArmed) {
-                performTeleport(point);
             }
         };
         MapBackendPolicy.Decision backend = MapBackendPolicy.choose(
@@ -952,7 +923,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (mapHost == null) {
             return;
         }
-        // 整条路线取景与「传送到某点」互斥：后发的操作覆盖前一个，避免刚传送就被拉回全线。
+        // 整条路线取景与单点对焦互斥：后发的操作覆盖前一个，避免刚对准起点就被拉回全线。
         pendingCameraFocus = null;
         pendingFit = true;
         if (mapReady && runScreenVisible) {
@@ -965,7 +936,7 @@ public final class CampusRunActivity extends AppCompatActivity {
      * 把镜头移到指定位置并保持居中。
      *
      * <p>地图页刚显示或底图还没就绪时先记住目标，等就绪回调再移动；期间不再按整条路线取景，
-     * 否则传送/定位的结果会被随后的 fitRoute 覆盖。
+     * 否则对中的位置会被随后的 fitRoute 覆盖。
      */
     private void focusMapOn(@NonNull GeoPoint point) {
         pendingCameraFocus = point;
@@ -986,7 +957,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         GeoPoint point = pendingCameraFocus;
         pendingCameraFocus = null;
         mapHost.focusOn(point);
-        // 手动定位/传送后重新打开跟随：之后模拟位置怎么移动，地图都会追上。
+        // 镜头对准某点后重新打开跟随：之后模拟位置怎么移动，地图都会追上。
         // 用户再次拖动地图时由地图实现自动关闭。
         mapHost.setFollowRunner(true);
     }
@@ -1269,7 +1240,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         } else {
             syncMapRoute(false);
         }
-        // 在排帧前就记下是否有「传送到某点」的镜头目标：目标即使已被更早的一帧应用并清空，
+        // 在排帧前就记下是否已经有镜头目标：目标即使已被更早的一帧应用并清空，
         // 也不要再补一次整线取景把镜头拉回去。
         final boolean focusRequested = pendingCameraFocus != null;
         // 运行中回到地图（含从悬浮屏、其他页面切回）：直接对着当前模拟位置，
@@ -1280,7 +1251,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 return;
             }
             if (focusRequested) {
-                // 传送/定位刚发生：以目标点为中心，不要再按整条路线取景。
+                // 镜头刚被指定到某点：以该点为中心，不要再按整条路线取景。
                 applyPendingCameraFocus();
             } else if (simulatedHere != null) {
                 focusMapOn(simulatedHere);
@@ -1292,7 +1263,6 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (!drawMode) {
             binding.drawBar.setVisibility(View.GONE);
         }
-        binding.textTeleportHint.setVisibility(teleportArmed ? View.VISIBLE : View.GONE);
         updateRunUi();
     }
 
@@ -1417,12 +1387,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         RunSpeedPreferences.selectSport(this, sportIndex());
         naturalPhase1 = Math.random() * Math.PI * 2d;
         naturalPhase2 = Math.random() * Math.PI * 2d;
-        teleportTarget = null;
-        deviceLocation = null;
         activeRunId = request.runId();
         claimOwnSession = true;
-        awaitingTeleportAck = false;
-        handler.removeCallbacks(teleportAckTimeout);
         stopRequested = false;
         autoPauseNotifiedRunId = "";
         prefs.edit()
@@ -1451,286 +1417,6 @@ public final class CampusRunActivity extends AppCompatActivity {
         toast(getString(R.string.campus_stopping));
     }
 
-    // ---------------------------------------------------------------- 传送 / 定位
-
-    /** 右下角按钮：先选择「传送」或「定位当前位置」。 */
-    private void showMapActionsMenu(View anchor) {
-        if (drawMode) {
-            toast(getString(R.string.campus_draw_finish_first));
-            return;
-        }
-        if (teleportArmed) {
-            // 传送已待命时再点一次就是取消，不再弹菜单。
-            teleportArmed = false;
-            binding.textTeleportHint.setVisibility(View.GONE);
-            return;
-        }
-        PopupMenu popup = new PopupMenu(this, anchor);
-        popup.getMenu().add(0, 1, 0, getString(R.string.campus_menu_teleport));
-        popup.getMenu().add(0, 2, 1, getString(R.string.campus_menu_locate));
-        popup.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == 1) {
-                onTeleportPressed();
-            } else if (item.getItemId() == 2) {
-                locateCurrentPosition();
-            }
-            return true;
-        });
-        popup.show();
-    }
-
-    /**
-     * 定位当前位置。
-     *
-     * <p>跑圈/单点保持中，App 的「当前位置」就是跑者或传送点，先把镜头移回去；
-     * 空闲时改为读取设备真实定位（与旧版「定位到当前位置」一致），读不到才退回路线起点。
-     */
-    private void locateCurrentPosition() {
-        if (mapHost == null) {
-            return;
-        }
-        if (claimOwnSession && snapshot.hasPosition()
-                && Double.isFinite(snapshot.latitude()) && Double.isFinite(snapshot.longitude())) {
-            focusMapOn(new GeoPoint(snapshot.latitude(), snapshot.longitude()));
-            toast(getString(R.string.campus_locate_done));
-            return;
-        }
-        if (teleportTarget != null) {
-            focusMapOn(teleportTarget);
-            toast(getString(R.string.campus_locate_done));
-            return;
-        }
-        if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            pendingLocate = true;
-            toast(getString(R.string.campus_locate_permission));
-            permissionLauncher.launch(new String[]{Manifest.permission.ACCESS_FINE_LOCATION});
-            return;
-        }
-        // 已有设备位置时先立即回到红点，再尝试刷新；GPS 室内迟迟不返回也不会“点了没反应”。
-        if (deviceLocation != null) {
-            focusMapOn(deviceLocation);
-            toast(getString(R.string.campus_locate_done));
-        }
-        locateByDevice();
-    }
-
-    /** 先读系统缓存的最近位置；没有就请求一次实时定位，仍拿不到再退回路线起点。 */
-    @SuppressWarnings("deprecation")
-    private void locateByDevice() {
-        if (mapHost == null) {
-            return;
-        }
-        LocationManager manager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        if (manager == null || !manager.isLocationEnabled()) {
-            toast(getString(R.string.campus_locate_off));
-            locateFallback();
-            return;
-        }
-        SystemLocationReader.Probe best = null;
-        for (SystemLocationReader.Probe probe : SystemLocationReader.readAll(this)) {
-            // 跳过模拟来源：本应用自己跑圈时提交的假位置不能被当成「设备当前位置」。
-            if (!probe.hasFix() || probe.markedMock()) {
-                continue;
-            }
-            if (best == null || probe.ageMillis() < best.ageMillis()) {
-                best = probe;
-            }
-        }
-        if (best != null) {
-            showDeviceLocated(best.point(), best.provider);
-            return;
-        }
-        toast(getString(R.string.campus_locate_searching));
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                manager.getCurrentLocation(LocationManager.GPS_PROVIDER, null, getMainExecutor(),
-                        location -> {
-                            if (location == null) {
-                                locateFallback();
-                            } else {
-                                showDeviceLocated(new GeoPoint(location.getLatitude(),
-                                        location.getLongitude()), location.getProvider());
-                            }
-                        });
-            } else {
-                // Android 10 没有 getCurrentLocation，用一次单次请求代替。
-                manager.requestSingleUpdate(LocationManager.GPS_PROVIDER,
-                        new LocationListener() {
-                            @Override
-                            public void onLocationChanged(@NonNull Location location) {
-                                showDeviceLocated(new GeoPoint(location.getLatitude(),
-                                        location.getLongitude()), location.getProvider());
-                            }
-
-                            @Override
-                            public void onStatusChanged(String provider, int status, Bundle extras) {
-                            }
-
-                            @Override
-                            public void onProviderEnabled(@NonNull String provider) {
-                            }
-
-                            @Override
-                            public void onProviderDisabled(@NonNull String provider) {
-                                locateFallback();
-                            }
-                        }, getMainLooper());
-            }
-        } catch (SecurityException | IllegalArgumentException error) {
-            DiagnosticLog.warn("定位：请求设备位置失败 " + error);
-            locateFallback();
-        }
-    }
-
-    private void showDeviceLocated(GeoPoint point, String provider) {
-        if (mapHost == null) {
-            return;
-        }
-        deviceLocation = point;
-        showRunnerNow(point);
-        focusMapOn(point);
-        binding.textCoordinates.setText(CampusFormat.coordinates(point.latitude(), point.longitude()));
-        toast(getString(R.string.campus_locate_device));
-        DiagnosticLog.info("定位到设备当前位置：" + point.format() + " via " + provider);
-    }
-
-    /** 设备定位不可用时退回最近一次设备位置，再退回路线起点。 */
-    private void locateFallback() {
-        if (mapHost == null) {
-            toast(getString(R.string.campus_locate_missing));
-            return;
-        }
-        // 地图上已经画着红点时优先回到红点：定位偶发失败不应把用户甩到别处。
-        if (deviceLocation != null) {
-            focusMapOn(deviceLocation);
-            toast(getString(R.string.campus_locate_done));
-            return;
-        }
-        GeoPoint start = route == null ? null : route.startGeo();
-        if (start == null) {
-            toast(getString(R.string.campus_locate_missing));
-            return;
-        }
-        focusMapOn(start);
-        toast(getString(R.string.campus_locate_fallback));
-    }
-
-    private void onTeleportPressed() {
-        if (drawMode) {
-            toast(getString(R.string.campus_draw_finish_first));
-            return;
-        }
-        if (teleportArmed) {
-            teleportArmed = false;
-            binding.textTeleportHint.setVisibility(View.GONE);
-            return;
-        }
-        if (snapshot.isActive() && !claimOwnSession) {
-            toast(getString(R.string.campus_toast_existing));
-            return;
-        }
-        teleportArmed = true;
-        binding.textTeleportHint.setVisibility(View.VISIBLE);
-        toast(getString(R.string.campus_teleport_hint));
-    }
-
-    private void performTeleport(GeoPoint target) {
-        teleportArmed = false;
-        binding.textTeleportHint.setVisibility(View.GONE);
-
-        if (snapshot.isActive()) {
-            if (!claimOwnSession) {
-                toast(getString(R.string.campus_toast_existing));
-                return;
-            }
-            if (snapshot.singlePoint()) {
-                sendTeleport(target, false);
-                return;
-            }
-            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-                    .setTitle(R.string.campus_teleport_confirm_title)
-                    .setMessage(getString(R.string.campus_teleport_confirm_message,
-                            target.format()))
-                    .setPositiveButton(R.string.campus_teleport_confirm_action,
-                            (dialog, which) -> sendTeleport(target, true))
-                    .setNegativeButton(R.string.campus_cancel, null)
-                    .show();
-            return;
-        }
-
-        sendTeleport(target, false);
-    }
-
-    /** 真正下发传送；expectRouteSwitch 表示当前是跑圈，需等服务确认已切换成单点。 */
-    private void sendTeleport(GeoPoint target, boolean expectRouteSwitch) {
-        teleportTarget = target;
-        if (mapHost != null) {
-            showRunnerNow(target);
-        }
-        focusMapOn(target);
-
-        if (snapshot.isActive()) {
-            // 确认弹窗期间会话所有权可能已被释放或接管，下发前再查一次。
-            if (!claimOwnSession) {
-                toast(getString(R.string.campus_toast_existing));
-                return;
-            }
-            if (expectRouteSwitch) {
-                awaitingTeleportAck = true;
-                handler.removeCallbacks(teleportAckTimeout);
-                handler.postDelayed(teleportAckTimeout, TELEPORT_ACK_TIMEOUT_MS);
-                SimulationService.teleportTo(this, target);
-                toast(getString(R.string.campus_teleport_sending));
-            } else {
-                SimulationService.teleportTo(this, target);
-                toast(getString(R.string.campus_teleport_started_short));
-            }
-            return;
-        }
-
-        List<String> needed = neededPermissions();
-        if (needed.isEmpty()) {
-            ensureMockReady(() -> beginSinglePoint(target));
-            return;
-        }
-        pendingTeleport = target;
-        toast(getString(R.string.campus_permission_needed));
-        permissionLauncher.launch(needed.toArray(new String[0]));
-    }
-
-    private void beginSinglePoint(GeoPoint target) {
-        if (snapshot.isActive()) {
-            toast(getString(R.string.campus_toast_existing));
-            return;
-        }
-        RunRequest request = RunRequest.createSinglePoint(target);
-        teleportTarget = target;
-        deviceLocation = null;
-        showResult = false;
-        resultRequested = false;
-        activeLapMeters = 0d;
-        activeRunId = request.runId();
-        claimOwnSession = true;
-        awaitingTeleportAck = false;
-        handler.removeCallbacks(teleportAckTimeout);
-        stopRequested = false;
-        autoPauseNotifiedRunId = "";
-        prefs.edit()
-                .putBoolean(KEY_OWNED, true)
-                .putString(KEY_ACTIVE_RUN_ID, activeRunId)
-                .putFloat(KEY_ACTIVE_LAP, 0f)
-                .apply();
-        SimulationService.start(this, request);
-        // 先登记镜头目标再切页：showRunScreen 的取景 post 看到待定目标就只居中到传送点，
-        // 不会再按整条路线取景把镜头拉回去。
-        focusMapOn(target);
-        showRunScreen();
-        if (mapHost != null) {
-            showRunnerNow(target);
-        }
-        toast(getString(R.string.campus_teleport_hold_started));
-    }
-
     // ---------------------------------------------------------------- 权限 / 模拟位置检查
 
     private List<String> neededPermissions() {
@@ -1747,30 +1433,14 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void onPermissionResult(java.util.Map<String, Boolean> result) {
         boolean fineGranted = hasPermission(Manifest.permission.ACCESS_FINE_LOCATION);
-        GeoPoint teleport = pendingTeleport;
         PendingStart start = pendingStart;
-        boolean locate = pendingLocate;
-        pendingTeleport = null;
         pendingStart = null;
-        pendingLocate = false;
         if (!fineGranted) {
-            toast(getString(locate ? R.string.campus_locate_permission
-                    : R.string.campus_permission_missing));
-            if (locate) {
-                locateFallback();
-            }
-            return;
-        }
-        if (teleport != null) {
-            ensureMockReady(() -> beginSinglePoint(teleport));
+            toast(getString(R.string.campus_permission_missing));
             return;
         }
         if (start != null) {
             ensureMockReadyForRoute(start.route, start.speedKmh, start.loops);
-            return;
-        }
-        if (locate) {
-            locateByDevice();
             return;
         }
         toast(getString(R.string.campus_toast_pending));
@@ -1853,7 +1523,6 @@ public final class CampusRunActivity extends AppCompatActivity {
                         .apply();
             }
         }
-        handleTeleportAck(next, ours);
         if (ours && next.state() == RunState.PAUSED && next.errorCode() != null
                 && !next.runId().equals(autoPauseNotifiedRunId)) {
             autoPauseNotifiedRunId = next.runId();
@@ -1873,8 +1542,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     private void handleTerminal(RunSnapshot previous, RunSnapshot next) {
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
-        handler.removeCallbacks(teleportAckTimeout);
-        awaitingTeleportAck = false;
         boolean wasSinglePoint = next.singlePoint() || previous.singlePoint();
         showResult = !wasSinglePoint;
         boolean showResultNow = resultRequested;
@@ -1924,31 +1591,6 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private boolean isTerminal(RunState state) {
         return state == RunState.COMPLETED || state == RunState.STOPPED || state == RunState.ERROR;
-    }
-
-    /**
-     * 跑圈传送的确认结果只认服务快照：单点运行/保持中才算成功，错误/终止都按失败反馈。
-     * 暂停中的跑圈传送后按 PAUSED 发布新任务（TaskModeSwitch），所以 PAUSED 同样是成功。
-     */
-    private void handleTeleportAck(RunSnapshot next, boolean ours) {
-        if (!awaitingTeleportAck || !ours) {
-            return;
-        }
-        if ((next.state() == RunState.RUNNING || next.state() == RunState.PAUSED)
-                && next.singlePoint()) {
-            awaitingTeleportAck = false;
-            handler.removeCallbacks(teleportAckTimeout);
-            toast(getString(R.string.campus_teleport_route_ended));
-            return;
-        }
-        if (isTerminal(next.state())) {
-            awaitingTeleportAck = false;
-            handler.removeCallbacks(teleportAckTimeout);
-            String detail = next.errorMessage();
-            toast(detail == null || detail.isEmpty()
-                    ? getString(R.string.campus_teleport_failed)
-                    : getString(R.string.campus_teleport_failed_detail, detail));
-        }
     }
 
     private void syncNaturalTicker() {
@@ -2017,9 +1659,6 @@ public final class CampusRunActivity extends AppCompatActivity {
                 && Double.isFinite(snapshot.latitude()) && Double.isFinite(snapshot.longitude())) {
             binding.textCoordinates.setText(
                     CampusFormat.coordinates(snapshot.latitude(), snapshot.longitude()));
-        } else if (!active && deviceLocation != null) {
-            binding.textCoordinates.setText(
-                    CampusFormat.coordinates(deviceLocation.latitude(), deviceLocation.longitude()));
         } else if (route != null) {
             GeoPoint start = route.startGeo();
             binding.textCoordinates.setText(CampusFormat.coordinates(start.latitude(), start.longitude()));
@@ -2036,14 +1675,12 @@ public final class CampusRunActivity extends AppCompatActivity {
                     GeoPoint running = new GeoPoint(snapshot.latitude(), snapshot.longitude());
                     animateRunnerTo(running, snapshot.state() == RunState.RUNNING);
                     // 跑圈/单点保持/摇杆移动时让镜头跟着模拟位置走；用户拖动地图后
-                    // 地图实现会关闭跟随，点「定位当前位置」或再传送即可恢复。
+                    // 地图实现会关闭跟随，重新进入跑圈页或再次开始跑圈时恢复。
                     boolean moving = snapshot.state() == RunState.RUNNING
                             || snapshot.state() == RunState.PAUSED;
                     if (runScreenVisible && moving) {
                         mapHost.followRunner(running);
                     }
-                } else if (!active) {
-                    showRunnerNow(teleportTarget != null ? teleportTarget : deviceLocation);
                 }
             }
         }
@@ -2070,9 +1707,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         boolean showEnd = active && !single;
         binding.buttonEndRun.setVisibility(showEnd ? View.VISIBLE : View.GONE);
         binding.buttonGoal.setEnabled(!drawMode);
-        binding.buttonTeleport.setEnabled(!drawMode);
         binding.buttonGoal.setAlpha(drawMode ? 0.45f : 1f);
-        binding.buttonTeleport.setAlpha(drawMode ? 0.45f : 1f);
         binding.buttonRunSport.setEnabled(!active);
         binding.runStats.setVisibility(active || showResult ? View.VISIBLE : View.GONE);
         binding.buttonAdvanced.setEnabled(!drawMode);
@@ -2108,7 +1743,7 @@ public final class CampusRunActivity extends AppCompatActivity {
      * 把跑者标记滑到新位置：500ms 一次的快照之间用球面插值补帧，
      * 地图上的跑者就会连续前进，而不是每半秒跳一下。
      *
-     * @param smooth 只在 RUNNING 时补帧；暂停、结束、传送等场景直接落点
+     * @param smooth 只在 RUNNING 时补帧；暂停、结束等场景直接落点
      */
     private void animateRunnerTo(@NonNull GeoPoint target, boolean smooth) {
         if (mapHost == null) {
@@ -2443,7 +2078,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     private void applyRoute(@Nullable CampusRoute candidate) {
         route = candidate;
         persistSelectedRoute(candidate);
-        teleportTarget = null;
         activeLapMeters = candidate == null ? 0d : candidate.lapMeters();
         renderedRoute = null;
         showResult = false;
@@ -2477,12 +2111,10 @@ public final class CampusRunActivity extends AppCompatActivity {
         drawMode = true;
         showResult = false;
         resultRequested = false;
-        teleportArmed = false;
         draftPoints.clear();
         if (editTarget != null) {
             draftPoints.addAll(editTarget.waypointsForSave());
         }
-        binding.textTeleportHint.setVisibility(View.GONE);
         binding.drawBar.setVisibility(View.VISIBLE);
         updateDrawBanner();
         renderedRoute = null;
@@ -2649,8 +2281,6 @@ public final class CampusRunActivity extends AppCompatActivity {
     protected void onDestroy() {
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
-        handler.removeCallbacks(teleportAckTimeout);
-        awaitingTeleportAck = false;
         pendingOverlayProceed = null;
         cancelRunnerAnimation();
         if (mapHost != null) {

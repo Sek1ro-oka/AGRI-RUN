@@ -200,3 +200,24 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 处置：用户确认旧私钥找不到了，本条按「不可追认」定案。签名主线只保留 `unloop-release.jks`；`docs/BUILD.md` 第 4.1 节写清两条线的指纹、覆盖范围，以及「手上只有证书时不要试图换回旧签名」的原因，防止后续重复尝试。旧设备的唯一升级路径是先卸载再安装，代价是丢本地数据（`files/routes/` 的路线、课表登录态、自建作业、跑速与提醒设置；课表与作业缓存重装后可重新同步）。
 
 后续待办（未开工，需用户点头）：加一份本地数据导出/导入，让「换签名必须卸载」不再等于丢数据；同时把 `keystore/` + `keystore.properties` 做仓库外备份——旧 key 已经丢过一次，不能再丢第二次。
+
+## 2026-11-23 悬浮窗默认开启、跑圈页去掉传送/定位、界面风格与主页卡片（已实现待验证）
+
+需求（用户原话摘要）：① 悬浮窗默认打开；② 跑圈卡片的「传送」「定位」按钮删除，「已经有一个专门的通道来传送和定位」；③ 主页两张入口卡片图标缩小、放到文字左边；④ 设置页加一张「界面风格」卡片，可选跟随系统/深色/浅色，默认跟随系统。
+
+改动：
+
+| 位置 | 内容 |
+| --- | --- |
+| `OverlayHost` | 新增 `DEFAULT_ENABLED = true`，读取 `overlay_enabled` 时用该默认值。只影响从没手动切过开关的设备；用户关掉后写回的 `false` 会一直保留。没有「显示在其他应用上层」权限时依然不画任何东西，仍在开始跑圈前提示一次去授权 |
+| `CampusRunActivity` + `activity_campus_run.xml` | 删掉 `buttonTeleport`（「传送/定位」按钮）、`textTeleportHint` 待命提示，以及 `showMapActionsMenu`/`onTeleportPressed`/`performTeleport`/`sendTeleport`/`beginSinglePoint`/`locateCurrentPosition`/`locateByDevice`/`showDeviceLocated`/`locateFallback` 九个方法与 `teleportArmed`、`teleportTarget`、`deviceLocation`、`pendingTeleport`、`pendingLocate`、`awaitingTeleportAck`（含超时回调与 `handleTeleportAck`）状态；权限回调只剩「开始跑圈」一条分支；地图点击只在绘制模式加节点。整文件净减 370 行（+10/−380），本次九文件合计 −491/+160 |
+| `strings.xml` | 删除随之上架失效的 21 条文案（`campus_map_actions_*`、`campus_menu_*`、`campus_teleport_*`、`campus_locate_done/fallback/missing`）。`campus_locate_device/searching/permission/off` 四条仍被「虚拟定位」页使用，保留 |
+| `AppearancePreferences`（新） | `ui`/`night_mode` 存三种模式，默认 `MODE_FOLLOW_SYSTEM`；`nightModeFor` 映射到 `AppCompatDelegate` 常量，纯函数便于 JVM 测试 |
+| `UnloopApplication`（新）+ `AndroidManifest` | 应用启动时 `AppearancePreferences.apply(this)`，冷启动即恢复用户选的风格；此前从不调用 `setDefaultNightMode`，深浅色一直靠系统隐式跟随，本次只是把选择权交给用户，默认值不变 |
+| `AppSettingsActivity` + `activity_app_settings.xml` + `ic_fm_display.xml` | 「通用」卡片第一行新增「界面风格」（图标 44dp + 当前值 + 箭头），点击弹单选对话框，选中后立即 `setDefaultNightMode` 并刷新行内文案。放在设置页而非主页，是因为主页本身没有设置类卡片 |
+| `activity_main.xml` | 「校园快跑」「虚拟定位」两张卡片去掉 92dp 色块头部，改为卡内 36dp 圆底图标 + 右侧标题（18sp→15sp），说明与入口文案移到下方，11sp |
+| `CampusWorkspaceTest` | 两处 `buttonTeleport` 可见性断言改为断言 `mapContainer` 完整显示 |
+
+已知取舍：跑圈中把地图拖走之后，页内没有「回到当前位置」的手动按钮了；恢复镜头只剩重新进入跑圈页或开始跑圈（这两处仍会自动对准模拟位置）。跨应用传送/定位仍走主页「虚拟定位」与悬浮控制台，功能没有减少，只是入口收敛。
+
+验证：277 个 JVM 用例全过（38 个测试类，较上一版 +4，即 `AppearancePreferencesTest`）；`lintRelease` 0 errors、279 warnings（比基线少 2 条，来自删除的文案）；`assembleRelease` 产物 74,177,165 字节、sha256 `91e1581ae35e2619d221434960dde49b4ff9a44c49f162e8efbb705f7046ab4d`、签名 `CN=UNLOOP Release`；`compileDebugAndroidTestJavaWithJavac` 通过。本机无 adb 也无模拟器，因此悬浮窗默认态、深浅色切换、两张卡片新排版、去掉按钮后的跑圈页布局都只做了静态验证，真机效果待复验。本改动尚未出包发布，是否升 0.9.9（versionCode 39）待定。
