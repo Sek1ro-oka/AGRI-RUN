@@ -40,7 +40,16 @@ public final class UpdateChecker {
             "https://github.com/Sek1ro-oka/AGRI-RUN/releases";
 
     private static final String APK_MIME = "application/vnd.android.package-archive";
-    private static final String APK_PREFIX = "route-workshop-";
+    /**
+     * 主程序附件的命名前缀。0.9.4 及更早是 route-workshop-&lt;版本&gt;-release.apk，
+     * 0.9.5–0.9.7 发布时用了 app-release.apk，两种都要认，否则已装的旧版本会在
+     * 检查更新里报「未找到 apk」，只能手动去发布页安装。
+     */
+    private static final String[] MAIN_APK_NAME_PREFIXES = {
+            "route-workshop-",
+            "app-release"
+    };
+    private static final String APK_PROBE_MARKER = "probe";
     private static final int CONNECT_TIMEOUT_MS = 6_000;
     private static final int READ_TIMEOUT_MS = 8_000;
     private static final int MAX_NOTES_CHARS = 700;
@@ -324,7 +333,7 @@ public final class UpdateChecker {
             JSONObject best = null;
             for (int i = 0; i < assets.length(); i++) {
                 JSONObject asset = assets.optJSONObject(i);
-                if (asset == null || !isRouteWorkshopApk(asset)) {
+                if (asset == null || !isMainApk(asset)) {
                     continue;
                 }
                 String name = asset.optString("name", "");
@@ -364,12 +373,21 @@ public final class UpdateChecker {
     }
 
     /** Release 里同时会有定位探针 APK，只接受主程序的附件。 */
-    private static boolean isRouteWorkshopApk(@NonNull JSONObject asset) {
-        String name = asset.optString("name", "");
+    private static boolean isMainApk(@NonNull JSONObject asset) {
+        String name = asset.optString("name", "").toLowerCase(Locale.ROOT);
         String type = asset.optString("content_type", "");
-        boolean apk = APK_MIME.equalsIgnoreCase(type)
-                || name.toLowerCase(Locale.ROOT).endsWith(".apk");
-        return apk && name.toLowerCase(Locale.ROOT).startsWith(APK_PREFIX);
+        boolean apk = APK_MIME.equalsIgnoreCase(type) || name.endsWith(".apk");
+        return apk && !name.contains(APK_PROBE_MARKER) && isMainApkName(name);
+    }
+
+    /** 主程序附件的历史与当前命名都接受，否则新版本附件会被当成「未找到 apk」。 */
+    private static boolean isMainApkName(@NonNull String name) {
+        for (String prefix : MAIN_APK_NAME_PREFIXES) {
+            if (name.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 附件里若同时有多份主程序包，优先包含 release 字样的那一份。 */

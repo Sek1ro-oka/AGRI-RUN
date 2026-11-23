@@ -71,4 +71,29 @@
                 android:src="@drawable/ic_campus_chevron_right" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="6dp">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonReleasePage"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/home_update_release_page"
+            android:textColor="@color/campus_ink"
+            android:textSize="13sp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonDiagnostics"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/home_update_diagnostics"
+            android:textColor="@color/campus_ink"
+            android:textSize="13sp" />
+    </LinearLayout>
 </LinearLayout>
