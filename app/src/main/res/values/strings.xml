@@ -174,6 +174,9 @@
     <string name="overlay_scale">缩放悬浮窗：向左下拖动缩小，向右上拖动放大</string>
     <string name="overlay_scale_percent">%1$d%%</string>
     <string name="overlay_grip">拖动悬浮窗</string>
+    <string name="overlay_fold">折叠成小球</string>
+    <string name="overlay_fold_toast">已折叠成小球，点一下小球就能展开控制台</string>
+    <string name="overlay_ball">悬浮小球：点一下展开控制台，按住可挪位置</string>
     <string name="overlay_gear_walk">行走</string>
     <string name="overlay_gear_run">跑步</string>
     <string name="overlay_gear_ride">骑行</string>

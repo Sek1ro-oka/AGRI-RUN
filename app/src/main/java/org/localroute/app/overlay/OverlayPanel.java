@@ -18,6 +18,7 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -56,6 +57,10 @@ import org.localroute.core.RunState;
  * <p>面板只在虚拟定位任务运行中、且用户已经离开跑圈地图时显示：跑圈地图上不遮挡地图，
  * 切到设置页、主页、作业/课表或系统后台时出现；任务结束立即收起。面板可拖动、位置与
  * 缩放持久化；没有「显示在其他应用上层」权限时整体不显示，由设置页引导授权。
+ *
+ * <p>面板右下角能折叠成一个小球：小球同样可拖动、点一下展开控制台，折叠与否也持久化。
+ * 两种内容是同一个悬浮窗的两种尺寸，换过去时按中心不动换算位置（见 {@link OverlayFold}），
+ * 不会跳到面板原来的左上角。
  */
 public final class OverlayPanel {
 
@@ -67,6 +72,7 @@ public final class OverlayPanel {
     private static final String KEY_Y = "overlay_y";
     private static final String KEY_GEAR = "overlay_gear";
     private static final String KEY_SCALE = "overlay_scale";
+    private static final String KEY_FOLDED = "overlay_folded";
 
     /** 摇杆命令间隔：与服务端 500 ms 的定位节拍一致，方向变化即时生效。 */
     private static final long DRIVE_INTERVAL_MS = 500L;
@@ -75,6 +81,8 @@ public final class OverlayPanel {
     private static final int BUTTON_DP = 36;
     /** 摇杆直径：与上下按钮排的宽度接近，居中摆放。 */
     private static final int JOYSTICK_DP = 108;
+    /** 折叠成小球的基准直径：够一根拇指按住，又不至于挡住半个屏幕。 */
+    private static final int BALL_DP = 56;
     /** 按钮之间的水平间距。 */
     private static final int GAP_DP = 6;
     /** 三枚按钮加两处间距并排放下的宽度，上下两行以它为基准宽度。 */
@@ -119,6 +127,7 @@ public final class OverlayPanel {
 
     private OverlayScaleHost scaleHost;
     private LinearLayout root;
+    private ImageView ball;
     private JoystickView joystick;
     private ScaleControlView scaleControl;
     private ImageView pauseButton;
@@ -129,6 +138,7 @@ public final class OverlayPanel {
     private boolean moving;
     private boolean gestureAnnounced;
     private boolean joystickUnlocked;
+    private boolean folded;
     private float overlayScale = 1f;
     private int gear;
     private float moveX;
@@ -155,6 +165,7 @@ public final class OverlayPanel {
         });
         this.gear = normalizeGear(prefs.getInt(KEY_GEAR, 1));
         this.overlayScale = ScaleControlView.clamp(prefs.getFloat(KEY_SCALE, 1f));
+        this.folded = prefs.getBoolean(KEY_FOLDED, false);
     }
 
     public boolean isShowing() {
@@ -185,6 +196,7 @@ public final class OverlayPanel {
                 android.util.Log.w("OverlayPanel", "addView 失败: " + e, e);
                 // 权限被撤销或窗口被系统拒绝：保持安静，不要因为悬浮窗失败影响主流程。
                 root = null;
+                ball = null;
                 scaleHost = null;
                 running = false;
             }
@@ -226,10 +238,9 @@ public final class OverlayPanel {
         root.addView(buildControlCluster());
         updateGearStyles();
 
+        ball = buildBall();
         scaleHost = new OverlayScaleHost(context);
-        scaleHost.addView(root, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT));
+        attachContent();
         scaleHost.setScale(overlayScale);
 
         params = new WindowManager.LayoutParams(
@@ -392,14 +403,57 @@ public final class OverlayPanel {
             }
             gears.addView(button, params);
         }
-        LinearLayout.LayoutParams gearParams =
-                new LinearLayout.LayoutParams(dp(CONTENT_DP), dp(BUTTON_DP));
-        gearParams.topMargin = dp(GAP_DP);
-        cluster.addView(gears, gearParams);
+        // 下排右侧再挤进一格「折叠成小球」：三档仍按 120dp 居中，右侧空出的正好是一枚按钮。
+        FrameLayout bottomRow = new FrameLayout(context);
+        bottomRow.addView(gears,
+                new FrameLayout.LayoutParams(dp(CONTENT_DP), dp(BUTTON_DP), Gravity.CENTER));
+        ImageView foldButton = circleIcon(R.drawable.ic_overlay_fold, BUTTON_DP, 9,
+                R.color.overlay_icon, R.string.overlay_fold);
+        foldButton.setOnClickListener(v -> toggleFold());
+        bottomRow.addView(foldButton, new FrameLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP),
+                Gravity.END | Gravity.CENTER_VERTICAL));
+
+        LinearLayout.LayoutParams bottomParams =
+                new LinearLayout.LayoutParams(dp(MIDDLE_DP), dp(BUTTON_DP));
+        bottomParams.topMargin = dp(GAP_DP);
+        cluster.addView(bottomRow, bottomParams);
 
         cluster.setLayoutParams(new LinearLayout.LayoutParams(dp(MIDDLE_DP),
                 LinearLayout.LayoutParams.WRAP_CONTENT));
         return cluster;
+    }
+
+    /**
+     * 折叠后的悬浮小球：一枚圆形摇杆图样，点一下展开控制台，按住可挪位置。
+     *
+     * <p>展开走点击监听，触摸监听只负责拖动；两者用位移阈值分开（见 {@link BallListener}），
+     * 这样 TalkBack 的双击也能展开。配色沿用面板的选中态（薄荷绿描边），在深色底上更容易看见。
+     */
+    private ImageView buildBall() {
+        ImageView view = new ImageView(context);
+        view.setImageResource(R.drawable.ic_overlay_joystick);
+        view.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        int padding = dp(16);
+        view.setPadding(padding, padding, padding, padding);
+        view.setImageTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(context, R.color.overlay_mint)));
+        view.setBackground(circleBackground(true));
+        view.setContentDescription(context.getString(R.string.overlay_ball));
+        view.setClickable(true);
+        view.setOnClickListener(v -> toggleFold());
+        view.setOnTouchListener(new BallListener());
+        return view;
+    }
+
+    /** 缩放容器里现在放面板还是小球；基准尺寸在这里给，缩放比例由容器统一乘。 */
+    private void attachContent() {
+        FrameLayout.LayoutParams content = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        if (folded) {
+            content.width = dp(BALL_DP);
+            content.height = dp(BALL_DP);
+        }
+        scaleHost.addView(folded ? ball : root, content);
     }
 
     /** 圆形深色按钮：薄荷绿描边 + 轻触涟漪。 */
@@ -456,6 +510,11 @@ public final class OverlayPanel {
         updateGearStyles();
         if (pauseButton == null) {
             return;
+        }
+        if (ball != null) {
+            // 小球上没有文字和数值，用摇杆图样的颜色区分「有没有在跑」。
+            ball.setImageTintList(ColorStateList.valueOf(ContextCompat.getColor(context,
+                    snapshot.isActive() ? R.color.overlay_mint : R.color.overlay_icon)));
         }
         OverlayViewState state = OverlayViewState.from(snapshot);
         boolean resume = state.actionIsResume();
@@ -586,6 +645,43 @@ public final class OverlayPanel {
                 context.getString(gearLabelRes(gear)), SpeedPresets.format(kmh)));
     }
 
+    // ---------------------------------------------------------------- 折叠
+
+    /**
+     * 折叠成小球，或点小球展开面板。
+     *
+     * <p>折叠时先停掉摇杆驱动：面板收起来之后不该还往服务端发方向。位置换算要等新内容的尺寸
+     * 量出来才知道差多少，所以放到 {@code post} 里；万一量到 0 就按原位收下，顶多小球落在
+     * 面板原来的左上角，下次拖动自动正。
+     */
+    private void toggleFold() {
+        folded = !folded;
+        prefs(context).edit().putBoolean(KEY_FOLDED, folded).apply();
+        stopMoving();
+        if (folded) {
+            // 折叠这一步变化最大，说明怎么回来；展开本身看得见，不再啰嗦。
+            toast(context.getString(R.string.overlay_fold_toast));
+        }
+        if (!running || scaleHost == null) {
+            return;
+        }
+        int oldWidth = scaleHost.getMeasuredWidth();
+        int oldHeight = scaleHost.getMeasuredHeight();
+        scaleHost.removeAllViews();
+        attachContent();
+        scaleHost.post(() -> reanchorAfterFold(oldWidth, oldHeight));
+    }
+
+    private void reanchorAfterFold(int oldWidth, int oldHeight) {
+        if (params == null || scaleHost == null) {
+            return;
+        }
+        params.x = OverlayFold.keepCenter(params.x, oldWidth, scaleHost.getMeasuredWidth());
+        params.y = OverlayFold.keepCenter(params.y, oldHeight, scaleHost.getMeasuredHeight());
+        clampOnScreen();
+        persistPosition();
+    }
+
     // ---------------------------------------------------------------- 缩放
 
     private void applyScale(float scale, boolean persist) {
@@ -673,7 +769,7 @@ public final class OverlayPanel {
         }
     }
 
-    /** 把 x/y 夹在屏幕内，面板（含缩放后的尺寸）永远完整可见。 */
+    /** 把 x/y 夹在屏幕内，当前内容（含缩放后的尺寸）永远完整可见。 */
     private void clampToScreen() {
         if (params == null) {
             return;
@@ -683,10 +779,15 @@ public final class OverlayPanel {
                 ? scaleHost.getMeasuredWidth() : dp(MIDDLE_DP + 12);
         int height = scaleHost != null && scaleHost.getMeasuredHeight() > 0
                 ? scaleHost.getMeasuredHeight() : dp(320);
-        int maxX = Math.max(0, metrics.widthPixels - width);
-        int maxY = Math.max(0, metrics.heightPixels - height);
-        params.x = Math.max(0, Math.min(params.x, maxX));
-        params.y = Math.max(0, Math.min(params.y, maxY));
+        params.x = OverlayFold.clamp(params.x, width, metrics.widthPixels);
+        params.y = OverlayFold.clamp(params.y, height, metrics.heightPixels);
+    }
+
+    /** 记住窗口位置：拖动松手、折叠换尺寸都要写一次，下次出现才不跳回原处。 */
+    private void persistPosition() {
+        if (params != null) {
+            prefs(context).edit().putInt(KEY_X, params.x).putInt(KEY_Y, params.y).apply();
+        }
     }
 
     /** 只挂在左侧「移动」按钮上，避免吃掉摇杆和其余按钮的触摸。 */
@@ -722,7 +823,56 @@ public final class OverlayPanel {
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
-                    prefs(context).edit().putInt(KEY_X, params.x).putInt(KEY_Y, params.y).apply();
+                    persistPosition();
+                    return true;
+                default:
+                    return false;
+            }
+        }
+    }
+
+    /**
+     * 只挂在小球上负责拖动：位移没超过阈值就算点一下，转给 {@code performClick} 展开控制台。
+     *
+     * <p>不能让框架自己判点击——拖动过程也会走 UP，每次挪完位置都会误展开一次。取消手势
+     * （系统抢走触摸）只收按压态，不算点。
+     */
+    private final class BallListener implements View.OnTouchListener {
+        private final int slop = ViewConfiguration.get(context).getScaledTouchSlop();
+        private int startX;
+        private int startY;
+        private float touchX;
+        private float touchY;
+
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            if (params == null) {
+                return false;
+            }
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    startX = params.x;
+                    startY = params.y;
+                    touchX = event.getRawX();
+                    touchY = event.getRawY();
+                    v.setPressed(true);
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    params.x = startX + Math.round(event.getRawX() - touchX);
+                    params.y = startY + Math.round(event.getRawY() - touchY);
+                    clampOnScreen();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    v.setPressed(false);
+                    if (OverlayFold.isTap(event.getRawX() - touchX,
+                            event.getRawY() - touchY, slop)) {
+                        v.performClick();
+                    } else {
+                        persistPosition();
+                    }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    v.setPressed(false);
                     return true;
                 default:
                     return false;
