@@ -235,3 +235,28 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 | 发布前测试 | `:app:testDebugUnitTest` 277 例 0 失败；构建产物即 tag 指向的 `7a9bdaa` 状态 |
 
 仍待真机复验：悬浮窗默认开启后的首次表现、深浅色切换（尤其高德 SDK 底图与悬浮控制台配色）、主页两张 32dp 图标卡片在窄屏的换行、跑圈页去掉传送/定位后的布局与「拖走地图难以回中」的实际体验。
+
+## 2026-11-24 本机数据备份与恢复（新功能，已实现待验证）
+
+需求来源：对标审查里列为 B 档第 1 项的「换机/重装丢数据」这个洞。2026-11-23 签名定案时确认过，0.9.4 及更早的包装不上新版本、只能卸载重装，用户手绘的路线、课表、自建作业会跟着存储一起没；`android:allowBackup="false"` 之后系统也不会代劳。所以补一个用户自己按一下就生成的 JSON 备份。
+
+改动：
+
+| 位置 | 内容 |
+| --- | --- |
+| `backup/BackupSection`、`BackupBundle`、`BackupCodec`（新） | 文件格式：`format="unloop.backup"`、`formatVersion=1`、`createdAt`（ISO-8601）、`appVersion`/`appVersionCode`、`sections:[{name,schema,count,data}]`，缩进输出。解码是「整体能读就尽量读」：不是 JSON、`format` 对不上、`formatVersion` 比本机新才判失败，单个坏段落只跳过并记一条告警；超 32 MB 直接判「拿错文件」。时间字段读不出来按 0 处理，不把整份备份判死 |
+| `backup/BackupMerge`（新） | 纯函数的合并判定，`Policy{REPLACE, MERGE_NEWER, KEEP_MINE}` × `Action{ADD,REPLACE,KEEP,DROP}`，条目顺序固定「先本机后新增」，`entries()` 与 `actions()` 一一对应（KEEP 用本机那份、REPLACE 用备份那份），备份里重复的 id 只补一次 |
+| `backup/BackupValues`（新） | SharedPreferences 值带类型标记序列化（`b/i/l/f/s`）。JSON 里 3 与 3.0 是同一种数字，标记丢了写回时就会 `ClassCastException`，因此未知标记与缺值条目一律跳过，不猜类型 |
+| `backup/BackupCatalog`（新） | 7 个段落与键白名单：自建路线、路线文件、课表、自建作业、教务学校信息、运行与界面设置、作业缓存（最后一项默认不勾选）。**白名单而不是黑名单**：新增的键默认不进备份。`study_auth`（学习通 cookie/uid）与 `app_update`（下载状态）整文件排除，`active_run_id`/`active_lap_meters`/`period_minutes` 三个运行期键排除——恢复后不能假装「上次还在跑」 |
+| `backup/BackupStore`（新） | 收集与写回：路线段跳过预设（预设靠激活码补回，存进备份只会在换机后变成重复预设），路线文件段读 `files/routes/*.json`；恢复时逐条经 `CampusRouteCodec` 校验再合并，文件段先要求 `RouteRepository.isValidId(id)` 且 id 与内容一致，仍走 `save()` 的原子写与隔离目录。空段落不写入文件 |
+| `backup/BackupTransfer`（新） | 唯一碰 `ContentResolver` 的一层：单线程 `ExecutorService` + 主线程 `Handler` 回调，失败只回异常原文，文案交给界面。本机不认识的段落 id 一律不写，只报数量，内容仍完整留在文件里，所以新版导出、旧版恢复再新版恢复不会丢东西 |
+| `AppSettingsActivity` + `activity_app_settings.xml` + `ic_fm_backup/restore.xml`（新） | 设置页新增「数据」分组两行：导出备份、恢复备份。导出＝多选段落（默认勾选按清单来）→ 系统保存面板（`ACTION_CREATE_DOCUMENT`，`application/json`，默认名 `unloop-backup-<版本>-yyyyMMdd-HHmmss.json`）。恢复＝`ACTION_OPEN_DOCUMENT` → 只列出本机认识且有内容的段落 → **二次确认**（点名哪些段落会整段替换、自建路线只补缺、是否有本机不认识的段落）→ 写回后按「已恢复 N 项，跳过 M 项」提示 |
+| `strings.xml` | 新增 29 条文案：7 条段落名 + 21 条对话框与提示 + 1 条「数据」分组标题；整段替换与只补缺分开说，不用一句「会覆盖数据」糊过去 |
+| `BackupCodecTest`、`BackupMergeTest`、`BackupValuesTest`、`BackupCatalogTest`（新） | 26 个用例。除格式与合并边界外，`BackupCatalogTest` 守三条不变量：同一个键不能出现在两个段落；键类型必须在声明的标记集合里；清单里不得出现 `cookie/token/password/uid/secret` 或排除文件/排除键——防止以后有人图省事把凭据加进白名单 |
+
+顺带修的一处隐患：`List.of()`/`Map.of()` 这类 Java 9 工厂方法在 Android 上是 API 30 才有的，本机 minSdk 29，调用会在 Android 10 真机抛 `NoSuchMethodError`；lint 的 `NewApi` 对 `java.*` 覆盖不全，0 errors 也照不出。新代码里的 13 处已全部换成 `Arrays.asList` / `Collections.singletonList` / `Collections.emptyList`（仓库其它主源码本来就没有 `List.of` 用法）。
+
+已知取舍：① 备份不含学习通登录态，恢复完要重新登录一次，这是有意的——cookie 出去的风险比省一次登录的收益大；② 段落级选择，键级不能挑（想只恢复课表周数而不覆盖课程，做不到）；③ 课表、设置这类「一份当前状态」的数据整段替换，靠确认对话框承担告知责任；④ 预设路线不进备份。
+
+验证：303 个 JVM 用例全过（42 个测试类，较 0.9.9 的 277 例 / 38 类 +26，即上述四个新测试类）；`lintRelease` 0 errors、279 warnings（与基线持平，新增文案与资源没引入新告警）；`assembleDebug` 通过，`ActivityAppSettingsBinding` 能读到 `rowBackupExport`/`rowBackupImport`。本机无 adb 也无模拟器，因此 SAF 保存面板的实际落盘、各家文件管理器对 `application/json` 这个 MIME 的接受度、恢复后课表/路线/悬浮窗位置是否真的生效，都还只是静态验证，真机效果待复验。
+
