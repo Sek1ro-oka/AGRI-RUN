@@ -30,20 +30,19 @@
             android:layout_weight="1"
             android:orientation="vertical">
             <TextView
-            style="@style/Text.Unloop.Metric"
+                style="@style/Text.Unloop.Metric"
                 android:id="@+id/textStudyTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/study_title"
                 android:textStyle="bold" />
             <TextView
-            style="@style/Text.Unloop.Note"
+                style="@style/Text.Unloop.Note"
                 android:id="@+id/textStudyAccount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_hair"
-                android:text="@string/study_account_unbound"
-                />
+                android:text="@string/study_account_unbound" />
         </LinearLayout>
         <ImageButton
             android:id="@+id/buttonStudySettings"
@@ -73,13 +72,12 @@
                 android:orientation="horizontal"
                 android:paddingHorizontal="@dimen/space_4xl">
                 <TextView
-                style="@style/Text.Unloop.Note"
+                    style="@style/Text.Unloop.Note"
                     android:id="@+id/textHomeworkSummary"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="@string/study_homework_summary_loading"
-                    />
+                    android:text="@string/study_homework_summary_loading" />
                 <ImageButton
                     android:id="@+id/buttonHomeworkRefresh"
                     android:layout_width="@dimen/touch_min"
@@ -125,7 +123,7 @@
                         android:padding="@dimen/space_2xl"
                         android:src="@drawable/ic_study_homework" />
                     <TextView
-                    style="@style/Text.Unloop.Heading"
+                        style="@style/Text.Unloop.Heading"
                         android:id="@+id/textHomeworkEmptyTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -133,14 +131,13 @@
                         android:text="@string/study_homework_empty_title"
                         android:textStyle="bold" />
                     <TextView
-                    style="@style/Text.Unloop.Note"
+                        style="@style/Text.Unloop.Note"
                         android:id="@+id/textHomeworkEmptyHint"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_sm"
                         android:gravity="center"
-                        android:text="@string/study_homework_empty_hint"
-                        />
+                        android:text="@string/study_homework_empty_hint" />
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/buttonHomeworkEmptyAction"
                         style="@style/Widget.Unloop.TextButton"
@@ -164,13 +161,12 @@
                         android:layout_height="34dp"
                         android:indeterminateTint="@color/campus_mint" />
                     <TextView
-                    style="@style/Text.Unloop.Note"
+                        style="@style/Text.Unloop.Note"
                         android:id="@+id/textHomeworkLoading"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_lg"
-                        android:text="@string/study_homework_summary_loading"
-                        />
+                        android:text="@string/study_homework_summary_loading" />
                 </LinearLayout>
             </FrameLayout>
             <!-- 底部固定入口：自建作业只在本机保存，用于「作业截止提醒」 -->
@@ -220,11 +216,10 @@
                 android:paddingTop="@dimen/space_lg"
                 android:paddingBottom="@dimen/space_5xl">
                 <TextView
-                style="@style/Text.Unloop.Note"
+                    style="@style/Text.Unloop.Note"
                     android:id="@+id/textTimetableSummary"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    />
+                    android:layout_height="wrap_content" />
                 <LinearLayout
                     android:id="@+id/bannerSemesterStart"
                     android:layout_width="match_parent"
@@ -244,13 +239,12 @@
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_calendar" />
                     <TextView
-                    style="@style/Text.Unloop.Note"
+                        style="@style/Text.Unloop.Note"
                         android:id="@+id/textBannerSemesterStart"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_lg"
-                        android:layout_weight="1"
-                        />
+                        android:layout_weight="1" />
                     <ImageView
                         android:layout_width="16dp"
                         android:layout_height="16dp"
@@ -288,20 +282,19 @@
                         android:orientation="vertical"
                         android:paddingVertical="@dimen/space_hair">
                         <TextView
-                        style="@style/Text.Unloop.Heading"
+                            style="@style/Text.Unloop.Heading"
                             android:id="@+id/textWeekLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/study_week_first"
                             android:textStyle="bold" />
                         <TextView
-                        style="@style/Text.Unloop.Caption"
+                            style="@style/Text.Unloop.Caption"
                             android:id="@+id/textWeekRange"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_hair"
-                            android:text="@string/study_week_total_default"
-                            />
+                            android:text="@string/study_week_total_default" />
                     </LinearLayout>
                     <ImageButton
                         android:id="@+id/buttonNextWeek"
@@ -373,7 +366,7 @@
                     android:background="@drawable/bg_campus_card"
                     android:padding="@dimen/space_sm" />
                 <TextView
-                style="@style/Text.Unloop.Meta"
+                    style="@style/Text.Unloop.Meta"
                     android:id="@+id/textTimetableEmpty"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -385,13 +378,12 @@
                     android:text="@string/study_timetable_empty"
                     android:visibility="gone" />
                 <TextView
-                style="@style/Text.Unloop.Caption"
+                    style="@style/Text.Unloop.Caption"
                     android:id="@+id/textTimetableNote"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_lg"
-                    android:lineSpacingExtra="2dp"
-                    />
+                    android:lineSpacingExtra="2dp" />
             </LinearLayout>
         </ScrollView>
     </FrameLayout>
@@ -426,7 +418,7 @@
                 android:contentDescription="@null"
                 android:src="@drawable/ic_study_homework" />
             <TextView
-            style="@style/Text.Unloop.Action"
+                style="@style/Text.Unloop.Action"
                 android:id="@+id/textTabHomework"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -454,7 +446,7 @@
                 android:contentDescription="@null"
                 android:src="@drawable/ic_study_calendar" />
             <TextView
-            style="@style/Text.Unloop.Meta"
+                style="@style/Text.Unloop.Meta"
                 android:id="@+id/textTabTimetable"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

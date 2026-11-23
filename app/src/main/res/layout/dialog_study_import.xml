@@ -6,12 +6,11 @@
     android:paddingHorizontal="@dimen/space_4xl"
     android:paddingTop="@dimen/space_sm">
     <TextView
-    style="@style/Text.Unloop.Caption"
+        style="@style/Text.Unloop.Caption"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:lineSpacingExtra="2dp"
-        android:text="@string/study_import_dialog_hint"
-        />
+        android:text="@string/study_import_dialog_hint" />
     <TextView
         android:id="@+id/textImportFile"
         android:layout_width="match_parent"
@@ -43,7 +42,7 @@
         android:textSize="@dimen/text_meta"
         android:visibility="gone" />
     <TextView
-    style="@style/Text.Unloop.Caption"
+        style="@style/Text.Unloop.Caption"
         android:id="@+id/textImportReplaceHint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

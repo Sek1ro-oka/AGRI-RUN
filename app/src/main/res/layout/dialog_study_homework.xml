@@ -12,7 +12,7 @@
         android:paddingTop="@dimen/space_xs"
         android:paddingBottom="@dimen/space_xs">
         <TextView
-        style="@style/Text.Unloop.Caption"
+            style="@style/Text.Unloop.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/study_homework_name"
@@ -33,7 +33,7 @@
             android:textColorHint="@color/fm_muted"
             android:textSize="@dimen/text_body" />
         <TextView
-        style="@style/Text.Unloop.Caption"
+            style="@style/Text.Unloop.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_lg"
@@ -56,18 +56,17 @@
                 android:contentDescription="@null"
                 android:src="@drawable/ic_study_clock" />
             <TextView
-            style="@style/Text.Unloop.Body"
+                style="@style/Text.Unloop.Body"
                 android:id="@+id/textHomeworkDeadlineValue"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_md"
                 android:layout_weight="1"
                 android:singleLine="true"
-                android:text="@string/study_homework_deadline_pick"
-                />
+                android:text="@string/study_homework_deadline_pick" />
         </LinearLayout>
         <TextView
-        style="@style/Text.Unloop.Caption"
+            style="@style/Text.Unloop.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_lg"
@@ -86,11 +85,10 @@
             android:textColor="@color/campus_ink"
             android:textSize="@dimen/text_body" />
         <TextView
-        style="@style/Text.Unloop.Caption"
+            style="@style/Text.Unloop.Caption"
             android:id="@+id/textHomeworkRemindPreview"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_md"
-            />
+            android:layout_marginTop="@dimen/space_md" />
     </LinearLayout>
 </ScrollView>

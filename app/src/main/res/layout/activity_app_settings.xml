@@ -25,7 +25,7 @@
             android:orientation="vertical"
             android:paddingBottom="@dimen/space_3xl">
             <TextView
-            style="@style/Text.Unloop.Note"
+                style="@style/Text.Unloop.Note"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_3xl"
@@ -66,18 +66,17 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
-                            style="@style/Text.Unloop.Body"
+                                style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_appearance_title"
                                 android:textStyle="bold" />
                             <TextView
-                            style="@style/Text.Unloop.Caption"
+                                style="@style/Text.Unloop.Caption"
                                 android:id="@+id/textAppearanceValue"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_hair"
-                                />
+                                android:layout_marginTop="@dimen/space_hair" />
                         </LinearLayout>
                         <ImageView
                             android:layout_width="20dp"
@@ -103,18 +102,17 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
-                            style="@style/Text.Unloop.Body"
+                                style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_language_title"
                                 android:textStyle="bold" />
                             <TextView
-                            style="@style/Text.Unloop.Caption"
+                                style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_hair"
-                                android:text="@string/app_settings_language_value"
-                                />
+                                android:text="@string/app_settings_language_value" />
                         </LinearLayout>
                         <TextView
                             android:layout_width="wrap_content"
@@ -147,7 +145,7 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
-                            style="@style/Text.Unloop.Body"
+                                style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_activation_title"
@@ -181,18 +179,17 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
-                            style="@style/Text.Unloop.Body"
+                                style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_widget_title"
                                 android:textStyle="bold" />
                             <TextView
-                            style="@style/Text.Unloop.Caption"
+                                style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_hair"
-                                android:text="@string/app_settings_widget_subtitle"
-                                />
+                                android:text="@string/app_settings_widget_subtitle" />
                         </LinearLayout>
                     </LinearLayout>
                     <View
@@ -216,25 +213,24 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
-                            style="@style/Text.Unloop.Body"
+                                style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_reminders_title"
                                 android:textStyle="bold" />
                             <TextView
-                            style="@style/Text.Unloop.Caption"
+                                style="@style/Text.Unloop.Caption"
                                 android:id="@+id/textRemindersValue"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_hair"
-                                android:text="@string/app_settings_reminders_subtitle"
-                                />
+                                android:text="@string/app_settings_reminders_subtitle" />
                         </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
             <TextView
-            style="@style/Text.Unloop.Note"
+                style="@style/Text.Unloop.Note"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_3xl"
@@ -275,18 +271,17 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
-                            style="@style/Text.Unloop.Body"
+                                style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/run_history_title"
                                 android:textStyle="bold" />
                             <TextView
-                            style="@style/Text.Unloop.Caption"
+                                style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_hair"
-                                android:text="@string/run_history_entry_subtitle"
-                                />
+                                android:text="@string/run_history_entry_subtitle" />
                         </LinearLayout>
                         <ImageView
                             android:layout_width="20dp"
@@ -315,18 +310,17 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
-                            style="@style/Text.Unloop.Body"
+                                style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/backup_export_action"
                                 android:textStyle="bold" />
                             <TextView
-                            style="@style/Text.Unloop.Caption"
+                                style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_hair"
-                                android:text="@string/backup_export_hint"
-                                />
+                                android:text="@string/backup_export_hint" />
                         </LinearLayout>
                         <ImageView
                             android:layout_width="20dp"
@@ -355,18 +349,17 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
-                            style="@style/Text.Unloop.Body"
+                                style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/backup_import_action"
                                 android:textStyle="bold" />
                             <TextView
-                            style="@style/Text.Unloop.Caption"
+                                style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_hair"
-                                android:text="@string/backup_import_hint"
-                                />
+                                android:text="@string/backup_import_hint" />
                         </LinearLayout>
                         <ImageView
                             android:layout_width="20dp"

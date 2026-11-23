@@ -78,13 +78,12 @@
                 android:layout_height="34dp"
                 android:indeterminateTint="@color/campus_mint" />
             <TextView
-            style="@style/Text.Unloop.Note"
+                style="@style/Text.Unloop.Note"
                 android:id="@+id/textLoginLoading"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_lg"
-                android:text="@string/study_login_loading"
-                />
+                android:text="@string/study_login_loading" />
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>

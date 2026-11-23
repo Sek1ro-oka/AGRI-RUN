@@ -43,7 +43,7 @@
                 android:contentDescription="@string/run_settings" />
         </LinearLayout>
         <TextView
-        style="@style/Text.Unloop.Action"
+            style="@style/Text.Unloop.Action"
             android:id="@+id/textRunStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -64,31 +64,29 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
-                style="@style/Text.Unloop.Note"
+                    style="@style/Text.Unloop.Note"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/campus_stat_distance"
-                    />
+                    android:text="@string/campus_stat_distance" />
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:baselineAligned="true"
                     android:orientation="horizontal">
                     <TextView
-                    style="@style/Text.Unloop.Metric"
+                        style="@style/Text.Unloop.Metric"
                         android:id="@+id/textDistance"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0.00"
                         android:textStyle="bold" />
                     <TextView
-                    style="@style/Text.Unloop.Note"
+                        style="@style/Text.Unloop.Note"
                         android:id="@+id/textDistanceUnit"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_xs"
-                        android:text="km"
-                        />
+                        android:text="km" />
                 </LinearLayout>
             </LinearLayout>
             <LinearLayout
@@ -97,13 +95,12 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
-                style="@style/Text.Unloop.Note"
+                    style="@style/Text.Unloop.Note"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/campus_stat_time"
-                    />
+                    android:text="@string/campus_stat_time" />
                 <TextView
-                style="@style/Text.Unloop.Metric"
+                    style="@style/Text.Unloop.Metric"
                     android:id="@+id/textRunTime"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -116,11 +113,10 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
-                style="@style/Text.Unloop.Note"
+                    style="@style/Text.Unloop.Note"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/campus_stat_pace"
-                    />
+                    android:text="@string/campus_stat_pace" />
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -135,13 +131,12 @@
                         android:textSize="@dimen/text_metric"
                         android:textStyle="bold" />
                     <TextView
-                    style="@style/Text.Unloop.Note"
+                        style="@style/Text.Unloop.Note"
                         android:id="@+id/textPaceUnit"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_xs"
-                        android:text="/km"
-                        />
+                        android:text="/km" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
@@ -202,7 +197,7 @@
                 android:textColor="#FFFFFF"
                 android:textSize="@dimen/text_caption" />
             <TextView
-            style="@style/Text.Unloop.Caption"
+                style="@style/Text.Unloop.Caption"
                 android:id="@+id/textMapMode"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -319,20 +314,19 @@
                     android:layout_marginHorizontal="@dimen/space_xl"
                     android:orientation="vertical">
                     <TextView
-                    style="@style/Text.Unloop.Heading"
+                        style="@style/Text.Unloop.Heading"
                         android:id="@+id/textRouteInfo"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/campus_route_none"
                         android:textStyle="bold" />
                     <TextView
-                    style="@style/Text.Unloop.Note"
+                        style="@style/Text.Unloop.Note"
                         android:id="@+id/textLapInfo"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_xs"
-                        android:text="@string/run_choose_route"
-                        />
+                        android:text="@string/run_choose_route" />
                 </LinearLayout>
                 <ImageView
                     android:layout_width="24dp"
@@ -341,15 +335,14 @@
                     android:contentDescription="@null" />
             </LinearLayout>
             <TextView
-            style="@style/Text.Unloop.Note"
+                style="@style/Text.Unloop.Note"
                 android:id="@+id/textPlanSummary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_md"
                 android:background="@drawable/bg_fm_metric"
                 android:paddingHorizontal="@dimen/space_xl"
-                android:paddingVertical="@dimen/space_sm"
-                />
+                android:paddingVertical="@dimen/space_sm" />
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -440,7 +433,7 @@
                     android:src="@drawable/ic_campus_back"
                     android:contentDescription="@string/run_return_map" />
                 <TextView
-                style="@style/Text.Unloop.Metric"
+                    style="@style/Text.Unloop.Metric"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/run_settings"
@@ -462,31 +455,28 @@
                 android:textColor="@color/campus_ink"
                 android:textSize="@dimen/text_title" />
             <TextView
-            style="@style/Text.Unloop.Meta"
+                style="@style/Text.Unloop.Meta"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/campus_natural_hint"
-                />
+                android:text="@string/campus_natural_hint" />
             <TextView
-            style="@style/Text.Unloop.Heading"
+                style="@style/Text.Unloop.Heading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_5xl"
                 android:text="@string/run_vary_next"
                 android:textStyle="bold" />
             <TextView
-            style="@style/Text.Unloop.Value"
+                style="@style/Text.Unloop.Value"
                 android:id="@+id/textVaryValue"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_sm"
-                />
+                android:layout_marginTop="@dimen/space_sm" />
             <TextView
-            style="@style/Text.Unloop.Meta"
+                style="@style/Text.Unloop.Meta"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/campus_vary_hint"
-                />
+                android:text="@string/campus_vary_hint" />
             <SeekBar
                 android:id="@+id/seekVary"
                 android:layout_width="match_parent"
@@ -502,11 +492,10 @@
                 android:textColor="@color/campus_ink"
                 android:textSize="@dimen/text_title" />
             <TextView
-            style="@style/Text.Unloop.Meta"
+                style="@style/Text.Unloop.Meta"
                 android:id="@+id/textCampusOverlayStatus"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                />
+                android:layout_height="wrap_content" />
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/rowAppSettings"
                 style="@style/Widget.Unloop.OutlinedButton"
@@ -549,7 +538,7 @@
                 android:textSize="@dimen/text_hero"
                 android:textStyle="bold" />
             <TextView
-            style="@style/Text.Unloop.Note"
+                style="@style/Text.Unloop.Note"
                 android:id="@+id/textDoneMessage"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -567,11 +556,10 @@
                     android:layout_weight="1"
                     android:orientation="vertical">
                     <TextView
-                    style="@style/Text.Unloop.Caption"
+                        style="@style/Text.Unloop.Caption"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/campus_done_distance"
-                        />
+                        android:text="@string/campus_done_distance" />
                     <TextView
                         android:id="@+id/textDoneDistance"
                         android:layout_width="wrap_content"
@@ -587,11 +575,10 @@
                     android:layout_weight="1"
                     android:orientation="vertical">
                     <TextView
-                    style="@style/Text.Unloop.Caption"
+                        style="@style/Text.Unloop.Caption"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/campus_done_time"
-                        />
+                        android:text="@string/campus_done_time" />
                     <TextView
                         android:id="@+id/textDoneTime"
                         android:layout_width="wrap_content"
@@ -607,13 +594,12 @@
                     android:layout_weight="1"
                     android:orientation="vertical">
                     <TextView
-                    style="@style/Text.Unloop.Caption"
+                        style="@style/Text.Unloop.Caption"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/campus_done_avg_pace"
-                        />
+                        android:text="@string/campus_done_avg_pace" />
                     <TextView
-                    style="@style/Text.Unloop.Section"
+                        style="@style/Text.Unloop.Section"
                         android:id="@+id/textDonePace"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"

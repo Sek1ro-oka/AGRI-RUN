@@ -30,15 +30,14 @@
             android:textStyle="bold" />
     </LinearLayout>
     <TextView
-    style="@style/Text.Unloop.Action"
+        style="@style/Text.Unloop.Action"
         android:id="@+id/textVirtualStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:accessibilityLiveRegion="polite"
         android:paddingHorizontal="@dimen/space_5xl"
         android:paddingBottom="@dimen/space_lg"
-        android:text="@string/virtual_status_idle"
-        />
+        android:text="@string/virtual_status_idle" />
     <FrameLayout
         android:id="@+id/mapContainer"
         android:layout_width="match_parent"
@@ -165,7 +164,7 @@
             android:paddingHorizontal="@dimen/space_xl"
             android:paddingVertical="@dimen/space_sm">
             <TextView
-            style="@style/Text.Unloop.Note"
+                style="@style/Text.Unloop.Note"
                 android:id="@+id/textSearchStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -185,7 +184,7 @@
                     android:orientation="vertical" />
             </ScrollView>
             <TextView
-            style="@style/Text.Unloop.Caption"
+                style="@style/Text.Unloop.Caption"
                 android:id="@+id/textSearchAttribution"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -213,14 +212,13 @@
             android:textSize="@dimen/text_lead"
             android:textStyle="bold" />
         <TextView
-        style="@style/Text.Unloop.Note"
+            style="@style/Text.Unloop.Note"
             android:id="@+id/textVirtualHintInfo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_xs"
             android:lineSpacingExtra="2dp"
-            android:text="@string/virtual_target_hint"
-            />
+            android:text="@string/virtual_target_hint" />
         <LinearLayout
             android:id="@+id/pendingBar"
             android:layout_width="match_parent"

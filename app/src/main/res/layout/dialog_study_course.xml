@@ -11,7 +11,7 @@
         android:paddingHorizontal="@dimen/space_4xl"
         android:paddingTop="@dimen/space_xs">
         <TextView
-        style="@style/Text.Unloop.Caption"
+            style="@style/Text.Unloop.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/study_course_name"
@@ -42,7 +42,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
-                style="@style/Text.Unloop.Caption"
+                    style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/study_course_weekday"
@@ -65,7 +65,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
-                style="@style/Text.Unloop.Caption"
+                    style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/study_course_period"
@@ -87,7 +87,7 @@
             </LinearLayout>
         </LinearLayout>
         <TextView
-        style="@style/Text.Unloop.Caption"
+            style="@style/Text.Unloop.Caption"
             android:id="@+id/textCourseTimeRange"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -104,7 +104,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
-                style="@style/Text.Unloop.Caption"
+                    style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/study_course_weeks"
@@ -133,7 +133,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
-                style="@style/Text.Unloop.Caption"
+                    style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/study_course_location"
@@ -155,7 +155,7 @@
             </LinearLayout>
         </LinearLayout>
         <TextView
-        style="@style/Text.Unloop.Caption"
+            style="@style/Text.Unloop.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_lg"

@@ -7,12 +7,11 @@
     android:paddingTop="@dimen/space_xs"
     android:paddingEnd="@dimen/space_5xl">
     <TextView
-    style="@style/Text.Unloop.Body"
+        style="@style/Text.Unloop.Body"
         android:id="@+id/textPresetConflictMessage"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:lineSpacingExtra="2dp"
-        />
+        android:lineSpacingExtra="2dp" />
     <CheckBox
         android:id="@+id/checkPresetConflictDontAsk"
         android:layout_width="wrap_content"

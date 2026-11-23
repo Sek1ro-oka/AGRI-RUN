@@ -108,12 +108,11 @@
                 android:layout_height="34dp"
                 android:indeterminateTint="@color/campus_mint" />
             <TextView
-            style="@style/Text.Unloop.Note"
+                style="@style/Text.Unloop.Note"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_lg"
-                android:text="@string/study_jw_loading"
-                />
+                android:text="@string/study_jw_loading" />
         </LinearLayout>
     </FrameLayout>
     <TextView

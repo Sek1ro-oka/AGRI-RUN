@@ -15,12 +15,11 @@
         android:textSize="@dimen/text_section"
         android:textStyle="bold" />
     <TextView
-    style="@style/Text.Unloop.Note"
+        style="@style/Text.Unloop.Note"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/space_hair"
-        android:text="@string/campus_routes_swipe_hint"
-        />
+        android:text="@string/campus_routes_swipe_hint" />
     <ScrollView
         android:id="@+id/routeScroll"
         android:layout_width="match_parent"
@@ -36,7 +35,7 @@
             android:orientation="vertical" />
     </ScrollView>
     <TextView
-    style="@style/Text.Unloop.Meta"
+        style="@style/Text.Unloop.Meta"
         android:id="@+id/textNoRoutes"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -49,19 +49,18 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
-                style="@style/Text.Unloop.Body"
+                    style="@style/Text.Unloop.Body"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/home_update_title"
                     android:textStyle="bold" />
                 <TextView
-                style="@style/Text.Unloop.Caption"
+                    style="@style/Text.Unloop.Caption"
                     android:id="@+id/textUpdateSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_hair"
-                    android:text="@string/home_update_idle"
-                    />
+                    android:text="@string/home_update_idle" />
             </LinearLayout>
             <ImageView
                 android:layout_width="20dp"
