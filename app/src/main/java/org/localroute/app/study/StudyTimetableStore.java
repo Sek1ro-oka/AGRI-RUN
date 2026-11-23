@@ -175,6 +175,15 @@ public final class StudyTimetableStore {
         return StudySchedule.currentSeason();
     }
 
+    /**
+     * 用户是否在设置里手动钉过作息。提醒中心要据此说「到 5 月 1 日会自己换季」还是
+     * 「你已经钉住了，它不会自己变」——两者的建议完全不同。
+     */
+    public static boolean seasonChosenManually(Context context) {
+        int stored = prefs(context).getInt(KEY_SEASON, -1);
+        return stored == StudySchedule.SEASON_WINTER || stored == StudySchedule.SEASON_SUMMER;
+    }
+
     public static void saveSeason(Context context, int season) {
         int value = season == StudySchedule.SEASON_SUMMER
                 ? StudySchedule.SEASON_SUMMER : StudySchedule.SEASON_WINTER;

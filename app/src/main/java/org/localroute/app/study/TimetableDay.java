@@ -89,6 +89,26 @@ public final class TimetableDay {
         return result;
     }
 
+    /**
+     * 从今天起（含今天）最近的一条例外；都没有就返回 {@code null}。
+     *
+     * <p>提醒中心用它回答「接下来有什么安排」，所以今天的调课也算在内——用户今天就得知道。
+     */
+    @Nullable
+    public static DayAdjustment nextAhead(@NonNull List<DayAdjustment> adjustments,
+                                          @NonNull LocalDate today) {
+        DayAdjustment nearest = null;
+        for (DayAdjustment adjustment : adjustments) {
+            if (adjustment.date().isBefore(today)) {
+                continue;
+            }
+            if (nearest == null || adjustment.date().isBefore(nearest.date())) {
+                nearest = adjustment;
+            }
+        }
+        return nearest;
+    }
+
     /** 这天是否被整日停课：课表页要据此把「今天没课」说成「今天放假」。 */
     public static boolean isClosed(@NonNull LocalDate day,
                                    @NonNull List<DayAdjustment> adjustments) {
