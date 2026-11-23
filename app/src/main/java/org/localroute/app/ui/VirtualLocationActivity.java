@@ -95,6 +95,13 @@ public final class VirtualLocationActivity extends AppCompatActivity {
     private RunSnapshot snapshot;
     @Nullable
     private GeoPoint target;
+    /**
+     * 单点保持中新选的点：先记在这儿，确认后才发给服务。
+     *
+     * <p>正在被其他应用读取的位置不该被一次误触挪走，所以「选点」与「生效」分开。
+     */
+    @Nullable
+    private GeoPoint pendingTarget;
     private boolean initialFocusDone;
     private boolean pendingStart;
     private boolean pendingLocate;
@@ -151,6 +158,11 @@ public final class VirtualLocationActivity extends AppCompatActivity {
                     dismissSearchMode();
                     return;
                 }
+                if (pendingTarget != null) {
+                    // 返回键先放弃待确认的点，而不是带着一个没生效的选择退出页面。
+                    dropPendingTarget();
+                    return;
+                }
                 finish();
             }
         });
@@ -158,6 +170,8 @@ public final class VirtualLocationActivity extends AppCompatActivity {
         binding.buttonVirtualMain.setOnClickListener(v -> onMainAction());
         binding.buttonLocateNow.setOnClickListener(v -> locateNow());
         binding.buttonMapPoints.setOnClickListener(v -> showMapPointsSheet());
+        binding.buttonPendingConfirm.setOnClickListener(v -> confirmPendingTarget());
+        binding.buttonPendingCancel.setOnClickListener(v -> dropPendingTarget());
         binding.inputPlaceSearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -208,10 +222,8 @@ public final class VirtualLocationActivity extends AppCompatActivity {
         RouteMapController.OnMapClickListener listener = point -> {
             hideSearchResults();
             hideKeyboard();
-            boolean moved = applyPoint(point);
-            if (moved && snapshot.isActive() && snapshot.singlePoint()) {
-                toast(getString(R.string.virtual_teleport_sent));
-            }
+            // 保持中会走「待确认」，界面靠确认条说话，这里不再提示已发送。
+            applyPoint(point);
         };
         MapBackendPolicy.Decision backend = MapBackendPolicy.choose(
                 BuildConfig.AMAP_KEY, Arrays.asList(Build.SUPPORTED_ABIS));
@@ -279,22 +291,59 @@ public final class VirtualLocationActivity extends AppCompatActivity {
                 getString(R.string.campus_map_layer_action, getString(label)));
     }
 
-    /** 选点统一入口：跑圈中拒绝，单点保持中直接移动，空闲时只预览。 */
+    /** 选点统一入口：跑圈中拒绝，单点保持中先记成「待确认」，空闲时只预览。 */
     private boolean applyPoint(GeoPoint point) {
-        if (snapshot.isActive() && !snapshot.singlePoint()) {
+        return applyPoint(point, true);
+    }
+
+    /** 「定位到实际位置」这类明确命令不受待确认约束：本来就是用户主动要求挪的。 */
+    private boolean applyPointNow(GeoPoint point) {
+        return applyPoint(point, false);
+    }
+
+    private boolean applyPoint(GeoPoint point, boolean askBeforeMoving) {
+        boolean hold = snapshot.isActive() && snapshot.singlePoint();
+        if (snapshot.isActive() && !hold) {
             toast(getString(R.string.virtual_status_route_active));
             return false;
         }
+        if (hold && askBeforeMoving) {
+            // 保持中的位置正被别的应用读取，一次误触不该把它挪走。
+            pendingTarget = point;
+            if (mapHost != null) {
+                mapHost.focusOn(point);
+            }
+            render();
+            return true;
+        }
         target = point;
+        pendingTarget = null;
         if (mapHost != null) {
             mapHost.renderRunner(point);
             mapHost.focusOn(point);
         }
-        if (snapshot.isActive() && snapshot.singlePoint()) {
+        if (hold) {
             SimulationService.teleportTo(this, point);
         }
         render();
         return true;
+    }
+
+    private void confirmPendingTarget() {
+        if (pendingTarget == null) {
+            return;
+        }
+        if (applyPointNow(pendingTarget)) {
+            toast(getString(R.string.virtual_pending_applied));
+        }
+    }
+
+    private void dropPendingTarget() {
+        if (pendingTarget == null) {
+            return;
+        }
+        pendingTarget = null;
+        render();
     }
 
     // ---------------------------------------------------------------- 常用点位收藏
@@ -397,10 +446,7 @@ public final class VirtualLocationActivity extends AppCompatActivity {
         content.addView(check);
 
         content.setOnClickListener(v -> {
-            boolean movingHold = snapshot.isActive() && snapshot.singlePoint();
-            if (applyPoint(point.point()) && movingHold) {
-                toast(getString(R.string.virtual_teleport_sent));
-            }
+            applyPoint(point.point());
             dialog.dismiss();
         });
 
@@ -609,10 +655,7 @@ public final class VirtualLocationActivity extends AppCompatActivity {
     }
 
     private void selectSearchResult(PhotonSearch.Place place) {
-        boolean movingHold = snapshot.isActive() && snapshot.singlePoint();
-        if (applyPoint(place.point()) && movingHold) {
-            toast(getString(R.string.virtual_teleport_sent));
-        }
+        applyPoint(place.point());
         hideSearchResults();
         hideKeyboard();
         binding.inputPlaceSearch.clearFocus();
@@ -637,6 +680,7 @@ public final class VirtualLocationActivity extends AppCompatActivity {
         binding.textVirtualTarget.setVisibility(View.GONE);
         binding.textVirtualHintInfo.setVisibility(View.GONE);
         binding.buttonVirtualMain.setVisibility(View.GONE);
+        binding.pendingBar.setVisibility(View.GONE);
         binding.cardSearchResults.setVisibility(View.VISIBLE);
     }
 
@@ -693,7 +737,7 @@ public final class VirtualLocationActivity extends AppCompatActivity {
         GeoPoint cached = readCachedRealLocation();
         if (cached != null) {
             cachedDeviceLocation = cached;
-            if (applyPoint(cached)) {
+            if (applyPointNow(cached)) {
                 toast(getString(snapshot.isActive() && snapshot.singlePoint()
                         ? R.string.virtual_locate_moved : R.string.campus_locate_device));
             }
@@ -767,7 +811,7 @@ public final class VirtualLocationActivity extends AppCompatActivity {
         }
         cachedDeviceLocation = new GeoPoint(location.getLatitude(), location.getLongitude());
         boolean hold = snapshot.isActive() && snapshot.singlePoint();
-        if (applyPoint(cachedDeviceLocation)) {
+        if (applyPointNow(cachedDeviceLocation)) {
             toast(getString(hold ? R.string.virtual_locate_moved : R.string.campus_locate_device));
             hideSearchResults();
         }
@@ -831,6 +875,12 @@ public final class VirtualLocationActivity extends AppCompatActivity {
     private void onSnapshot(RunSnapshot next) {
         snapshot = next;
         startRequested = false;
+        if (pendingTarget != null && !(next.isActive() && next.singlePoint())) {
+            // 保持已经停了，「别挪动正在生效的位置」这条约束就不成立了，
+            // 待确认直接变成预览点，用户接着按「开始定位」用的就是它。
+            target = pendingTarget;
+            pendingTarget = null;
+        }
         if (next.isActive() && next.hasPosition()) {
             GeoPoint point = new GeoPoint(next.latitude(), next.longitude());
             if (next.singlePoint()) {
@@ -869,16 +919,28 @@ public final class VirtualLocationActivity extends AppCompatActivity {
             binding.textVirtualStatus.setText(R.string.virtual_status_idle);
         }
 
-        binding.textVirtualHint.setText(holdActive
-                ? R.string.virtual_hint_move : R.string.virtual_hint);
+        binding.textVirtualHint.setText(pendingTarget != null ? R.string.virtual_hint_pending
+                : holdActive ? R.string.virtual_hint_move : R.string.virtual_hint);
         binding.textVirtualHint.setVisibility(routeActive ? View.GONE : View.VISIBLE);
-        binding.textVirtualTarget.setText(target == null
-                ? getString(R.string.virtual_target_none)
-                : getString(R.string.virtual_target, CampusFormat.coordinates(
-                target.latitude(), target.longitude())));
+        if (pendingTarget != null && target != null) {
+            binding.textVirtualTarget.setText(getString(R.string.virtual_target_pending,
+                    CampusFormat.coordinates(target.latitude(), target.longitude()),
+                    CampusFormat.coordinates(pendingTarget.latitude(), pendingTarget.longitude())));
+        } else {
+            binding.textVirtualTarget.setText(target == null
+                    ? getString(R.string.virtual_target_none)
+                    : getString(R.string.virtual_target, CampusFormat.coordinates(
+                    target.latitude(), target.longitude())));
+        }
         binding.textCoordinates.setText(target == null
                 ? getString(R.string.placeholder)
                 : CampusFormat.coordinates(target.latitude(), target.longitude()));
+        binding.pendingBar.setVisibility(pendingTarget == null ? View.GONE : View.VISIBLE);
+        if (mapHost != null) {
+            // 待生效的点用「起点」样式画出来，正在生效的位置仍由跑者标记表示。
+            mapHost.renderRoute(pendingTarget == null ? Collections.emptyList()
+                    : Collections.singletonList(pendingTarget), false, true);
+        }
 
         if (routeActive) {
             setMainButton(R.string.virtual_route_active_button, false);
