@@ -3,10 +3,11 @@ package org.localroute.app.widget;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.localroute.app.study.DayAdjustment;
 import org.localroute.app.study.SemesterCalendar;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.TimetableCourse;
-import org.localroute.app.study.TimetableText;
+import org.localroute.app.study.TimetableDay;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -99,10 +100,11 @@ public final class TimetableWidgetPlan {
     private final Slot next;
     private final long minutesToNext;
     private final int nowMinutes;
+    private final boolean closedToday;
 
     private TimetableWidgetPlan(Status status, int teachingWeek, boolean weekKnown,
                                List<Slot> todaySlots, int currentIndex, Slot next,
-                               long minutesToNext, int nowMinutes) {
+                               long minutesToNext, int nowMinutes, boolean closedToday) {
         this.status = status;
         this.teachingWeek = teachingWeek;
         this.weekKnown = weekKnown;
@@ -111,6 +113,7 @@ public final class TimetableWidgetPlan {
         this.next = next;
         this.minutesToNext = minutesToNext;
         this.nowMinutes = nowMinutes;
+        this.closedToday = closedToday;
     }
 
     /**
@@ -122,6 +125,7 @@ public final class TimetableWidgetPlan {
      * @param totalWeeks    学期总周数
      * @param today         今天
      * @param nowMinutes    现在从 0 点起的分钟数
+     * @param adjustments   调课与节假日：这天的例外清单，与课表页、课前提醒共用同一套算法
      */
     @NonNull
     public static TimetableWidgetPlan of(@NonNull List<TimetableCourse> courses,
@@ -129,13 +133,16 @@ public final class TimetableWidgetPlan {
                                          @Nullable LocalDate semesterStart,
                                          int totalWeeks,
                                          @NonNull LocalDate today,
-                                         int nowMinutes) {
+                                         int nowMinutes,
+                                         @NonNull List<DayAdjustment> adjustments) {
         if (courses.isEmpty()) {
             return new TimetableWidgetPlan(Status.NOT_IMPORTED, 0, semesterStart != null,
-                    new ArrayList<>(), -1, null, -1, nowMinutes);
+                    new ArrayList<>(), -1, null, -1, nowMinutes, false);
         }
         int week = SemesterCalendar.teachingWeek(semesterStart, today, totalWeeks);
-        List<Slot> slots = slotsOn(schedule, courses, semesterStart, totalWeeks, today, week);
+        boolean closed = TimetableDay.isClosed(today, adjustments);
+        List<Slot> slots = slotsOn(schedule, courses, semesterStart, totalWeeks, today,
+                adjustments);
         slots.sort(Comparator.comparingInt((Slot slot) -> slot.startMinutes)
                 .thenComparing(slot -> slot.course().name()));
 
@@ -157,19 +164,22 @@ public final class TimetableWidgetPlan {
         }
         if (current == null && next == null) {
             // 今天的课要么全上完了，要么本来就一节没有：两种情况都要往前找出「下一节」。
-            Slot upcoming = firstSlotAfter(schedule, courses, semesterStart, totalWeeks, today, week);
+            Slot upcoming = firstSlotAfter(schedule, courses, semesterStart, totalWeeks, today,
+                    adjustments);
             Status status = slots.isEmpty() ? Status.TODAY_CLEAR : Status.TODAY_DONE;
             return new TimetableWidgetPlan(status, week, semesterStart != null, slots, -1,
-                    upcoming, minutesUntil(today, nowMinutes, upcoming), nowMinutes);
+                    upcoming, minutesUntil(today, nowMinutes, upcoming), nowMinutes, closed);
         }
         if (current != null) {
             Slot upcoming = next != null ? next
-                    : firstSlotAfter(schedule, courses, semesterStart, totalWeeks, today, week);
+                    : firstSlotAfter(schedule, courses, semesterStart, totalWeeks, today,
+                    adjustments);
             return new TimetableWidgetPlan(Status.IN_CLASS, week, semesterStart != null, slots,
-                    currentIndex, upcoming, minutesUntil(today, nowMinutes, upcoming), nowMinutes);
+                    currentIndex, upcoming, minutesUntil(today, nowMinutes, upcoming), nowMinutes,
+                    closed);
         }
         return new TimetableWidgetPlan(Status.UPCOMING, week, semesterStart != null, slots, -1,
-                next, minutesUntil(today, nowMinutes, next), nowMinutes);
+                next, minutesUntil(today, nowMinutes, next), nowMinutes, closed);
     }
 
     /** 正在上的这节课还剩几分钟；不在上课时为 -1。 */
@@ -213,6 +223,11 @@ public final class TimetableWidgetPlan {
     /** 能不能确定周次，即用户是否设置过开学日期。 */
     public boolean weekKnown() {
         return weekKnown;
+    }
+
+    /** 今天是不是被整日停课（节假日、运动会）：组件据此说「今天放假」而不是「今天没课」。 */
+    public boolean closedToday() {
+        return closedToday;
     }
 
     @NonNull
@@ -271,17 +286,19 @@ public final class TimetableWidgetPlan {
         return leftHours == 0 ? days + " 天" : days + " 天 " + leftHours + " 小时";
     }
 
-    /** 今天有课的课程节次上限之外的脏数据（节次超出作息）会被自然跳过。 */
+    /**
+     * 这天要显示的课程段。
+     *
+     * <p>「这天到底有什么课」交给 {@link TimetableDay}，与课前提醒、课表页共用同一套调课规则；
+     * 节次超出作息的脏数据在这里被自然跳过。
+     */
     private static List<Slot> slotsOn(StudySchedule schedule, List<TimetableCourse> courses,
                                       @Nullable LocalDate semesterStart, int totalWeeks,
-                                      LocalDate day, int week) {
+                                      LocalDate day, List<DayAdjustment> adjustments) {
         List<Slot> slots = new ArrayList<>();
-        int weekday = day.getDayOfWeek().getValue();
-        for (TimetableCourse course : courses) {
-            if (course.weekday() != weekday || course.startPeriod() > schedule.totalPeriods()) {
-                continue;
-            }
-            if (!activeThisWeek(course, semesterStart, week)) {
+        for (TimetableCourse course : TimetableDay.classesOn(courses, day, semesterStart,
+                totalWeeks, adjustments)) {
+            if (course.startPeriod() > schedule.totalPeriods()) {
                 continue;
             }
             int start = schedule.periodStartMinutes(course.startPeriod());
@@ -292,30 +309,15 @@ public final class TimetableWidgetPlan {
         return slots;
     }
 
-    /**
-     * 周次是否生效：没设置开学日期时不做周次过滤（组件另有提示），设置了就按单双周判断。
-     */
-    private static boolean activeThisWeek(TimetableCourse course, @Nullable LocalDate semesterStart,
-                                          int week) {
-        if (semesterStart == null) {
-            return true;
-        }
-        if (week < 1) {
-            return false;
-        }
-        return TimetableText.activeInWeek(course.weeks(), week);
-    }
-
     /** 从今天往后找第一节有课的时间；{@link #HORIZON_DAYS} 天内没有就返回 null。 */
     @Nullable
     private static Slot firstSlotAfter(StudySchedule schedule, List<TimetableCourse> courses,
                                        @Nullable LocalDate semesterStart, int totalWeeks,
-                                       LocalDate today, int todayWeek) {
+                                       LocalDate today, List<DayAdjustment> adjustments) {
         for (int offset = 1; offset <= HORIZON_DAYS; offset++) {
             LocalDate day = today.plusDays(offset);
-            int week = semesterStart == null ? todayWeek
-                    : SemesterCalendar.teachingWeek(semesterStart, day, totalWeeks);
-            List<Slot> slots = slotsOn(schedule, courses, semesterStart, totalWeeks, day, week);
+            List<Slot> slots = slotsOn(schedule, courses, semesterStart, totalWeeks, day,
+                    adjustments);
             if (slots.isEmpty()) {
                 continue;
             }

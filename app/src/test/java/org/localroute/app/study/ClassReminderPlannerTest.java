@@ -12,15 +12,20 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/** 课前提醒计划：提醒时刻、周次过滤、节次越界与到期窗口。 */
+/** 课前提醒计划：提醒时刻、周次过滤、节次越界、调课与到期窗口。 */
 public class ClassReminderPlannerTest {
 
     private static final LocalDate START = LocalDate.of(2026, 9, 7); // 周一，第 1 周
     private static final StudySchedule WINTER = StudySchedule.winterDefault();
+    private static final List<DayAdjustment> NONE = Collections.emptyList();
 
     private static TimetableCourse course(String name, int weekday, int start, int end,
                                           String weeks) {
         return TimetableCourse.create(name, "", "一教101", weekday, start, end, weeks);
+    }
+
+    private static List<TimetableCourse> one(TimetableCourse course) {
+        return Collections.singletonList(course);
     }
 
     @Test
@@ -36,8 +41,7 @@ public class ClassReminderPlannerTest {
         // 周一 08:00 第一节，提前 10 分钟 → 07:50。
         LocalDateTime now = START.atTime(7, 0);
         List<ClassReminderPlanner.Reminder> reminders = ClassReminderPlanner.upcoming(
-                Collections.singletonList(course("高数", 1, 1, 2, "1-16")),
-                WINTER, START, 20, now, 10, 7);
+                one(course("高数", 1, 1, 2, "1-16")), WINTER, START, 20, now, 10, 7, NONE);
         assertEquals(1, reminders.size());
         assertEquals(START.atTime(7, 50), reminders.get(0).remindAt);
         assertEquals(8 * 60, reminders.get(0).startMinutesOfDay);
@@ -49,8 +53,7 @@ public class ClassReminderPlannerTest {
         // 今天 07:50 的提醒点已过，不再补发；周二向后看 7 天，下周一才会再出现。
         LocalDateTime now = START.plusDays(1).atTime(0, 0);
         List<ClassReminderPlanner.Reminder> reminders = ClassReminderPlanner.upcoming(
-                Collections.singletonList(course("高数", 1, 1, 1, "1-16")),
-                WINTER, START, 20, now, 10, 7);
+                one(course("高数", 1, 1, 1, "1-16")), WINTER, START, 20, now, 10, 7, NONE);
         assertEquals(1, reminders.size());
         assertEquals(START.plusDays(7).atTime(7, 50), reminders.get(0).remindAt);
     }
@@ -61,8 +64,7 @@ public class ClassReminderPlannerTest {
         StudySchedule early = new StudySchedule(60, 600, 720, 45, 5, 5, 1, 1, 1);
         LocalDateTime now = START.atTime(22, 0); // 周一晚，课程在周二
         List<ClassReminderPlanner.Reminder> reminders = ClassReminderPlanner.upcoming(
-                Collections.singletonList(course("早课", 2, 1, 1, "1-16")),
-                early, START, 20, now, 120, 7);
+                one(course("早课", 2, 1, 1, "1-16")), early, START, 20, now, 120, 7, NONE);
         assertEquals(1, reminders.size());
         assertEquals(START.atTime(23, 0), reminders.get(0).remindAt);
         assertEquals(START.plusDays(1), reminders.get(0).day);
@@ -75,46 +77,42 @@ public class ClassReminderPlannerTest {
                 course("双周课", 1, 1, 1, "1-16双"));
         // 周一在第 1 周（单周）：只有单周课；第 2 周只有双周课。
         List<ClassReminderPlanner.Reminder> weekOne = ClassReminderPlanner.upcoming(
-                courses, WINTER, START, 20, START.atTime(7, 0), 10, 1);
+                courses, WINTER, START, 20, START.atTime(7, 0), 10, 1, NONE);
         assertEquals(1, weekOne.size());
         assertEquals("单周课", weekOne.get(0).course.name());
 
         LocalDateTime weekTwoMorning = START.plusDays(7).atTime(7, 0);
         List<ClassReminderPlanner.Reminder> weekTwo = ClassReminderPlanner.upcoming(
-                courses, WINTER, START, 20, weekTwoMorning, 10, 1);
+                courses, WINTER, START, 20, weekTwoMorning, 10, 1, NONE);
         assertEquals(1, weekTwo.size());
         assertEquals("双周课", weekTwo.get(0).course.name());
     }
 
     @Test
     public void missingSemesterStartMeansNoReminders() {
-        List<TimetableCourse> courses =
-                Collections.singletonList(course("高数", 1, 1, 1, "1-16"));
+        List<TimetableCourse> courses = one(course("高数", 1, 1, 1, "1-16"));
         assertTrue(ClassReminderPlanner.upcoming(courses, WINTER, null, 20,
-                START.atTime(7, 0), 10, 7).isEmpty());
+                START.atTime(7, 0), 10, 7, NONE).isEmpty());
         assertNull(ClassReminderPlanner.next(courses, WINTER, null, 20,
-                START.atTime(7, 0), 10, 7));
+                START.atTime(7, 0), 10, 7, NONE));
     }
 
     @Test
     public void beforeSemesterStartSkipped() {
         // 开学前两周：teachingWeek < 1，全部跳过。
         LocalDateTime now = START.minusWeeks(2).atTime(7, 0);
-        assertTrue(ClassReminderPlanner.upcoming(
-                Collections.singletonList(course("高数", 1, 1, 1, "1-16")),
-                WINTER, START, 20, now, 10, 7).isEmpty());
+        assertTrue(ClassReminderPlanner.upcoming(one(course("高数", 1, 1, 1, "1-16")),
+                WINTER, START, 20, now, 10, 7, NONE).isEmpty());
     }
 
     @Test
     public void periodBeyondScheduleSkipped() {
         StudySchedule early = new StudySchedule(60, 600, 720, 45, 5, 5, 1, 1, 1); // 共 3 节
         LocalDateTime now = START.atTime(0, 0);
-        assertTrue(ClassReminderPlanner.upcoming(
-                Collections.singletonList(course("第 5 节", 1, 5, 5, "1-16")),
-                early, START, 20, now, 10, 7).isEmpty());
-        assertEquals(1, ClassReminderPlanner.upcoming(
-                Collections.singletonList(course("第 3 节", 1, 3, 3, "1-16")),
-                early, START, 20, now, 10, 7).size());
+        assertTrue(ClassReminderPlanner.upcoming(one(course("第 5 节", 1, 5, 5, "1-16")),
+                early, START, 20, now, 10, 7, NONE).isEmpty());
+        assertEquals(1, ClassReminderPlanner.upcoming(one(course("第 3 节", 1, 3, 3, "1-16")),
+                early, START, 20, now, 10, 7, NONE).size());
     }
 
     @Test
@@ -125,7 +123,7 @@ public class ClassReminderPlannerTest {
                 course("英语", 2, 5, 6, "1-16"));
         LocalDateTime now = START.atTime(0, 0);
         List<ClassReminderPlanner.Reminder> reminders = ClassReminderPlanner.upcoming(
-                courses, WINTER, START, 20, now, 10, 2);
+                courses, WINTER, START, 20, now, 10, 2, NONE);
         assertEquals(3, reminders.size());
         assertEquals("高数", reminders.get(0).course.name()); // 周一 08:00 → 07:50
         assertEquals("晚课", reminders.get(1).course.name()); // 周一晚段
@@ -133,17 +131,70 @@ public class ClassReminderPlannerTest {
     }
 
     @Test
+    public void holidayCancelsEveryReminderThatDay() {
+        List<TimetableCourse> courses = Arrays.asList(
+                course("高数", 1, 1, 2, "1-16"), course("英语", 1, 3, 4, "1-16"));
+        List<ClassReminderPlanner.Reminder> reminders = ClassReminderPlanner.upcoming(courses,
+                WINTER, START, 20, START.atTime(0, 0), 10, 2,
+                Collections.singletonList(DayAdjustment.holiday(START)));
+        assertTrue(reminders.isEmpty());
+    }
+
+    @Test
+    public void cancelledCourseLosesOnlyItsOwnReminder() {
+        TimetableCourse math = course("高数", 1, 1, 2, "1-16");
+        TimetableCourse english = course("英语", 1, 3, 4, "1-16");
+        List<ClassReminderPlanner.Reminder> reminders = ClassReminderPlanner.upcoming(
+                Arrays.asList(math, english), WINTER, START, 20, START.atTime(0, 0), 10, 1,
+                Collections.singletonList(DayAdjustment.cancel(START, math.id())));
+        assertEquals(1, reminders.size());
+        assertEquals("英语", reminders.get(0).course.name());
+        assertEquals(START.atTime(9, 40), reminders.get(0).remindAt);
+    }
+
+    @Test
+    public void movedCourseRemindsOnItsNewDay() {
+        TimetableCourse math = course("高数", 1, 1, 2, "1-16");
+        // 周一第一节挪到周三第 3-4 节：周一不该再响，周三 09:40 才响。
+        List<ClassReminderPlanner.Reminder> reminders = ClassReminderPlanner.upcoming(
+                one(math), WINTER, START, 20, START.atTime(0, 0), 10, 4,
+                Collections.singletonList(DayAdjustment.move(START, math.id(), 3, 3, 4)));
+        assertEquals(1, reminders.size());
+        assertEquals(START.plusDays(2), reminders.get(0).day);
+        assertEquals(START.plusDays(2).atTime(9, 40), reminders.get(0).remindAt);
+    }
+
+    @Test
+    public void makeupDayRemindsWithTheBorrowedTimetable() {
+        TimetableCourse math = course("高数", 1, 1, 1, "1-16");
+        // 周日按周一的课表上：提醒点落在周日 07:50。
+        List<ClassReminderPlanner.Reminder> reminders = ClassReminderPlanner.upcoming(
+                one(math), WINTER, START, 20, START.atTime(0, 0), 10, 7,
+                Collections.singletonList(DayAdjustment.makeup(START.plusDays(6), 1)));
+        assertEquals(2, reminders.size());
+        assertEquals(START.atTime(7, 50), reminders.get(0).remindAt);
+        assertEquals(START.plusDays(6).atTime(7, 50), reminders.get(1).remindAt);
+    }
+
+    @Test
     public void dueBetweenWindowBounds() {
         LocalDateTime first = START.atTime(7, 50);
-        List<TimetableCourse> courses =
-                Collections.singletonList(course("高数", 1, 1, 1, "1-16"));
+        List<TimetableCourse> courses = one(course("高数", 1, 1, 1, "1-16"));
         // from 含、to 不含。
         assertEquals(1, ClassReminderPlanner.dueBetween(courses, WINTER, START, 20,
-                first, first.plusMinutes(5), 10).size());
+                first, first.plusMinutes(5), 10, NONE).size());
         assertTrue(ClassReminderPlanner.dueBetween(courses, WINTER, START, 20,
-                first.plusMinutes(1), first.plusMinutes(5), 10).isEmpty());
+                first.plusMinutes(1), first.plusMinutes(5), 10, NONE).isEmpty());
         assertTrue(ClassReminderPlanner.dueBetween(courses, WINTER, START, 20,
-                first.minusMinutes(30), first, 10).isEmpty());
+                first.minusMinutes(30), first, 10, NONE).isEmpty());
+    }
+
+    @Test
+    public void dueBetweenSkipsAHoliday() {
+        LocalDateTime first = START.atTime(7, 50);
+        assertTrue(ClassReminderPlanner.dueBetween(one(course("高数", 1, 1, 1, "1-16")),
+                WINTER, START, 20, first, first.plusMinutes(5), 10,
+                Collections.singletonList(DayAdjustment.holiday(START))).isEmpty());
     }
 
     @Test
@@ -152,7 +203,7 @@ public class ClassReminderPlannerTest {
                 course("英语", 2, 5, 6, "1-16"),
                 course("高数", 1, 1, 2, "1-16"));
         ClassReminderPlanner.Reminder next = ClassReminderPlanner.next(
-                courses, WINTER, START, 20, START.atTime(0, 0), 10, 7);
+                courses, WINTER, START, 20, START.atTime(0, 0), 10, 7, NONE);
         assertEquals("高数", next.course.name());
     }
 }

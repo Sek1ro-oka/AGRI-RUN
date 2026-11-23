@@ -61,7 +61,8 @@ public final class ClassReminderScheduler {
                 StudyTimetableStore.loadTotalWeeks(app),
                 now,
                 StudyTimetableStore.loadClassReminderLeadMinutes(app),
-                ClassReminderPlanner.DEFAULT_HORIZON_DAYS)) {
+                ClassReminderPlanner.DEFAULT_HORIZON_DAYS,
+                StudyTimetableStore.loadAdjustments(app))) {
             if (skipRemindersBefore == null
                     || !reminder.remindAt.isBefore(skipRemindersBefore)) {
                 next = reminder;

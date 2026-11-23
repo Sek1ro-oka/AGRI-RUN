@@ -116,7 +116,8 @@ public final class TimetableWidgetProvider extends AppWidgetProvider {
                 StudyTimetableStore.loadSchedule(context),
                 StudyTimetableStore.loadSemesterStart(context),
                 StudyTimetableStore.loadTotalWeeks(context),
-                LocalDate.now(), now.getHour() * 60 + now.getMinute());
+                LocalDate.now(), now.getHour() * 60 + now.getMinute(),
+                StudyTimetableStore.loadAdjustments(context));
 
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_timetable);
         views.setTextViewText(R.id.widgetTimetableTitle, context.getString(
@@ -188,7 +189,9 @@ public final class TimetableWidgetProvider extends AppWidgetProvider {
                 return statusAboutNext(context, plan, R.string.widget_timetable_status_done);
             case TODAY_CLEAR:
             default:
-                return statusAboutNext(context, plan, R.string.widget_timetable_status_clear);
+                return statusAboutNext(context, plan, plan.closedToday()
+                        ? R.string.widget_timetable_status_holiday
+                        : R.string.widget_timetable_status_clear);
         }
     }
 

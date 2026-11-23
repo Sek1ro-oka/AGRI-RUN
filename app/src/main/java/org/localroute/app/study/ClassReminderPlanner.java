@@ -54,9 +54,10 @@ public final class ClassReminderPlanner {
     }
 
     /**
-     * {@code now} 之后 horizonDays 天内、按周次过滤后的全部提醒点，按时间升序。
+     * {@code now} 之后 horizonDays 天内、按周次与调课排掉后的全部提醒点，按时间升序。
      *
      * @param semesterStart 开学第 1 周日期；null 时没有结果（无法确定周次）
+     * @param adjustments   调课与节假日：停课的那天不提醒，改到别处的课在新那天提醒
      */
     @NonNull
     public static List<Reminder> upcoming(@NonNull List<TimetableCourse> courses,
@@ -65,7 +66,8 @@ public final class ClassReminderPlanner {
                                           int totalWeeks,
                                           @NonNull LocalDateTime now,
                                           int leadMinutes,
-                                          int horizonDays) {
+                                          int horizonDays,
+                                          @NonNull List<DayAdjustment> adjustments) {
         List<Reminder> result = new ArrayList<>();
         if (semesterStart == null || horizonDays < 1) {
             return result;
@@ -75,16 +77,8 @@ public final class ClassReminderPlanner {
                 .minusDays(1); // 提前量可能把「今天第一节课」的提醒点压到昨天
         LocalDate lastDay = now.toLocalDate().plusDays(horizonDays - 1L);
         for (LocalDate day = firstDay; !day.isAfter(lastDay); day = day.plusDays(1)) {
-            int week = SemesterCalendar.teachingWeek(semesterStart, day, totalWeeks);
-            if (week < 1) {
-                continue;
-            }
-            int weekday = day.getDayOfWeek().getValue();
-            for (TimetableCourse course : courses) {
-                if (course.weekday() != weekday
-                        || !TimetableText.activeInWeek(course.weeks(), week)) {
-                    continue;
-                }
+            for (TimetableCourse course : TimetableDay.classesOn(courses, day, semesterStart,
+                    totalWeeks, adjustments)) {
                 if (course.startPeriod() > schedule.totalPeriods()) {
                     continue;
                 }
@@ -109,9 +103,10 @@ public final class ClassReminderPlanner {
                                 int totalWeeks,
                                 @NonNull LocalDateTime now,
                                 int leadMinutes,
-                                int horizonDays) {
+                                int horizonDays,
+                                @NonNull List<DayAdjustment> adjustments) {
         List<Reminder> upcoming = upcoming(courses, schedule, semesterStart, totalWeeks,
-                now, leadMinutes, horizonDays);
+                now, leadMinutes, horizonDays, adjustments);
         return upcoming.isEmpty() ? null : upcoming.get(0);
     }
 
@@ -123,10 +118,11 @@ public final class ClassReminderPlanner {
                                             int totalWeeks,
                                             @NonNull LocalDateTime from,
                                             @NonNull LocalDateTime to,
-                                            int leadMinutes) {
+                                            int leadMinutes,
+                                            @NonNull List<DayAdjustment> adjustments) {
         List<Reminder> due = new ArrayList<>();
         for (Reminder reminder : upcoming(courses, schedule, semesterStart, totalWeeks,
-                from.minusDays(1), leadMinutes, 2)) {
+                from.minusDays(1), leadMinutes, 2, adjustments)) {
             if (!reminder.remindAt.isBefore(from) && reminder.remindAt.isBefore(to)) {
                 due.add(reminder);
             }
