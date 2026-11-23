@@ -93,6 +93,13 @@
     <string name="settings_conflict_ask_summary">激活码导入预设遇到同名路线时，弹出「跳过 / 替换」选择。关闭后按上次选择处理；还没选过时默认跳过。</string>
     <string name="settings_section_environment">环境检查</string>
     <string name="settings_intro">按下面顺序准备环境。任一项是「失败」时，模拟位置不会被系统接受。</string>
+    <string name="guide_home_title">下一步：%1$s</string>
+    <string name="guide_home_detail">环境还差 %1$d 项没准备好，点进来逐项处理</string>
+    <string name="guide_next_step">下一步：%1$s（还有 %2$d 项待处理）</string>
+    <string name="guide_all_ready">环境已就绪，可以直接开始跑圈</string>
+    <string name="guide_action_run">去跑圈页授权</string>
+    <string name="guide_action_location_switch">打开定位设置</string>
+    <string name="guide_action_notification">开启通知</string>
 
     <!-- 诊断页 -->
     <string name="diagnostics_title">诊断信息</string>
