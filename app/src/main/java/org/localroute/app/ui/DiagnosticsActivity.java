@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityDiagnosticsBinding;
 import org.localroute.app.simulation.GmsFlpBackend;
+import org.localroute.app.diagnostics.CrashStore;
 import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.diagnostics.SystemLocationReader;
 import org.localroute.app.model.RouteSummary;
@@ -79,8 +80,10 @@ public class DiagnosticsActivity extends AppCompatActivity {
         binding.buttonCopy.setOnClickListener(v -> copyReport());
         binding.buttonClearLog.setOnClickListener(v -> {
             DiagnosticLog.clearRecent();
+            // 崩溃记录与日志一起清：留着一半、清掉一半的报告最容易让人误判「应该没崩过」。
+            CrashStore.clear(this);
             refreshReport();
-            toast("日志已清空");
+            toast("日志与崩溃记录已清空");
         });
 
         refreshReport();
@@ -180,6 +183,22 @@ public class DiagnosticsActivity extends AppCompatActivity {
             RouteSummary summary = summaries.get(i);
             builder.append("  · ").append(summary.displayName())
                     .append("（").append(summary.pointCount()).append(" 点）\n");
+        }
+
+        builder.append("\n【崩溃记录】\n");
+        List<String> crashes = CrashStore.recent(this);
+        if (crashes.isEmpty()) {
+            builder.append("（本机没有留下崩溃记录）\n");
+        } else {
+            builder.append("共 ").append(crashes.size())
+                    .append(" 份，全部只存在这台手机里、不发网络；下面展开最新一份。\n");
+            builder.append(crashes.get(0));
+            if (!crashes.get(0).endsWith("\n")) {
+                builder.append('\n');
+            }
+            if (crashes.size() > 1) {
+                builder.append("（更早的 ").append(crashes.size() - 1).append(" 份未展开）\n");
+            }
         }
 
         builder.append("\n【最近日志】\n");
