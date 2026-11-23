@@ -123,6 +123,10 @@ public final class BackupCatalog {
                             new KeyRef("study_timetable", "semester_start", BackupValues.TYPE_LONG),
                             new KeyRef("study_timetable", "day_adjustments",
                                     BackupValues.TYPE_STRING),
+                            // 归档与当前指针跟课表同进同出，否则换机后只剩一个学期、其余凭空消失。
+                            new KeyRef("study_semesters", "active_semester",
+                                    BackupValues.TYPE_STRING),
+                            new KeyRef("study_semesters", "archive", BackupValues.TYPE_STRING),
                             new KeyRef("study_timetable", "class_reminder_enabled", BackupValues.TYPE_BOOLEAN),
                             new KeyRef("study_timetable", "class_reminder_lead_minutes", BackupValues.TYPE_INT))),
             new Section(SECTION_HOMEWORK, 1, R.string.backup_kind_homework, true, false,

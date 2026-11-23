@@ -8,7 +8,9 @@ import androidx.annotation.Nullable;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 课表与作息时间的本机存储。课表是用户手动录入的数据，不依赖学习通接口。
@@ -20,13 +22,14 @@ public final class StudyTimetableStore {
 
     /** 课表与作息共用的偏好文件名；小组件靠监听它来感知数据变化。 */
     public static final String PREFS = "study_timetable";
-    private static final String KEY_COURSES = "courses";
+    /** 学期归档要按同样的键读写这几个值，所以对本包可见，不对外公开。 */
+    static final String KEY_COURSES = "courses";
     private static final String KEY_SEASON = "season";
     private static final String KEY_SCHEDULE_WINTER = "schedule_winter";
     private static final String KEY_SCHEDULE_SUMMER = "schedule_summer";
-    private static final String KEY_TOTAL_WEEKS = "total_weeks";
+    static final String KEY_TOTAL_WEEKS = "total_weeks";
     private static final String KEY_CURRENT_WEEK = "current_week";
-    private static final String KEY_SEMESTER_START = "semester_start";
+    static final String KEY_SEMESTER_START = "semester_start";
     private static final String KEY_CLASS_REMINDER_ENABLED = "class_reminder_enabled";
     private static final String KEY_CLASS_REMINDER_LEAD = "class_reminder_lead_minutes";
     /** 调课、停课、补课：按日期生效的例外清单。 */
@@ -53,6 +56,42 @@ public final class StudyTimetableStore {
 
     public static void clearCourses(Context context) {
         prefs(context).edit().remove(KEY_COURSES).apply();
+    }
+
+    /**
+     * 把当前学期的键值原样抄一份，交给 {@link SemesterStore} 归档。
+     *
+     * <p>不筛键也不转类型：偏好文件里是什么类型就带出去什么类型，还原时按同样类型写回，
+     * 开学日期这类 long 才不会被折成 int 后越界。
+     */
+    @NonNull
+    public static Map<String, Object> snapshotValues(Context context) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<String, ?> entry : prefs(context).getAll().entrySet()) {
+            copy.put(entry.getKey(), entry.getValue());
+        }
+        return copy;
+    }
+
+    /** 整份换成另一个学期的数据：先清后写、一次提交，中途不会读到两套学期拼起来的样子。 */
+    public static void restoreValues(@NonNull Context context,
+                                     @NonNull Map<String, Object> values) {
+        SharedPreferences.Editor editor = prefs(context).edit().clear();
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            Object value = entry.getValue();
+            if (value instanceof Integer) {
+                editor.putInt(entry.getKey(), (Integer) value);
+            } else if (value instanceof Long) {
+                editor.putLong(entry.getKey(), (Long) value);
+            } else if (value instanceof Float) {
+                editor.putFloat(entry.getKey(), (Float) value);
+            } else if (value instanceof Boolean) {
+                editor.putBoolean(entry.getKey(), (Boolean) value);
+            } else if (value instanceof String) {
+                editor.putString(entry.getKey(), (String) value);
+            }
+        }
+        editor.apply();
     }
 
     /**

@@ -40,6 +40,9 @@ import org.localroute.app.study.HomeworkReminderPlanner;
 import org.localroute.app.study.HomeworkReminderScheduler;
 import org.localroute.app.study.IcsTimetableWriter;
 import org.localroute.app.study.IcsTransfer;
+import org.localroute.app.study.SemesterArchive;
+import org.localroute.app.study.SemesterProfile;
+import org.localroute.app.study.SemesterStore;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
@@ -48,6 +51,7 @@ import org.localroute.app.study.TimetableCourse;
 import org.localroute.app.study.TimetableDay;
 import org.localroute.app.study.TimetableImportPlan;
 import org.localroute.app.study.TimetableShareCodec;
+import org.localroute.app.widget.TimetableWidgetProvider;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -136,6 +140,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         binding.rowExportIcs.setOnClickListener(view -> confirmExportIcs());
         binding.rowCopyShareCode.setOnClickListener(view -> copyShareCode());
         binding.rowImportShareCode.setOnClickListener(view -> showShareCodeDialog());
+        binding.rowSemesters.setOnClickListener(view -> showSemesters());
         binding.rowAdjustments.setOnClickListener(view -> showAdjustments());
 
         binding.switchClassReminder.setOnClickListener(view -> {
@@ -245,6 +250,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         renderAccount();
         renderTimetableCount();
         renderAdjustments();
+        renderSemesters();
         renderSchedule();
         renderReminder();
         renderHomeworkReminder();
@@ -256,6 +262,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         renderAccount();
         renderTimetableCount();
         renderAdjustments();
+        renderSemesters();
         renderSchedule();
         renderReminder();
         renderHomeworkReminder();
@@ -301,6 +308,188 @@ public class StudySettingsActivity extends AppCompatActivity {
         binding.textTimetableCount.setText(getString(R.string.study_settings_timetable_count,
                 StudyTimetableStore.loadCourses(this).size()));
         renderSemesterStart();
+    }
+
+    // ------------------------------------------------------------------ 多学期
+
+    /** 行上写「N 个学期 · 当前「X」」；还没分过学期时直说，不摆一个假的 1。 */
+    private void renderSemesters() {
+        SemesterProfile active = SemesterStore.active(this);
+        List<SemesterProfile> profiles = SemesterStore.profiles(this);
+        if (active == null || profiles.isEmpty()) {
+            binding.textSemesterValue.setText(R.string.study_semester_manage_none);
+            return;
+        }
+        binding.textSemesterValue.setText(getString(R.string.study_semester_manage_count,
+                profiles.size(), active.name()));
+    }
+
+    private void showSemesters() {
+        List<SemesterProfile> profiles = SemesterStore.profiles(this);
+        if (profiles.isEmpty()) {
+            // 一份归档都还没有时列表是空的，与其摆个假条目，不如直接把「新建」讲清楚。
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.study_semester_manage_title)
+                    .setMessage(R.string.study_semester_manage_single)
+                    .setNegativeButton(R.string.campus_cancel, null)
+                    .setPositiveButton(R.string.study_semester_create,
+                            (dialog, which) -> promptCreateSemester())
+                    .show();
+            return;
+        }
+        String activeId = SemesterStore.activeId(this);
+        LocalDate today = LocalDate.now();
+        String[] labels = new String[profiles.size()];
+        for (int i = 0; i < profiles.size(); i++) {
+            SemesterProfile profile = profiles.get(i);
+            labels[i] = profile.name() + "（" + (profile.id().equals(activeId)
+                    ? getString(R.string.study_semester_current) + " · " : "")
+                    + SemesterStore.summary(this, profile.id(), today) + "）";
+        }
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.study_semester_manage_title)
+                .setMessage(R.string.study_semester_manage_hint)
+                .setItems(labels, (dialog, which) -> showSemesterActions(profiles.get(which),
+                        profiles.get(which).id().equals(activeId)))
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.study_semester_create,
+                        (dialog, which) -> promptCreateSemester())
+                .show();
+    }
+
+    /** 当前学期只给改名：删掉正在看的这份没有意义，切到自己也不产生任何变化。 */
+    private void showSemesterActions(@NonNull SemesterProfile profile, boolean current) {
+        String[] actions = current
+                ? new String[]{getString(R.string.study_semester_action_rename)}
+                : new String[]{getString(R.string.study_semester_action_switch),
+                        getString(R.string.study_semester_action_rename),
+                        getString(R.string.study_semester_action_delete)};
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(profile.name())
+                .setItems(actions, (dialog, which) -> {
+                    if (current) {
+                        promptRenameSemester(profile);
+                    } else if (which == 0) {
+                        confirmSwitchSemester(profile);
+                    } else if (which == 1) {
+                        promptRenameSemester(profile);
+                    } else {
+                        confirmDeleteSemester(profile);
+                    }
+                })
+                .setNegativeButton(R.string.campus_cancel, null)
+                .show();
+    }
+
+    /**
+     * 新建时不立刻切过去：用户可能只是想先把下学期的位置占上，
+     * 手滑切走会把当前课表收进归档，屏幕上的内容整个换掉。
+     */
+    private void promptCreateSemester() {
+        if (!SemesterStore.canCreate(this)) {
+            toast(getString(R.string.study_semester_full, SemesterArchive.MAX_SEMESTERS));
+            return;
+        }
+        promptForName(getString(R.string.study_semester_create), SemesterProfile.defaultName(
+                        StudyTimetableStore.loadSemesterStart(this),
+                        SemesterStore.profiles(this).size()),
+                name -> {
+                    SemesterProfile created = SemesterStore.create(this, name);
+                    renderSemesters();
+                    new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                            .setMessage(getString(R.string.study_semester_created,
+                                    created.name()))
+                            .setNegativeButton(R.string.study_semester_stay, null)
+                            .setPositiveButton(R.string.study_semester_switch_now,
+                                    (dialog, which) -> confirmSwitchSemester(created))
+                            .show();
+                });
+    }
+
+    private void promptRenameSemester(@NonNull SemesterProfile profile) {
+        promptForName(getString(R.string.study_semester_action_rename), profile.name(), name -> {
+            SemesterStore.rename(this, profile.id(), name);
+            renderSemesters();
+            toast(getString(R.string.study_semester_renamed, name));
+        });
+    }
+
+    /** 新建与改名都只要一行文字，共用同一个输入框：默认值填好、光标停在末尾。 */
+    private void promptForName(@NonNull CharSequence title, @NonNull String suggested,
+                               @NonNull java.util.function.Consumer<String> onAccept) {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setTextSize(14f);
+        input.setText(suggested);
+        input.setSelection(input.getText().length());
+        int padding = Math.round(20 * getResources().getDisplayMetrics().density);
+        FrameLayout container = new FrameLayout(this);
+        container.setPadding(padding, Math.round(8 * getResources().getDisplayMetrics().density),
+                padding, 0);
+        container.addView(input);
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(title)
+                .setView(container)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        toast(getString(R.string.study_semester_name_empty));
+                        return;
+                    }
+                    onAccept.accept(name);
+                })
+                .show();
+    }
+
+    /** 切换前把「本机存起来几门、换上几门」说清楚：切完才发现课表空了是最糟的体验。 */
+    private void confirmSwitchSemester(@NonNull SemesterProfile target) {
+        int localCourses = StudyTimetableStore.loadCourses(this).size();
+        int targetCourses = SemesterStore.courseCount(this, target.id());
+        confirmSwitch(target, targetCourses == 0
+                ? getString(R.string.study_semester_switch_empty, localCourses)
+                : getString(R.string.study_semester_switch_message, localCourses, target.name(),
+                        targetCourses));
+    }
+
+    private void confirmSwitch(@NonNull SemesterProfile target, @NonNull String message) {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.study_semester_switch_title, target.name()))
+                .setMessage(message)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.study_semester_switch_now,
+                        (dialog, which) -> switchSemester(target))
+                .show();
+    }
+
+    /** 换学期等于换了开学日期、总周数、课表与作息：这几处显示与闹钟都得跟着重算。 */
+    private void switchSemester(@NonNull SemesterProfile target) {
+        SemesterStore.switchTo(this, target.id());
+        markWeekChanged();
+        renderTimetableCount();
+        renderSchedule();
+        renderAdjustments();
+        renderSemesters();
+        renderReminder();
+        ClassReminderScheduler.update(this);
+        TimetableWidgetProvider.updateAll(this);
+        toast(getString(R.string.study_semester_switched, target.name()));
+    }
+
+    private void confirmDeleteSemester(@NonNull SemesterProfile profile) {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.study_semester_delete_title, profile.name()))
+                .setMessage(R.string.study_semester_delete_message)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.study_semester_action_delete, (dialog, which) -> {
+                    if (!SemesterStore.delete(this, profile.id())) {
+                        toast(getString(R.string.study_semester_cannot_delete_current));
+                        return;
+                    }
+                    renderSemesters();
+                    toast(getString(R.string.study_semester_deleted, profile.name()));
+                })
+                .show();
     }
 
     // ------------------------------------------------------------ 调课与节假日
@@ -525,6 +714,7 @@ public class StudySettingsActivity extends AppCompatActivity {
 
     private void onTimetableChanged() {
         renderTimetableCount();
+        renderSemesters();
         notifyChanged();
     }
 
