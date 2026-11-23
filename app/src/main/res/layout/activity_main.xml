@@ -115,11 +115,11 @@
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:background="@drawable/bg_campus_entry_icon"
                                 android:contentDescription="@null"
-                                android:padding="8dp"
+                                android:padding="7dp"
                                 android:src="@drawable/ic_campus_run"
                                 app:tint="@color/fm_link" />
                             <TextView
@@ -174,11 +174,11 @@
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
                             <ImageView
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
                                 android:background="@drawable/bg_campus_entry_icon"
                                 android:contentDescription="@null"
-                                android:padding="8dp"
+                                android:padding="7dp"
                                 android:src="@drawable/ic_campus_teleport"
                                 app:tint="@color/fm_link" />
                             <TextView
