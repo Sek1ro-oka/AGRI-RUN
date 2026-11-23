@@ -819,4 +819,36 @@
     <string name="run_route_select">选择路线</string>
     <string name="run_pace_input">例如 6:30</string>
     <string name="run_speed_input">例如 9.5</string>
+
+    <!-- 桌面课表小组件 -->
+    <string name="widget_timetable_label">课表</string>
+    <string name="widget_timetable_description">今天几节课、下一节还有多久；点按打开课表页</string>
+    <string name="widget_timetable_title">今日课表 · %1$s</string>
+    <string name="widget_timetable_week">第 %1$d 周</string>
+    <string name="widget_timetable_week_unknown">未设开学日期</string>
+    <string name="widget_timetable_week_off">非教学周</string>
+    <string name="widget_timetable_status_empty">还没有课表</string>
+    <string name="widget_timetable_status_in_class">上课中 · 还剩 %1$s</string>
+    <string name="widget_timetable_status_upcoming">还有 %1$s · 下一节 %2$s</string>
+    <string name="widget_timetable_status_done">今天的课上完 · 下次 %1$s</string>
+    <string name="widget_timetable_status_clear">今天没有课 · 下次 %1$s</string>
+    <string name="widget_timetable_next_none">未来 %1$d 天没有课</string>
+    <string name="widget_timetable_when_today">%1$s</string>
+    <string name="widget_timetable_when_tomorrow">明天 %1$s</string>
+    <string name="widget_timetable_when_weekday">%1$s %2$s</string>
+    <string name="widget_timetable_row_with_place">%1$s %2$s · %3$s</string>
+    <string name="widget_timetable_unnamed_course">未命名课程</string>
+    <string name="widget_timetable_footer_import">点按导入教务课表，或手动添加</string>
+    <string name="widget_timetable_footer_week_unknown">未设置开学日期，按全部周次显示</string>
+    <string name="widget_timetable_footer_week_off">不在教学周内，今天不列课程</string>
+    <string name="widget_timetable_footer_next">这节课之后 · %1$s %2$s</string>
+    <string name="widget_timetable_footer_open">点按查看完整课表</string>
+    <!-- 初次添加到桌面、还没被代码填过内容时先显示这三句，预览里也是一样的样子。 -->
+    <string name="widget_timetable_title_placeholder">今日课表 · 第 1 周</string>
+    <string name="widget_timetable_status_placeholder">今天没有课</string>
+    <string name="widget_timetable_footer_placeholder">点按查看完整课表</string>
+    <string name="app_settings_widget_title">桌面课表小组件</string>
+    <string name="app_settings_widget_subtitle">桌面上直接看今天几节课、下一节还有多久</string>
+    <string name="widget_pin_requested">已请求添加，请在桌面弹出的确认框里点「添加到桌面」</string>
+    <string name="widget_pin_unsupported">当前桌面不支持应用直接添加。请长按桌面空白处 → 「小组件」 → 找到 UNLOOP 的「课表」。</string>
 </resources>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    桌面课表小组件的外壳：标题（今天 + 周次）、一句状态、今天的课程行、一句补充说明。
+
+    只能用 RemoteViews 支持的控件：LinearLayout 与 TextView，不能用 MaterialCardView、ConstraintLayout。
+    行由代码 addView 追加，所以行数随组件高度变化，2×2 到 4×3 共用这一份布局。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widgetTimetableRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_campus_card"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/widgetTimetableTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="@string/widget_timetable_title_placeholder"
+        android:textColor="@color/campus_ink"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widgetTimetableStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="2"
+        android:text="@string/widget_timetable_status_placeholder"
+        android:textColor="@color/campus_mint_dark"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:id="@+id/widgetTimetableRows"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/widgetTimetableFooter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="2"
+        android:text="@string/widget_timetable_footer_placeholder"
+        android:textColor="@color/campus_muted"
+        android:textSize="11sp" />
+</LinearLayout>

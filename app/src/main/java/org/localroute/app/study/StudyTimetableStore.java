@@ -18,7 +18,8 @@ import java.util.List;
  */
 public final class StudyTimetableStore {
 
-    private static final String PREFS = "study_timetable";
+    /** 课表与作息共用的偏好文件名；小组件靠监听它来感知数据变化。 */
+    public static final String PREFS = "study_timetable";
     private static final String KEY_COURSES = "courses";
     private static final String KEY_SEASON = "season";
     private static final String KEY_SCHEDULE_WINTER = "schedule_winter";

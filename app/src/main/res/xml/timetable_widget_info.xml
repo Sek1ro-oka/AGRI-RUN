@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    课表小组件的规格声明。
+
+    尺寸只给最小值并打开水平/垂直缩放：宿主上报可视高度后由代码换算行数，
+    所以 2×2、4×2、4×3 用的是同一份布局，不必为每种尺寸各写一个 provider。
+    updatePeriodMillis 系统最小且最密就是 30 分钟，倒计时靠打开应用、改课表与跨天广播刷新，
+    组件自己只兜住「一直停在桌面」这一种情况。
+
+    targetCell* 与 previewLayout 是 12 才认的字段，低版本直接忽略：留着它们，12+ 的桌面才会
+    按格子给尺寸并在选择器里显示真实预览；用 tools:ignore 压掉 UnusedAttribute，而不是为了
+    数字好看把新功能在老系统上能打的分也一起丢掉。
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:description="@string/widget_timetable_description"
+    android:initialLayout="@layout/widget_timetable"
+    android:maxHeight="400dp"
+    android:maxWidth="420dp"
+    android:minHeight="110dp"
+    android:minWidth="140dp"
+    android:previewLayout="@layout/widget_timetable"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="2"
+    android:targetCellWidth="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen"
+    tools:ignore="UnusedAttribute" />

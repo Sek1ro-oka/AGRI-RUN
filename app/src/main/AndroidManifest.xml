@@ -177,6 +177,28 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            桌面课表小组件。APPWIDGET_UPDATE 是 protected broadcast，只有系统能发出，
+            与上面课前提醒那两个接收器收到的开机/改时广播同类，因此同样保持不导出。
+            跨天、改时钟、换时区、开机、覆盖安装都重画一次，避免停在昨天的课上。
+        -->
+        <receiver
+            android:name=".widget.TimetableWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_timetable_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/timetable_widget_info" />
+        </receiver>
+
         <activity
             android:name=".ui.DiagnosticsActivity"
             android:exported="false"

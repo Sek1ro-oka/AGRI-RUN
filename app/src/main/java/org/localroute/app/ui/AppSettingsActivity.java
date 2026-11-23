@@ -1,5 +1,7 @@
 package org.localroute.app.ui;
 
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -31,6 +33,8 @@ import org.localroute.app.backup.BackupTransfer;
 import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivityAppSettingsBinding;
 import org.localroute.app.settings.AppearancePreferences;
+import org.localroute.app.widget.TimetableWidgetProvider;
+import org.localroute.app.widget.TimetableWidgetSync;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -112,6 +116,31 @@ public class AppSettingsActivity extends AppCompatActivity {
         binding.rowBackupImport.setOnClickListener(v -> startImportPick());
         binding.rowRunHistory.setOnClickListener(v ->
                 startActivity(new Intent(this, RunHistoryActivity.class)));
+        binding.rowTimetableWidget.setOnClickListener(v -> requestTimetableWidgetPin());
+    }
+
+    /**
+     * 请求桌面直接把课表小组件放上主屏。
+     *
+     * <p>能不能这样做得由桌面决定：{@code requestPinAppWidget} 在部分启动器上就是不支持，
+     * 那种情况必须给出可操作的手动路径，否则点完毫无反应会被当成 bug。放置本身仍要用户确认，
+     * 应用无法代劳。
+     */
+    private void requestTimetableWidgetPin() {
+        AppWidgetManager manager = AppWidgetManager.getInstance(this);
+        ComponentName provider = new ComponentName(this, TimetableWidgetProvider.class);
+        if (!manager.isRequestPinAppWidgetSupported()) {
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.app_settings_widget_title)
+                    .setMessage(R.string.widget_pin_unsupported)
+                    .setPositiveButton(R.string.backup_confirm, null)
+                    .show();
+            return;
+        }
+        manager.requestPinAppWidget(provider, null, null);
+        // 组件落地后马上挂上数据变更监听，改完课表桌面上就能跟着变。
+        TimetableWidgetSync.attach(this);
+        toast(getString(R.string.widget_pin_requested));
     }
 
     /** 导出：先让用户勾选段落，再由系统保存面板决定落到哪个文件。 */
