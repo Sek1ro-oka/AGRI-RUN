@@ -84,8 +84,22 @@ keyPassword=<你的口令>
 ```
 
 `app/build.gradle` 会**条件式**读取它：文件存在就签名，不存在就产出未签名包，构建不会因此失败。
-0.6.3 起的公开 Release 使用本机自签名证书（不是应用商店证书）签名；后续版本必须使用同一 keystore 才能覆盖升级，请离线备份 `keystore/` 与口令。
 公开包不内置高德 Key（当前版本未接入官方 SDK），可用 `.\gradlew.bat :app:assembleRelease "-PamapKey= "`（值是一个空格）覆盖 `local.properties` 里的 Key；不带该参数时仍按本机配置注入。
+
+### 4.1 签名主线：只有一把，不要试图追认旧证书
+
+上面示例里的 `route-workshop-release.jks`（别名 `routeworkshop`）已经**彻底丢失**：本机全盘、两个 `$RECYCLE.BIN`、`git log --all -- keystore/` 都找不到它（它从未入库）。当前实际在用的是 2026-11-22 新建的 `keystore/unloop-release.jks`（别名 `unloop`，`keystore.properties` 指向它）。
+
+| 主线 | keystore | 证书 DN | 证书 SHA-256 | 覆盖的发布 |
+| --- | --- | --- | --- | --- |
+| 已失效 | `keystore/route-workshop-release.jks`（不存在） | `CN=Route Workshop Local, O=Local Dev` | `14f0286f4624de37fc1a013f9a15514ac04981bb1f222b77b3ce7dbb38f02a9c` | v0.6.3 – v0.9.4 |
+| 唯一在用 | `keystore/unloop-release.jks` | `CN=UNLOOP Release, O=Local Dev` | `01547534323da4c5455ffd6f1228a907e4cfdce0815d9f3c1e01c14a0f2682f4` | v0.9.5 起 |
+
+因此 **v0.9.4 及更早的设备不能覆盖升级到 0.9.5+**，只能先卸载再装；卸载会删掉 `files/routes/` 与课表/自建作业等本地数据。手上只有旧证书（`.der`/`.pem`/公钥）时不要试图「换回旧签名」：APK 签名需要私钥，公钥只能用来比对指纹，Android 的签名校验也无法由打包方式绕过。同理，后续版本一律继续用 `unloop-release.jks`，换 key 等于再次逼所有用户卸载重装。
+
+离线备份要求（这条被踩过两次）：`keystore/unloop-release.jks` 与 `keystore.properties` 各存一份到仓库之外（网盘或 U 盘），口令不要写进仓库。
+
+本机 JDK 路径已迁到 `D:\UNLOOP\tools\jdk-21.0.13+9\bin\keytool.exe`（上面示例中的 `D:\Java\jdk-21` 与 `agents.md` 里的 `E:\Android\Sdk` 都是旧机器路径，见第 5 节校验命令用 `$env:ANDROID_HOME`）。
 
 校验：
 

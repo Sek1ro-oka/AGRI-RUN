@@ -182,3 +182,21 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 背景证据：用户手工从加速线路下载的 74 MB 文件首 4 字节是 `<!DO`，即拿到的是网页而非 APK；本机实测 5 条线路（GitHub 直连 + gh-proxy.com/.org + ghproxy.imciel.com/net）均返回 `PK` 且完整下载与 GitHub digest、本机构造三者 sha256 一致。
 
 验证：273 个 JVM 单元测试全过（37 个测试类，较上一版 +7）；`lintRelease` 0 errors、281 warnings（均为既有文案项）；`assembleRelease` 产物 74,194,505 字节、sha256 `8908a31431fdac7503533d5572f2cbdf3e77b99baa3c813869813add15b43c3c`、签名 `CN=UNLOOP Release`，已作为 v0.9.8（versionCode 38，tag 指向 `a04769f`）的附件 `route-workshop-0.9.8-release.apk` 发布，GitHub 回读的 digest 与本机构建一致。真机侧「应用内更新到 0.9.8」与拦截页提示尚未实测。
+
+## 2026-11-23 旧签名无法追认，0.9.4 及更早只能卸载重装（已定案）
+
+现象：手机上装过 0.9.4 及更早版本的设备安装 0.9.5+ 时被系统拒绝，提示签名不一致（`INSTALL_FAILED_UPDATE_INCOMPATIBLE`）。用户提供了 `unloop-keystore-2026Q3_cert-14f0286f.der`，要求把 0.9.5 之后的包全部换成这个签名。
+
+定位：这是 2026-11-22 重建签名 key 的必然结果，记录在 v0.9.5 的发布说明里。逐项核实：
+
+| 证据 | 结果 |
+| --- | --- |
+| 用户给的 `.der` | 913 字节 X.509 DER **公钥证书**；`openssl pkey/pkcs8` 读为「Could not find private key」，按 PKCS#12 解析报 wrong tag → 不含私钥，无法用于签名 |
+| 证书身份 | `CN=Route Workshop Local, O=Local Dev`，2026-10-26 生效，SHA-256 `14f0286f…02a9c` |
+| 旧包确实是它签的 | 取回 v0.9.4 附件（74,137,033 B，直连截断后经 gh-proxy.com 取全），`apksigner verify --print-certs` 得到同一 DN 与指纹 |
+| 当前包 | `CN=UNLOOP Release`，SHA-256 `01547534…82f4`，两把 key 不同 → 系统必须拒绝覆盖安装 |
+| 旧私钥下落 | 全盘 `*.jks/*.keystore/*.p12/*.pem`（D: 与 C:\Users\GOST）、两个 `$RECYCLE.BIN`、`git log --all -- keystore/` 均无结果；按 `docs/BUILD.md` 原路径应为 `keystore/route-workshop-release.jks`（别名 `routeworkshop`），从未入库 |
+
+处置：用户确认旧私钥找不到了，本条按「不可追认」定案。签名主线只保留 `unloop-release.jks`；`docs/BUILD.md` 第 4.1 节写清两条线的指纹、覆盖范围，以及「手上只有证书时不要试图换回旧签名」的原因，防止后续重复尝试。旧设备的唯一升级路径是先卸载再安装，代价是丢本地数据（`files/routes/` 的路线、课表登录态、自建作业、跑速与提醒设置；课表与作业缓存重装后可重新同步）。
+
+后续待办（未开工，需用户点头）：加一份本地数据导出/导入，让「换签名必须卸载」不再等于丢数据；同时把 `keystore/` + `keystore.properties` 做仓库外备份——旧 key 已经丢过一次，不能再丢第二次。
