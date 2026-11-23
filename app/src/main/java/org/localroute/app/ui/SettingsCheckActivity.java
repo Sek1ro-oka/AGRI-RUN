@@ -200,7 +200,7 @@ public class SettingsCheckActivity extends AppCompatActivity {
         action.setFocusable(true);
         action.setOnClickListener(v -> openEntry(entry));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(44));
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
         params.topMargin = dp(7);
         row.addView(action, params);
     }

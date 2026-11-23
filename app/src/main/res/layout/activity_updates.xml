@@ -16,53 +16,51 @@
         android:id="@+id/cardUpdate"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="12dp"
+        android:layout_marginStart="@dimen/space_xl"
+        android:layout_marginTop="@dimen/space_lg"
+        android:layout_marginEnd="@dimen/space_xl"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackground"
-        android:minHeight="68dp"
+        android:minHeight="@dimen/touch_min"
         app:cardBackgroundColor="@color/fm_surface"
-        app:cardCornerRadius="16dp"
+        app:cardCornerRadius="@dimen/radius_card"
         app:cardElevation="0dp"
         app:strokeColor="@color/campus_card_stroke"
-        app:strokeWidth="1dp">
+        app:strokeWidth="@dimen/stroke_edge">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="12dp">
+            android:paddingHorizontal="@dimen/space_2xl"
+            android:paddingVertical="@dimen/space_xl">
             <ImageView
                 android:layout_width="36dp"
                 android:layout_height="36dp"
                 android:background="@drawable/bg_campus_entry_icon"
                 android:contentDescription="@string/home_update_title"
-                android:padding="8dp"
+                android:padding="@dimen/space_md"
                 android:src="@drawable/ic_campus_update" />
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="@dimen/space_xl"
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
+                    style="@style/Text.Unloop.Body"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/home_update_title"
-                    android:textColor="@color/campus_ink"
-                    android:textSize="14sp"
                     android:textStyle="bold" />
                 <TextView
+                    style="@style/Text.Unloop.Caption"
                     android:id="@+id/textUpdateSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:text="@string/home_update_idle"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp" />
+                    android:layout_marginTop="@dimen/space_hair"
+                    android:text="@string/home_update_idle" />
             </LinearLayout>
             <ImageView
                 android:layout_width="20dp"
@@ -74,26 +72,26 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="@dimen/space_hair"
         android:orientation="horizontal"
-        android:paddingHorizontal="6dp">
+        android:paddingHorizontal="@dimen/space_sm">
         <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonReleasePage"
-            style="@style/Widget.Material3.Button.TextButton"
+            style="@style/Widget.Unloop.TextButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/home_update_release_page"
             android:textColor="@color/campus_ink"
-            android:textSize="13sp" />
+            android:textSize="@dimen/text_meta" />
         <com.google.android.material.button.MaterialButton
             android:id="@+id/buttonDiagnostics"
-            style="@style/Widget.Material3.Button.TextButton"
+            style="@style/Widget.Unloop.TextButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/home_update_diagnostics"
             android:textColor="@color/campus_ink"
-            android:textSize="13sp" />
+            android:textSize="@dimen/text_meta" />
     </LinearLayout>
 </LinearLayout>
