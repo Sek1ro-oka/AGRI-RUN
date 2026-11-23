@@ -29,6 +29,8 @@ public final class StudyTimetableStore {
     private static final String KEY_SEMESTER_START = "semester_start";
     private static final String KEY_CLASS_REMINDER_ENABLED = "class_reminder_enabled";
     private static final String KEY_CLASS_REMINDER_LEAD = "class_reminder_lead_minutes";
+    /** 调课、停课、补课：按日期生效的例外清单。 */
+    private static final String KEY_ADJUSTMENTS = "day_adjustments";
     /** 旧版本只保存了每节课分钟数，读取时迁移后删除。 */
     private static final String KEY_LEGACY_PERIOD_MINUTES = "period_minutes";
 
@@ -51,6 +53,30 @@ public final class StudyTimetableStore {
 
     public static void clearCourses(Context context) {
         prefs(context).edit().remove(KEY_COURSES).apply();
+    }
+
+    /**
+     * 调课与节假日记录（只存今天及以后的，写入时顺手清掉过期的）。
+     * 小组件与课前提醒都读它，所以写在同一个偏好文件里，一次改动一起生效。
+     */
+    @NonNull
+    public static List<DayAdjustment> loadAdjustments(Context context) {
+        return DayAdjustmentCodec.decode(prefs(context).getString(KEY_ADJUSTMENTS, "[]"));
+    }
+
+    public static void saveAdjustments(Context context, List<DayAdjustment> items) {
+        prefs(context).edit().putString(KEY_ADJUSTMENTS, DayAdjustmentCodec.encode(items))
+                .apply();
+    }
+
+    /** 同一天同一门课只留最后一次安排。 */
+    public static void putAdjustment(Context context, @NonNull DayAdjustment adjustment) {
+        saveAdjustments(context,
+                TimetableDay.replacing(loadAdjustments(context), adjustment));
+    }
+
+    public static void removeAdjustment(Context context, @NonNull DayAdjustment adjustment) {
+        saveAdjustments(context, TimetableDay.removing(loadAdjustments(context), adjustment));
     }
 
     /** 学期教学总周数：默认 20，限制在 1–30。 */

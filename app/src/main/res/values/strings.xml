@@ -590,6 +590,25 @@
     <string name="study_timetable_import_nothing">分享码里的课本机都已经有了</string>
     <string name="study_timetable_import_done">已追加 %1$d 门课</string>
     <string name="study_timetable_import_replaced">课表已替换为 %1$d 门课</string>
+
+    <!-- 调课与节假日：只影响本机课表、小组件与提醒，按具体日期生效。 -->
+    <string name="study_timetable_adjust_title">调课与节假日</string>
+    <string name="study_timetable_adjust_none">没有例外</string>
+    <string name="study_timetable_adjust_count">%1$d 条例外</string>
+    <string name="study_timetable_adjust_manage_hint">点一条就能删掉。例外只改本机课表、小组件与课前提醒，不会写进导出的日历。</string>
+    <string name="study_timetable_adjust_empty">还没有例外，点「添加」记一条</string>
+    <string name="study_timetable_adjust_add">添加</string>
+    <string name="study_timetable_adjust_pick_title">记哪一类例外</string>
+    <string name="study_timetable_adjust_need_start">先设置开学日期，例外才知道落在哪一周</string>
+    <string name="study_timetable_adjust_need_courses">课表还是空的，先导入课表</string>
+    <string name="study_timetable_adjust_course_title">哪门课</string>
+    <string name="study_timetable_adjust_ref_title">按星期几的课表上</string>
+    <string name="study_timetable_adjust_no_class_on_day">这天没有课可改，先确认周次与星期</string>
+    <string name="study_timetable_adjust_target_title">改到星期几</string>
+    <string name="study_timetable_adjust_period_title">从第几节开始</string>
+    <string name="study_timetable_adjust_saved">已记下：%1$s</string>
+    <string name="study_timetable_adjust_removed">已删除这条例外</string>
+    <string name="study_timetable_adjust_delete_title">删掉这条例外？</string>
     <string name="study_import_title">导入课表</string>
     <string name="study_import_dialog_hint">确认后写入本机课表；导入后仍可点击课程修改或删除。</string>
     <string name="study_import_count">识别到 %1$d 门课程：</string>
@@ -861,6 +880,7 @@
     <string name="widget_timetable_status_upcoming">还有 %1$s · 下一节 %2$s</string>
     <string name="widget_timetable_status_done">今天的课上完 · 下次 %1$s</string>
     <string name="widget_timetable_status_clear">今天没有课 · 下次 %1$s</string>
+    <string name="widget_timetable_status_holiday">今天放假 · 下次 %1$s</string>
     <string name="widget_timetable_next_none">未来 %1$d 天没有课</string>
     <string name="widget_timetable_when_today">%1$s</string>
     <string name="widget_timetable_when_tomorrow">明天 %1$s</string>

@@ -33,6 +33,7 @@ import org.localroute.app.study.ClassReminderScheduler;
 import org.localroute.app.study.ChaoxingClient;
 import org.localroute.app.study.CustomHomework;
 import org.localroute.app.study.CustomHomeworkStore;
+import org.localroute.app.study.DayAdjustment;
 import org.localroute.app.study.HomeworkFilter;
 import org.localroute.app.study.HomeworkItem;
 import org.localroute.app.study.HomeworkReminderScheduler;
@@ -43,6 +44,7 @@ import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
+import org.localroute.app.study.TimetableDay;
 import org.localroute.app.study.TimetableText;
 
 import java.io.IOException;
@@ -751,12 +753,11 @@ public class StudyActivity extends AppCompatActivity {
         int teachingWeek = StudyTimetableStore.currentTeachingWeek(this);
         lastTeachingWeek = teachingWeek;
         currentWeek = Math.max(1, Math.min(totalWeeks, currentWeek));
-        List<TimetableCourse> weekCourses = new ArrayList<>();
-        for (TimetableCourse course : courses) {
-            if (TimetableText.activeInWeek(course.weeks(), currentWeek)) {
-                weekCourses.add(course);
-            }
-        }
+        LocalDate today = LocalDate.now();
+        LocalDate semesterStart = StudyTimetableStore.loadSemesterStart(this);
+        LocalDate weekStart = semesterStart == null ? null
+                : SemesterCalendar.mondayOf(semesterStart).plusWeeks(currentWeek - 1L);
+        List<TimetableCourse> weekCourses = visibleWeekCourses(courses, semesterStart, weekStart);
 
         boolean viewingCurrentWeek = teachingWeek > 0 && currentWeek == teachingWeek;
         binding.textWeekLabel.setText(getString(viewingCurrentWeek
@@ -769,8 +770,6 @@ public class StudyActivity extends AppCompatActivity {
         binding.buttonNextWeek.setEnabled(true);
         binding.buttonNextWeek.setAlpha(1f);
 
-        LocalDate today = LocalDate.now();
-        LocalDate semesterStart = StudyTimetableStore.loadSemesterStart(this);
         // 周次上方常驻「定位本周」入口：已设开学日期可一键跳回本周，未设置时引导去设置。
         binding.bannerSemesterStart.setVisibility(View.VISIBLE);
         if (teachingWeek > 0) {
@@ -789,8 +788,6 @@ public class StudyActivity extends AppCompatActivity {
             binding.bannerSemesterStart.setEnabled(false);
             binding.bannerSemesterStart.setAlpha(0.55f);
         }
-        LocalDate weekStart = semesterStart == null ? null
-                : SemesterCalendar.mondayOf(semesterStart).plusWeeks(currentWeek - 1L);
         int todayWeekday;
         if (weekStart == null) {
             // 没设置开学日期时不知道真实周次，沿用旧行为：高亮今天的星期。
@@ -817,6 +814,31 @@ public class StudyActivity extends AppCompatActivity {
         boolean empty = courses.isEmpty();
         binding.timetableGrid.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.textTimetableEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * 网格里这一周要画的课。
+     *
+     * <p>知道开学日期时，这一周的每一天都是具体日期，调课与节假日才能真的显示出来：
+     * 改到别天的课从原格子消失、出现在新格子，与桌面小组件、课前提醒说的是同一件事。
+     * 没设置开学日期时网格上的格子对不上具体日期，调课只作用于小组件与提醒。
+     */
+    @NonNull
+    private List<TimetableCourse> visibleWeekCourses(@NonNull List<TimetableCourse> courses,
+                                                     @Nullable LocalDate semesterStart,
+                                                     @Nullable LocalDate weekStart) {
+        List<DayAdjustment> adjustments = StudyTimetableStore.loadAdjustments(this);
+        if (weekStart != null) {
+            return TimetableDay.classesInWeek(courses, weekStart, semesterStart, totalWeeks,
+                    adjustments);
+        }
+        List<TimetableCourse> visible = new ArrayList<>();
+        for (TimetableCourse course : courses) {
+            if (TimetableText.activeInWeek(course.weeks(), currentWeek)) {
+                visible.add(course);
+            }
+        }
+        return visible;
     }
 
     /** 打开页面时定位到本学期真实教学周；没有开学日期时沿用上次查看的周。 */

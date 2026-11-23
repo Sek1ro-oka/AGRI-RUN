@@ -62,7 +62,8 @@ public class ClassReminderReceiver extends BroadcastReceiver {
                 StudyTimetableStore.loadSemesterStart(app),
                 StudyTimetableStore.loadTotalWeeks(app),
                 windowLeft, windowRight,
-                StudyTimetableStore.loadClassReminderLeadMinutes(app));
+                StudyTimetableStore.loadClassReminderLeadMinutes(app),
+                StudyTimetableStore.loadAdjustments(app));
         ensureChannel(app);
         NotificationManagerCompat manager = NotificationManagerCompat.from(app);
         for (ClassReminderPlanner.Reminder reminder : due) {

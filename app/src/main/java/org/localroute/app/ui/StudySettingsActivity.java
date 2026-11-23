@@ -34,6 +34,8 @@ import org.localroute.app.study.ClassReminderPlanner;
 import org.localroute.app.study.ClassReminderScheduler;
 import org.localroute.app.study.CustomHomework;
 import org.localroute.app.study.CustomHomeworkStore;
+import org.localroute.app.study.DayAdjustment;
+import org.localroute.app.study.DayAdjustmentLabel;
 import org.localroute.app.study.HomeworkReminderPlanner;
 import org.localroute.app.study.HomeworkReminderScheduler;
 import org.localroute.app.study.IcsTimetableWriter;
@@ -43,6 +45,7 @@ import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
+import org.localroute.app.study.TimetableDay;
 import org.localroute.app.study.TimetableImportPlan;
 import org.localroute.app.study.TimetableShareCodec;
 
@@ -133,6 +136,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         binding.rowExportIcs.setOnClickListener(view -> confirmExportIcs());
         binding.rowCopyShareCode.setOnClickListener(view -> copyShareCode());
         binding.rowImportShareCode.setOnClickListener(view -> showShareCodeDialog());
+        binding.rowAdjustments.setOnClickListener(view -> showAdjustments());
 
         binding.switchClassReminder.setOnClickListener(view -> {
             boolean enabled = binding.switchClassReminder.isChecked();
@@ -240,6 +244,7 @@ public class StudySettingsActivity extends AppCompatActivity {
 
         renderAccount();
         renderTimetableCount();
+        renderAdjustments();
         renderSchedule();
         renderReminder();
         renderHomeworkReminder();
@@ -250,6 +255,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         super.onResume();
         renderAccount();
         renderTimetableCount();
+        renderAdjustments();
         renderSchedule();
         renderReminder();
         renderHomeworkReminder();
@@ -295,6 +301,181 @@ public class StudySettingsActivity extends AppCompatActivity {
         binding.textTimetableCount.setText(getString(R.string.study_settings_timetable_count,
                 StudyTimetableStore.loadCourses(this).size()));
         renderSemesterStart();
+    }
+
+    // ------------------------------------------------------------ 调课与节假日
+
+    /** 例外条数写在行上，不用点开也知道这学期调过几次课。 */
+    private void renderAdjustments() {
+        int count = StudyTimetableStore.loadAdjustments(this).size();
+        binding.textAdjustmentValue.setText(count == 0
+                ? getString(R.string.study_timetable_adjust_none)
+                : getString(R.string.study_timetable_adjust_count, count));
+    }
+
+    /** 列表就是全部例外：点一条问要不要删，右下角「添加」走一遍录入。 */
+    private void showAdjustments() {
+        List<DayAdjustment> items = StudyTimetableStore.loadAdjustments(this);
+        List<TimetableCourse> courses = StudyTimetableStore.loadCourses(this);
+        LocalDate today = LocalDate.now();
+        String[] labels = new String[items.size()];
+        for (int i = 0; i < items.size(); i++) {
+            labels[i] = DayAdjustmentLabel.label(items.get(i), courses, today);
+        }
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.study_timetable_adjust_title)
+                .setMessage(items.isEmpty() ? R.string.study_timetable_adjust_empty
+                        : R.string.study_timetable_adjust_manage_hint)
+                .setItems(labels, (dialog, which) -> confirmRemoveAdjustment(items.get(which)))
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.study_timetable_adjust_add,
+                        (dialog, which) -> pickAdjustmentKind())
+                .show();
+    }
+
+    private void confirmRemoveAdjustment(@NonNull DayAdjustment item) {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.study_timetable_adjust_delete_title)
+                .setMessage(DayAdjustmentLabel.label(item,
+                        StudyTimetableStore.loadCourses(this), LocalDate.now()))
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.study_course_delete, (dialog, which) -> {
+                    StudyTimetableStore.removeAdjustment(this, item);
+                    renderAdjustments();
+                    toast(getString(R.string.study_timetable_adjust_removed));
+                })
+                .show();
+    }
+
+    private void pickAdjustmentKind() {
+        DayAdjustment.Kind[] kinds = {DayAdjustment.Kind.HOLIDAY, DayAdjustment.Kind.MAKEUP,
+                DayAdjustment.Kind.CANCEL, DayAdjustment.Kind.MOVE};
+        String[] labels = new String[kinds.length];
+        for (int i = 0; i < kinds.length; i++) {
+            labels[i] = DayAdjustmentLabel.kindLabel(kinds[i]);
+        }
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.study_timetable_adjust_pick_title)
+                .setItems(labels, (dialog, which) -> pickAdjustmentDate(kinds[which]))
+                .setNegativeButton(R.string.campus_cancel, null)
+                .show();
+    }
+
+    /**
+     * 先定日期再问细节。日期只让选今天及以后：过去的日子小组件和提醒都不会再回头看，
+     * 记了也等于没记，还白占存储。
+     */
+    private void pickAdjustmentDate(@NonNull DayAdjustment.Kind kind) {
+        if ((kind == DayAdjustment.Kind.CANCEL || kind == DayAdjustment.Kind.MOVE)
+                && StudyTimetableStore.loadCourses(this).isEmpty()) {
+            toast(getString(R.string.study_timetable_adjust_need_courses));
+            return;
+        }
+        if (kind == DayAdjustment.Kind.MOVE
+                && StudyTimetableStore.loadSemesterStart(this) == null) {
+            toast(getString(R.string.study_timetable_adjust_need_start));
+            return;
+        }
+        LocalDate today = LocalDate.now();
+        DatePickerDialog dialog = new DatePickerDialog(this, (view, year, month, dayOfMonth) ->
+                askRestOf(kind, LocalDate.of(year, month + 1, dayOfMonth)),
+                today.getYear(), today.getMonthValue() - 1, today.getDayOfMonth());
+        dialog.getDatePicker().setMinDate(System.currentTimeMillis());
+        dialog.show();
+    }
+
+    private void askRestOf(@NonNull DayAdjustment.Kind kind, @NonNull LocalDate date) {
+        switch (kind) {
+            case MAKEUP:
+                pickMakeupWeekday(date);
+                return;
+            case CANCEL:
+                pickCourseOn(date, false);
+                return;
+            case MOVE:
+                pickCourseOn(date, true);
+                return;
+            default:
+                saveAdjustment(DayAdjustment.holiday(date));
+        }
+    }
+
+    private void pickMakeupWeekday(@NonNull LocalDate date) {
+        newItemChooser(getString(R.string.study_timetable_adjust_ref_title), weekdayLabels(),
+                which -> saveAdjustment(DayAdjustment.makeup(date, which + 1)));
+    }
+
+    /**
+     * 只列这天真的会上到的课：把例外记在一节本来就没有的课上，除了让人以为上过之外没有别的效果。
+     */
+    private void pickCourseOn(@NonNull LocalDate date, boolean move) {
+        List<TimetableCourse> onDay = TimetableDay.classesOn(
+                StudyTimetableStore.loadCourses(this), date,
+                StudyTimetableStore.loadSemesterStart(this),
+                StudyTimetableStore.loadTotalWeeks(this),
+                StudyTimetableStore.loadAdjustments(this));
+        if (onDay.isEmpty()) {
+            toast(getString(R.string.study_timetable_adjust_no_class_on_day));
+            return;
+        }
+        String[] labels = new String[onDay.size()];
+        for (int i = 0; i < onDay.size(); i++) {
+            labels[i] = onDay.get(i).name() + " " + onDay.get(i).periodLabel();
+        }
+        newItemChooser(getString(R.string.study_timetable_adjust_course_title), labels, which -> {
+            TimetableCourse course = onDay.get(which);
+            if (move) {
+                pickMoveTarget(date, course);
+            } else {
+                saveAdjustment(DayAdjustment.cancel(date, course.id()));
+            }
+        });
+    }
+
+    /** 改课只问「改到哪天、从第几节开始」：目标日期由同一周内的星期几推出来，不必再填一次日期。 */
+    private void pickMoveTarget(@NonNull LocalDate date, @NonNull TimetableCourse source) {
+        newItemChooser(getString(R.string.study_timetable_adjust_target_title), weekdayLabels(),
+                which -> pickMovePeriod(date, source, which + 1));
+    }
+
+    /** 连上几节沿用原来的长度，超出当天最后一节时贴到最后一节。 */
+    private void pickMovePeriod(@NonNull LocalDate date, @NonNull TimetableCourse source,
+                                int weekday) {
+        int total = StudyTimetableStore.loadSchedule(this).totalPeriods();
+        String[] labels = new String[total];
+        for (int i = 1; i <= total; i++) {
+            labels[i - 1] = DayAdjustmentLabel.periodLabel(i, i);
+        }
+        newItemChooser(getString(R.string.study_timetable_adjust_period_title), labels, which -> {
+            int start = which + 1;
+            int length = Math.max(1, source.endPeriod() - source.startPeriod() + 1);
+            saveAdjustment(DayAdjustment.move(date, source.id(), weekday, start,
+                    Math.min(total, start + length - 1)));
+        });
+    }
+
+    private void saveAdjustment(@NonNull DayAdjustment adjustment) {
+        StudyTimetableStore.putAdjustment(this, adjustment);
+        renderAdjustments();
+        toast(getString(R.string.study_timetable_adjust_saved, DayAdjustmentLabel.label(
+                adjustment, StudyTimetableStore.loadCourses(this), LocalDate.now())));
+    }
+
+    private void newItemChooser(@NonNull String title, @NonNull String[] labels,
+                                @NonNull java.util.function.IntConsumer onPick) {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(title)
+                .setItems(labels, (dialog, which) -> onPick.accept(which))
+                .setNegativeButton(R.string.campus_cancel, null)
+                .show();
+    }
+
+    private static String[] weekdayLabels() {
+        String[] labels = new String[7];
+        for (int i = 1; i <= 7; i++) {
+            labels[i - 1] = DayAdjustmentLabel.weekdayName(i);
+        }
+        return labels;
     }
 
     private void renderSemesterStart() {
@@ -753,7 +934,8 @@ public class StudySettingsActivity extends AppCompatActivity {
                 StudyTimetableStore.loadTotalWeeks(this),
                 LocalDateTime.now(),
                 StudyTimetableStore.loadClassReminderLeadMinutes(this),
-                ClassReminderPlanner.DEFAULT_HORIZON_DAYS);
+                ClassReminderPlanner.DEFAULT_HORIZON_DAYS,
+                StudyTimetableStore.loadAdjustments(this));
         if (next == null) {
             showReminderWarning(getString(R.string.study_reminder_no_upcoming), true);
             return;

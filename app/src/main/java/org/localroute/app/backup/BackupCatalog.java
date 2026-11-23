@@ -121,6 +121,8 @@ public final class BackupCatalog {
                             new KeyRef("study_timetable", "total_weeks", BackupValues.TYPE_INT),
                             new KeyRef("study_timetable", "current_week", BackupValues.TYPE_INT),
                             new KeyRef("study_timetable", "semester_start", BackupValues.TYPE_LONG),
+                            new KeyRef("study_timetable", "day_adjustments",
+                                    BackupValues.TYPE_STRING),
                             new KeyRef("study_timetable", "class_reminder_enabled", BackupValues.TYPE_BOOLEAN),
                             new KeyRef("study_timetable", "class_reminder_lead_minutes", BackupValues.TYPE_INT))),
             new Section(SECTION_HOMEWORK, 1, R.string.backup_kind_homework, true, false,

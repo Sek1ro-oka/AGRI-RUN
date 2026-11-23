@@ -2,10 +2,12 @@ package org.localroute.app.widget;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+import org.localroute.app.study.DayAdjustment;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.TimetableCourse;
 
@@ -46,8 +48,13 @@ public class TimetableWidgetPlanTest {
 
     private static TimetableWidgetPlan plan(List<TimetableCourse> courses, LocalDate semesterStart,
                                            int nowMinutes) {
+        return plan(courses, semesterStart, nowMinutes, Collections.emptyList());
+    }
+
+    private static TimetableWidgetPlan plan(List<TimetableCourse> courses, LocalDate semesterStart,
+                                            int nowMinutes, List<DayAdjustment> adjustments) {
         return TimetableWidgetPlan.of(courses, StudySchedule.winterDefault(), semesterStart,
-                20, TODAY, nowMinutes);
+                20, TODAY, nowMinutes, adjustments);
     }
 
     @Test
@@ -206,6 +213,47 @@ public class TimetableWidgetPlanTest {
                 SEMESTER_START, at(9, 0));
         assertTrue(plan.todaySlots().isEmpty());
         assertEquals(TimetableWidgetPlan.Status.TODAY_CLEAR, plan.status());
+    }
+
+    @Test
+    public void holidayEmptiesTodayAndSaysSo() {
+        TimetableWidgetPlan plan = plan(
+                Collections.singletonList(course("高等数学", "教一", 1, 2, "1-20")),
+                SEMESTER_START, at(9, 0),
+                Collections.singletonList(DayAdjustment.holiday(TODAY)));
+        assertTrue(plan.todaySlots().isEmpty());
+        assertEquals(TimetableWidgetPlan.Status.TODAY_CLEAR, plan.status());
+        assertTrue(plan.closedToday());
+    }
+
+    @Test
+    public void withoutHolidayNothingIsMarkedClosed() {
+        TimetableWidgetPlan plan = plan(
+                Collections.singletonList(course("高等数学", "教一", 1, 2, "1-20")),
+                SEMESTER_START, at(9, 0));
+        assertFalse(plan.closedToday());
+    }
+
+    @Test
+    public void cancelledCourseLeavesTheRestOfToday() {
+        List<TimetableCourse> courses = Arrays.asList(
+                course("高等数学", "教一", 1, 2, "1-20"), course("英语", "教二", 3, 4, "1-20"));
+        TimetableWidgetPlan plan = plan(courses, SEMESTER_START, at(9, 0),
+                Collections.singletonList(DayAdjustment.cancel(TODAY, courses.get(0).id())));
+        assertEquals(1, plan.todaySlots().size());
+        assertEquals("英语", plan.todaySlots().get(0).course().name());
+    }
+
+    @Test
+    public void movedCourseIsGoneTodayAndAppearsOnItsNewDay() {
+        TimetableCourse math = course("高等数学", "教一", 1, 2, "1-20");
+        // 周三第一节挪到周四第 3-4 节：周四那格按 09:50 开始，作息没变。
+        TimetableWidgetPlan plan = plan(Collections.singletonList(math), SEMESTER_START, at(8, 0),
+                Collections.singletonList(DayAdjustment.move(TODAY, math.id(), 4, 3, 4)));
+        assertTrue(plan.todaySlots().isEmpty());
+        assertNotNull(plan.next());
+        assertEquals(TODAY.plusDays(1), plan.next().day());
+        assertEquals("09:50-11:25", plan.next().timeLabel());
     }
 
     @Test
