@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 小组件里的一节课：时间与教室写在同一行，超出宽度省略。 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widgetTimetableRow"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:includeFontPadding="false"
+    android:maxLines="1"
+    android:paddingTop="1dp"
+    android:paddingBottom="1dp"
+    android:textColor="@color/campus_ink"
+    android:textSize="12sp" />
