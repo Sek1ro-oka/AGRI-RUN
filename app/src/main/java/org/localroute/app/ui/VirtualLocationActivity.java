@@ -61,6 +61,7 @@ import org.localroute.app.overlay.OverlayHost;
 import org.localroute.app.run.RunRequest;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
+import org.localroute.app.search.CoordinateInput;
 import org.localroute.app.search.PhotonSearch;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.SettingsInspector;
@@ -108,6 +109,8 @@ public final class VirtualLocationActivity extends AppCompatActivity {
             () -> executeSearch(binding.inputPlaceSearch.getText().toString().trim());
     private int searchGeneration;
     private List<PhotonSearch.Place> lastSearchResults = Collections.emptyList();
+    /** 当前结果列表是「粘贴识别」出来的，用来换掉底图来源那行说明。 */
+    private boolean coordinateHit;
 
     @Nullable
     private GeoPoint cachedDeviceLocation;
@@ -500,6 +503,20 @@ public final class VirtualLocationActivity extends AppCompatActivity {
             hideSearchResults();
             return;
         }
+        CoordinateInput.Hit pasted = CoordinateInput.parse(query);
+        if (pasted != null) {
+            // 认得出坐标就不必联网：直接给一条结果，用户点它即完成选点。
+            ++searchGeneration;
+            coordinateHit = true;
+            lastSearchResults = Collections.singletonList(CoordinateInput.toPlace(pasted,
+                    getString(R.string.virtual_coord_name),
+                    getString(pasted.converted()
+                            ? R.string.virtual_coord_source_gcj
+                            : R.string.virtual_coord_source_wgs)));
+            renderSearchResults(lastSearchResults);
+            return;
+        }
+        coordinateHit = false;
         mainHandler.postDelayed(searchRunnable, SEARCH_DEBOUNCE_MS);
     }
 
@@ -543,6 +560,8 @@ public final class VirtualLocationActivity extends AppCompatActivity {
         enterSearchMode();
         binding.textSearchStatus.setVisibility(View.GONE);
         binding.textSearchAttribution.setVisibility(View.VISIBLE);
+        binding.textSearchAttribution.setText(getString(coordinateHit
+                ? R.string.virtual_search_attr_coordinate : R.string.virtual_search_attribution));
         LinearLayout container = binding.searchResultsContainer;
         container.removeAllViews();
         GeoPoint origin = cachedDeviceLocation != null ? cachedDeviceLocation
