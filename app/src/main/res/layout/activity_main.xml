@@ -24,15 +24,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="20dp"
-            android:paddingBottom="16dp">
+            android:paddingHorizontal="@dimen/space_4xl"
+            android:paddingBottom="@dimen/space_3xl">
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardHomeBanner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="@dimen/space_xs"
                 app:cardBackgroundColor="@color/fm_surface_alt"
-                app:cardCornerRadius="20dp"
+                app:cardCornerRadius="@dimen/radius_sheet"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp">
                 <ImageView
@@ -48,34 +48,34 @@
                 android:id="@+id/cardActiveRun"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/space_xl"
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
                 android:visibility="gone"
                 app:cardBackgroundColor="@color/fm_surface_alt"
-                app:cardCornerRadius="20dp"
+                app:cardCornerRadius="@dimen/radius_sheet"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="@dimen/space_3xl">
                     <TextView
                         android:id="@+id/textActiveRunTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:textColor="@color/fm_text"
-                        android:textSize="16sp"
+                        android:textSize="@dimen/text_title"
                         android:textStyle="bold" />
                     <TextView
                         android:id="@+id/textActiveRunDetail"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
+                        android:layout_marginTop="@dimen/space_xs"
                         android:textColor="@color/fm_link"
-                        android:textSize="13sp" />
+                        android:textSize="@dimen/text_meta" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
             <!-- 环境没准备好时才出现；三项阻塞项就绪后自动收起，不占常驻位置。 -->
@@ -83,13 +83,13 @@
                 android:id="@+id/cardSetupGuide"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/space_xl"
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
                 android:visibility="gone"
                 app:cardBackgroundColor="@color/fm_surface_alt"
-                app:cardCornerRadius="20dp"
+                app:cardCornerRadius="@dimen/radius_sheet"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp">
                 <LinearLayout
@@ -97,19 +97,19 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:padding="16dp">
+                    android:padding="@dimen/space_3xl">
                     <ImageView
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="@dimen/icon_home"
+                        android:layout_height="@dimen/icon_home"
                         android:background="@drawable/bg_campus_entry_icon"
                         android:contentDescription="@null"
-                        android:padding="7dp"
+                        android:padding="@dimen/space_sm"
                         android:src="@drawable/ic_campus_settings"
                         app:tint="@color/fm_link" />
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:orientation="vertical">
                         <TextView
@@ -117,32 +117,31 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:textColor="@color/fm_text"
-                            android:textSize="15sp"
+                            android:textSize="@dimen/text_lead"
                             android:textStyle="bold" />
                         <TextView
                             android:id="@+id/textSetupGuideDetail"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
+                            android:layout_marginTop="@dimen/space_xs"
                             android:textColor="@color/fm_text_secondary"
-                            android:textSize="11sp" />
+                            android:textSize="@dimen/text_caption" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="12dp"
+                android:layout_marginTop="@dimen/space_3xl"
+                android:layout_marginBottom="@dimen/space_xl"
                 android:text="@string/fm_home_section"
                 android:textColor="@color/fm_text_secondary"
-                android:textSize="14sp"
+                android:textSize="@dimen/text_body"
                 android:textStyle="bold" />
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardCampusRun"
                     android:layout_width="0dp"
@@ -152,110 +151,109 @@
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground"
                     app:cardBackgroundColor="@color/fm_surface_alt"
-                    app:cardCornerRadius="20dp"
+                    app:cardCornerRadius="@dimen/radius_sheet"
                     app:cardElevation="0dp"
                     app:strokeWidth="0dp">
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="14dp">
+                        android:padding="@dimen/space_2xl">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
                             <ImageView
-                                android:layout_width="32dp"
-                                android:layout_height="32dp"
+                                android:layout_width="@dimen/icon_home"
+                                android:layout_height="@dimen/icon_home"
                                 android:background="@drawable/bg_campus_entry_icon"
                                 android:contentDescription="@null"
-                                android:padding="7dp"
+                                android:padding="@dimen/space_sm"
                                 android:src="@drawable/ic_campus_run"
                                 app:tint="@color/fm_link" />
                             <TextView
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="9dp"
+                                android:layout_marginStart="@dimen/space_md"
                                 android:layout_weight="1"
                                 android:text="@string/campus_entry_title"
                                 android:textColor="@color/fm_text"
-                                android:textSize="15sp"
+                                android:textSize="@dimen/text_lead"
                                 android:textStyle="bold" />
                         </LinearLayout>
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="@dimen/space_md"
                             android:text="@string/campus_entry_subtitle_short"
                             android:textColor="@color/fm_text_secondary"
-                            android:textSize="11sp" />
+                            android:textSize="@dimen/text_caption" />
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
+                            android:layout_marginTop="@dimen/space_sm"
                             android:text="@string/fm_run_action"
                             android:textColor="@color/fm_link"
-                            android:textSize="11sp"
+                            android:textSize="@dimen/text_caption"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
-
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardVirtualLocation"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/space_xl"
                     android:layout_weight="1"
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground"
                     app:cardBackgroundColor="@color/fm_surface_alt"
-                    app:cardCornerRadius="20dp"
+                    app:cardCornerRadius="@dimen/radius_sheet"
                     app:cardElevation="0dp"
                     app:strokeWidth="0dp">
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="14dp">
+                        android:padding="@dimen/space_2xl">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
                             <ImageView
-                                android:layout_width="32dp"
-                                android:layout_height="32dp"
+                                android:layout_width="@dimen/icon_home"
+                                android:layout_height="@dimen/icon_home"
                                 android:background="@drawable/bg_campus_entry_icon"
                                 android:contentDescription="@null"
-                                android:padding="7dp"
+                                android:padding="@dimen/space_sm"
                                 android:src="@drawable/ic_campus_teleport"
                                 app:tint="@color/fm_link" />
                             <TextView
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="9dp"
+                                android:layout_marginStart="@dimen/space_md"
                                 android:layout_weight="1"
                                 android:text="@string/virtual_title"
                                 android:textColor="@color/fm_text"
-                                android:textSize="15sp"
+                                android:textSize="@dimen/text_lead"
                                 android:textStyle="bold" />
                         </LinearLayout>
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="@dimen/space_md"
                             android:text="@string/virtual_entry_subtitle"
                             android:textColor="@color/fm_text_secondary"
-                            android:textSize="11sp" />
+                            android:textSize="@dimen/text_caption" />
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
+                            android:layout_marginTop="@dimen/space_sm"
                             android:text="@string/virtual_entry_action"
                             android:textColor="@color/fm_link"
-                            android:textSize="11sp"
+                            android:textSize="@dimen/text_caption"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -263,11 +261,11 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="8dp"
+                android:layout_marginTop="@dimen/space_3xl"
+                android:layout_marginBottom="@dimen/space_md"
                 android:text="@string/fm_study_short"
                 android:textColor="@color/fm_text_secondary"
-                android:textSize="14sp"
+                android:textSize="@dimen/text_body"
                 android:textStyle="bold" />
             <LinearLayout
                 android:id="@+id/cardTimetable"
@@ -281,7 +279,7 @@
                 <ImageView
                     android:layout_width="44dp"
                     android:layout_height="44dp"
-                    android:padding="10dp"
+                    android:padding="@dimen/space_lg"
                     android:background="@drawable/bg_campus_entry_icon"
                     android:src="@drawable/ic_study_calendar"
                     android:contentDescription="@null"
@@ -290,22 +288,22 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/space_xl"
                     android:orientation="vertical">
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/fm_timetable"
                         android:textColor="@color/fm_text"
-                        android:textSize="16sp"
+                        android:textSize="@dimen/text_title"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
+                        android:layout_marginTop="@dimen/space_hair"
                         android:text="@string/fm_timetable_description"
                         android:textColor="@color/fm_muted"
-                        android:textSize="12sp" />
+                        android:textSize="@dimen/text_label" />
                 </LinearLayout>
                 <ImageView
                     android:layout_width="20dp"
@@ -316,7 +314,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginStart="56dp"
+                android:layout_marginStart="@dimen/inset_nav"
                 android:background="@color/fm_border" />
             <LinearLayout
                 android:id="@+id/cardStudy"
@@ -330,7 +328,7 @@
                 <ImageView
                     android:layout_width="44dp"
                     android:layout_height="44dp"
-                    android:padding="10dp"
+                    android:padding="@dimen/space_lg"
                     android:background="@drawable/bg_campus_entry_icon"
                     android:src="@drawable/ic_study_homework"
                     android:contentDescription="@null"
@@ -339,22 +337,22 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/space_xl"
                     android:orientation="vertical">
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/study_title"
                         android:textColor="@color/fm_text"
-                        android:textSize="16sp"
+                        android:textSize="@dimen/text_title"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
+                        android:layout_marginTop="@dimen/space_hair"
                         android:text="@string/study_entry_subtitle_short"
                         android:textColor="@color/fm_muted"
-                        android:textSize="12sp" />
+                        android:textSize="@dimen/text_label" />
                 </LinearLayout>
                 <ImageView
                     android:layout_width="20dp"
@@ -367,9 +365,9 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="60dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginBottom="10dp"
-        android:paddingHorizontal="12dp"
+        android:layout_marginHorizontal="@dimen/space_4xl"
+        android:layout_marginBottom="@dimen/space_lg"
+        android:paddingHorizontal="@dimen/space_xl"
         android:background="@drawable/bg_fm_nav"
         android:gravity="center_vertical"
         android:orientation="horizontal">
@@ -389,7 +387,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/fm_home"
                 android:textColor="@color/fm_on_nav"
-                android:textSize="11sp"
+                android:textSize="@dimen/text_caption"
                 android:textStyle="bold" />
         </LinearLayout>
         <LinearLayout
@@ -412,7 +410,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/campus_entry_title"
                 android:textColor="@color/fm_nav_idle"
-                android:textSize="11sp" />
+                android:textSize="@dimen/text_caption" />
         </LinearLayout>
         <LinearLayout
             android:id="@+id/navStudy"
@@ -434,7 +432,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/fm_study_short"
                 android:textColor="@color/fm_nav_idle"
-                android:textSize="11sp" />
+                android:textSize="@dimen/text_caption" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

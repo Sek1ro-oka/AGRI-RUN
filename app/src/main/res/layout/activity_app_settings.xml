@@ -23,33 +23,32 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="16dp">
+            android:paddingBottom="@dimen/space_3xl">
             <TextView
+            style="@style/Text.Unloop.Note"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginTop="18dp"
+                android:layout_marginStart="@dimen/space_3xl"
+                android:layout_marginTop="@dimen/space_3xl"
                 android:letterSpacing="0.08"
                 android:text="@string/app_settings_section_general"
-                android:textColor="@color/campus_muted"
-                android:textSize="12sp"
                 android:textStyle="bold" />
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginEnd="12dp"
+                android:layout_marginStart="@dimen/space_xl"
+                android:layout_marginTop="@dimen/space_md"
+                android:layout_marginEnd="@dimen/space_xl"
                 app:cardBackgroundColor="@color/fm_surface"
-                app:cardCornerRadius="20dp"
+                app:cardCornerRadius="@dimen/radius_sheet"
                 app:cardElevation="0dp"
                 app:strokeColor="@color/campus_card_stroke"
-                app:strokeWidth="1dp">
+                app:strokeWidth="@dimen/stroke_edge">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingHorizontal="14dp">
+                    android:paddingHorizontal="@dimen/space_2xl">
                     <LinearLayout
                         android:id="@+id/rowAppearance"
                         android:layout_width="match_parent"
@@ -59,27 +58,26 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingVertical="14dp">
-                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="12dp" android:background="@drawable/bg_campus_entry_icon" android:padding="10dp" android:src="@drawable/ic_fm_display" android:contentDescription="@null" app:tint="@color/fm_link" />
+                        android:paddingVertical="@dimen/space_2xl">
+                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="@dimen/space_xl" android:background="@drawable/bg_campus_entry_icon" android:padding="@dimen/space_lg" android:src="@drawable/ic_fm_display" android:contentDescription="@null" app:tint="@color/fm_link" />
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
+                            style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_appearance_title"
-                                android:textColor="@color/campus_ink"
-                                android:textSize="14sp"
                                 android:textStyle="bold" />
                             <TextView
+                            style="@style/Text.Unloop.Caption"
                                 android:id="@+id/textAppearanceValue"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:textColor="@color/campus_muted"
-                                android:textSize="11sp" />
+                                android:layout_marginTop="@dimen/space_hair"
+                                />
                         </LinearLayout>
                         <ImageView
                             android:layout_width="20dp"
@@ -97,37 +95,36 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingVertical="14dp">
-                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="12dp" android:background="@drawable/bg_campus_entry_icon" android:padding="10dp" android:src="@drawable/ic_fm_globe" android:contentDescription="@null" app:tint="@color/fm_link" />
+                        android:paddingVertical="@dimen/space_2xl">
+                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="@dimen/space_xl" android:background="@drawable/bg_campus_entry_icon" android:padding="@dimen/space_lg" android:src="@drawable/ic_fm_globe" android:contentDescription="@null" app:tint="@color/fm_link" />
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
+                            style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_language_title"
-                                android:textColor="@color/campus_ink"
-                                android:textSize="14sp"
                                 android:textStyle="bold" />
                             <TextView
+                            style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
+                                android:layout_marginTop="@dimen/space_hair"
                                 android:text="@string/app_settings_language_value"
-                                android:textColor="@color/campus_muted"
-                                android:textSize="11sp" />
+                                />
                         </LinearLayout>
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:background="@drawable/bg_campus_soft_pill"
-                            android:paddingHorizontal="9dp"
-                            android:paddingVertical="3dp"
+                            android:paddingHorizontal="@dimen/space_md"
+                            android:paddingVertical="@dimen/space_xs"
                             android:text="@string/app_settings_language_badge"
                             android:textColor="@color/campus_mint_dark"
-                            android:textSize="10sp" />
+                            android:textSize="@dimen/text_caption" />
                     </LinearLayout>
                     <View
                         android:layout_width="match_parent"
@@ -142,19 +139,18 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingVertical="14dp">
-                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="12dp" android:background="@drawable/bg_campus_entry_icon" android:padding="10dp" android:src="@drawable/ic_fm_key" android:contentDescription="@null" app:tint="@color/fm_link" />
+                        android:paddingVertical="@dimen/space_2xl">
+                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="@dimen/space_xl" android:background="@drawable/bg_campus_entry_icon" android:padding="@dimen/space_lg" android:src="@drawable/ic_fm_key" android:contentDescription="@null" app:tint="@color/fm_link" />
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
+                            style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_activation_title"
-                                android:textColor="@color/campus_ink"
-                                android:textSize="14sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
                         <ImageView
@@ -177,35 +173,32 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingVertical="14dp">
-                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="12dp" android:background="@drawable/bg_campus_entry_icon" android:padding="10dp" android:src="@drawable/ic_campus_widget" android:contentDescription="@null" app:tint="@color/fm_link" />
+                        android:paddingVertical="@dimen/space_2xl">
+                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="@dimen/space_xl" android:background="@drawable/bg_campus_entry_icon" android:padding="@dimen/space_lg" android:src="@drawable/ic_campus_widget" android:contentDescription="@null" app:tint="@color/fm_link" />
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
+                            style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_widget_title"
-                                android:textColor="@color/campus_ink"
-                                android:textSize="14sp"
                                 android:textStyle="bold" />
                             <TextView
+                            style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
+                                android:layout_marginTop="@dimen/space_hair"
                                 android:text="@string/app_settings_widget_subtitle"
-                                android:textColor="@color/campus_muted"
-                                android:textSize="11sp" />
+                                />
                         </LinearLayout>
                     </LinearLayout>
-
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/fm_border" />
-
                     <LinearLayout
                         android:id="@+id/rowReminders"
                         android:layout_width="match_parent"
@@ -215,58 +208,56 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingVertical="14dp">
-                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="12dp" android:background="@drawable/bg_campus_entry_icon" android:padding="10dp" android:src="@drawable/ic_study_clock" android:contentDescription="@null" app:tint="@color/fm_link" />
+                        android:paddingVertical="@dimen/space_2xl">
+                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="@dimen/space_xl" android:background="@drawable/bg_campus_entry_icon" android:padding="@dimen/space_lg" android:src="@drawable/ic_study_clock" android:contentDescription="@null" app:tint="@color/fm_link" />
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
+                            style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/app_settings_reminders_title"
-                                android:textColor="@color/campus_ink"
-                                android:textSize="14sp"
                                 android:textStyle="bold" />
                             <TextView
+                            style="@style/Text.Unloop.Caption"
                                 android:id="@+id/textRemindersValue"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
+                                android:layout_marginTop="@dimen/space_hair"
                                 android:text="@string/app_settings_reminders_subtitle"
-                                android:textColor="@color/campus_muted"
-                                android:textSize="11sp" />
+                                />
                         </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
             <TextView
+            style="@style/Text.Unloop.Note"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginTop="18dp"
+                android:layout_marginStart="@dimen/space_3xl"
+                android:layout_marginTop="@dimen/space_3xl"
                 android:letterSpacing="0.08"
                 android:text="@string/app_settings_section_data"
-                android:textColor="@color/campus_muted"
-                android:textSize="12sp"
                 android:textStyle="bold" />
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginEnd="12dp"
+                android:layout_marginStart="@dimen/space_xl"
+                android:layout_marginTop="@dimen/space_md"
+                android:layout_marginEnd="@dimen/space_xl"
                 app:cardBackgroundColor="@color/fm_surface"
-                app:cardCornerRadius="20dp"
+                app:cardCornerRadius="@dimen/radius_sheet"
                 app:cardElevation="0dp"
                 app:strokeColor="@color/campus_card_stroke"
-                app:strokeWidth="1dp">
+                app:strokeWidth="@dimen/stroke_edge">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingHorizontal="14dp">
+                    android:paddingHorizontal="@dimen/space_2xl">
                     <LinearLayout
                         android:id="@+id/rowRunHistory"
                         android:layout_width="match_parent"
@@ -276,27 +267,26 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingVertical="14dp">
-                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="12dp" android:background="@drawable/bg_campus_entry_icon" android:padding="10dp" android:src="@drawable/ic_campus_history" android:contentDescription="@null" app:tint="@color/fm_link" />
+                        android:paddingVertical="@dimen/space_2xl">
+                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="@dimen/space_xl" android:background="@drawable/bg_campus_entry_icon" android:padding="@dimen/space_lg" android:src="@drawable/ic_campus_history" android:contentDescription="@null" app:tint="@color/fm_link" />
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
+                            style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/run_history_title"
-                                android:textColor="@color/campus_ink"
-                                android:textSize="14sp"
                                 android:textStyle="bold" />
                             <TextView
+                            style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
+                                android:layout_marginTop="@dimen/space_hair"
                                 android:text="@string/run_history_entry_subtitle"
-                                android:textColor="@color/campus_muted"
-                                android:textSize="11sp" />
+                                />
                         </LinearLayout>
                         <ImageView
                             android:layout_width="20dp"
@@ -317,27 +307,26 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingVertical="14dp">
-                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="12dp" android:background="@drawable/bg_campus_entry_icon" android:padding="10dp" android:src="@drawable/ic_fm_backup" android:contentDescription="@null" app:tint="@color/fm_link" />
+                        android:paddingVertical="@dimen/space_2xl">
+                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="@dimen/space_xl" android:background="@drawable/bg_campus_entry_icon" android:padding="@dimen/space_lg" android:src="@drawable/ic_fm_backup" android:contentDescription="@null" app:tint="@color/fm_link" />
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
+                            style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/backup_export_action"
-                                android:textColor="@color/campus_ink"
-                                android:textSize="14sp"
                                 android:textStyle="bold" />
                             <TextView
+                            style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
+                                android:layout_marginTop="@dimen/space_hair"
                                 android:text="@string/backup_export_hint"
-                                android:textColor="@color/campus_muted"
-                                android:textSize="11sp" />
+                                />
                         </LinearLayout>
                         <ImageView
                             android:layout_width="20dp"
@@ -358,27 +347,26 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingVertical="14dp">
-                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="12dp" android:background="@drawable/bg_campus_entry_icon" android:padding="10dp" android:src="@drawable/ic_fm_restore" android:contentDescription="@null" app:tint="@color/fm_link" />
+                        android:paddingVertical="@dimen/space_2xl">
+                        <ImageView android:layout_width="44dp" android:layout_height="44dp" android:layout_marginEnd="@dimen/space_xl" android:background="@drawable/bg_campus_entry_icon" android:padding="@dimen/space_lg" android:src="@drawable/ic_fm_restore" android:contentDescription="@null" app:tint="@color/fm_link" />
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
                             <TextView
+                            style="@style/Text.Unloop.Body"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/backup_import_action"
-                                android:textColor="@color/campus_ink"
-                                android:textSize="14sp"
                                 android:textStyle="bold" />
                             <TextView
+                            style="@style/Text.Unloop.Caption"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
+                                android:layout_marginTop="@dimen/space_hair"
                                 android:text="@string/backup_import_hint"
-                                android:textColor="@color/campus_muted"
-                                android:textSize="11sp" />
+                                />
                         </LinearLayout>
                         <ImageView
                             android:layout_width="20dp"
@@ -390,10 +378,10 @@
             </com.google.android.material.card.MaterialCardView>
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/rowUpdate"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+                style="@style/Widget.Unloop.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
-                android:layout_margin="16dp"
+                android:layout_margin="@dimen/space_3xl"
                 android:text="@string/home_update_title"
                 app:icon="@drawable/ic_campus_update" />
         </LinearLayout>

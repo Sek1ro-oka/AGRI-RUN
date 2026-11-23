@@ -4,206 +4,177 @@
     android:layout_height="wrap_content"
     android:fillViewport="true"
     android:scrollbars="none">
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="4dp">
-
+        android:paddingHorizontal="@dimen/space_4xl"
+        android:paddingTop="@dimen/space_xs">
         <TextView
+        style="@style/Text.Unloop.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/study_course_name"
-            android:textColor="@color/campus_muted"
-            android:textSize="11sp"
             android:textStyle="bold" />
-
         <EditText
             android:id="@+id/inputCourseName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="@dimen/space_xs"
             android:background="@drawable/bg_study_input"
             android:hint="高等数学"
             android:importantForAutofill="no"
             android:inputType="text"
             android:maxLines="1"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="10dp"
+            android:paddingHorizontal="@dimen/space_xl"
+            android:paddingVertical="@dimen/space_lg"
             android:textColor="@color/campus_ink"
             android:textColorHint="@color/fm_muted"
-            android:textSize="14sp" />
-
+            android:textSize="@dimen/text_body" />
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/space_lg"
             android:orientation="horizontal">
-
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical">
-
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/study_course_weekday"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp"
                     android:textStyle="bold" />
-
                 <Spinner
                     android:id="@+id/spinnerCourseWeekday"
                     android:layout_width="match_parent"
                     android:layout_height="44dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:background="@drawable/bg_study_input"
-                    android:paddingHorizontal="10dp"
+                    android:paddingHorizontal="@dimen/space_lg"
                     android:popupBackground="@color/fm_surface" />
             </LinearLayout>
-
             <Space
                 android:layout_width="10dp"
                 android:layout_height="1dp" />
-
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical">
-
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/study_course_period"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp"
                     android:textStyle="bold" />
-
                 <EditText
                     android:id="@+id/inputCoursePeriod"
                     android:layout_width="match_parent"
                     android:layout_height="44dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:background="@drawable/bg_study_input"
                     android:hint="@string/study_course_period_hint"
                     android:importantForAutofill="no"
                     android:inputType="text"
                     android:maxLines="1"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="@dimen/space_xl"
                     android:textColor="@color/campus_ink"
                     android:textColorHint="@color/fm_muted"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/text_body" />
             </LinearLayout>
         </LinearLayout>
-
         <TextView
+        style="@style/Text.Unloop.Caption"
             android:id="@+id/textCourseTimeRange"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:textColor="@color/campus_muted"
-            android:textSize="11sp"
+            android:layout_marginTop="@dimen/space_sm"
             android:visibility="gone" />
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/space_lg"
             android:orientation="horizontal">
-
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical">
-
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/study_course_weeks"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp"
                     android:textStyle="bold" />
-
                 <EditText
                     android:id="@+id/inputCourseWeeks"
                     android:layout_width="match_parent"
                     android:layout_height="44dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:background="@drawable/bg_study_input"
                     android:hint="@string/study_course_weeks_hint"
                     android:importantForAutofill="no"
                     android:inputType="text"
                     android:maxLines="1"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="@dimen/space_xl"
                     android:textColor="@color/campus_ink"
                     android:textColorHint="@color/fm_muted"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/text_body" />
             </LinearLayout>
-
             <Space
                 android:layout_width="10dp"
                 android:layout_height="1dp" />
-
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical">
-
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/study_course_location"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp"
                     android:textStyle="bold" />
-
                 <EditText
                     android:id="@+id/inputCourseLocation"
                     android:layout_width="match_parent"
                     android:layout_height="44dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:background="@drawable/bg_study_input"
                     android:hint="教一101"
                     android:importantForAutofill="no"
                     android:inputType="text"
                     android:maxLines="1"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="@dimen/space_xl"
                     android:textColor="@color/campus_ink"
                     android:textColorHint="@color/fm_muted"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/text_body" />
             </LinearLayout>
         </LinearLayout>
-
         <TextView
+        style="@style/Text.Unloop.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/space_lg"
             android:text="@string/study_course_teacher"
-            android:textColor="@color/campus_muted"
-            android:textSize="11sp"
             android:textStyle="bold" />
-
         <EditText
             android:id="@+id/inputCourseTeacher"
             android:layout_width="match_parent"
             android:layout_height="44dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="4dp"
+            android:layout_marginTop="@dimen/space_xs"
+            android:layout_marginBottom="@dimen/space_xs"
             android:background="@drawable/bg_study_input"
             android:hint="张老师"
             android:importantForAutofill="no"
             android:inputType="text"
             android:maxLines="1"
-            android:paddingHorizontal="12dp"
+            android:paddingHorizontal="@dimen/space_xl"
             android:textColor="@color/campus_ink"
             android:textColorHint="@color/fm_muted"
-            android:textSize="14sp" />
+            android:textSize="@dimen/text_body" />
     </LinearLayout>
 </ScrollView>

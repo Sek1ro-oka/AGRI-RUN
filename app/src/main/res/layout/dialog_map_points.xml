@@ -3,77 +3,68 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingHorizontal="20dp"
-    android:paddingTop="18dp"
-    android:paddingBottom="12dp">
-
+    android:paddingHorizontal="@dimen/space_4xl"
+    android:paddingTop="@dimen/space_3xl"
+    android:paddingBottom="@dimen/space_xl">
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/virtual_points_title"
         android:textColor="@color/campus_ink"
-        android:textSize="18sp"
+        android:textSize="@dimen/text_section"
         android:textStyle="bold" />
-
     <TextView
+    style="@style/Text.Unloop.Note"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="@dimen/space_hair"
         android:text="@string/virtual_points_hint"
-        android:textColor="@color/campus_muted"
-        android:textSize="12sp" />
-
+        />
     <ScrollView
         android:id="@+id/pointsScroll"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="@dimen/space_md"
         android:fillViewport="true"
         android:overScrollMode="ifContentScrolls"
         android:scrollbars="none">
-
         <LinearLayout
             android:id="@+id/pointList"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />
     </ScrollView>
-
     <TextView
+    style="@style/Text.Unloop.Meta"
         android:id="@+id/textNoPoints"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingVertical="14dp"
+        android:paddingVertical="@dimen/space_2xl"
         android:text="@string/virtual_points_empty"
-        android:textColor="@color/campus_muted"
-        android:textSize="13sp"
         android:visibility="gone" />
-
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="@dimen/space_md"
         android:background="@color/campus_card_stroke" />
-
     <com.google.android.material.button.MaterialButton
         android:id="@+id/buttonSaveCenter"
-        style="@style/Widget.Material3.Button.TextButton"
+        style="@style/Widget.Unloop.TextButton"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:insetTop="0dp"
         android:insetBottom="0dp"
         android:text="@string/virtual_points_save"
         android:textColor="@color/campus_mint_dark"
-        android:textSize="14sp" />
-
+        android:textSize="@dimen/text_body" />
     <com.google.android.material.button.MaterialButton
         android:id="@+id/buttonClosePoints"
-        style="@style/Widget.Material3.Button.TextButton"
+        style="@style/Widget.Unloop.TextButton"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="@dimen/touch_min"
         android:insetTop="0dp"
         android:insetBottom="0dp"
         android:text="@string/virtual_points_close"
         android:textColor="@color/campus_muted"
-        android:textSize="13sp" />
+        android:textSize="@dimen/text_meta" />
 </LinearLayout>

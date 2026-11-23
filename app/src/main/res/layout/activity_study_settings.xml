@@ -6,103 +6,92 @@
     android:layout_height="match_parent"
     android:background="@color/campus_setup_bg"
     android:orientation="vertical">
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="8dp">
-
+        android:paddingHorizontal="@dimen/space_4xl"
+        android:paddingTop="@dimen/space_md">
         <ImageButton
             android:id="@+id/buttonSettingsBack"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="@dimen/touch_min"
+            android:layout_height="@dimen/touch_min"
             android:background="@drawable/bg_campus_soft_circle"
             android:contentDescription="@string/study_back"
-            android:elevation="2dp"
-            android:padding="11dp"
+            android:elevation="@dimen/elevation_low"
+            android:padding="@dimen/space_xl"
             android:src="@drawable/ic_campus_back" />
-
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="@dimen/space_xl"
             android:layout_weight="1"
             android:text="@string/study_settings_title"
             android:textColor="@color/campus_ink"
-            android:textSize="20sp"
+            android:textSize="@dimen/text_page_title"
             android:textStyle="bold" />
     </LinearLayout>
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true"
         android:scrollbars="none">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="20dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="26dp">
-
+            android:paddingHorizontal="@dimen/space_4xl"
+            android:paddingTop="@dimen/space_md"
+            android:paddingBottom="@dimen/space_5xl">
             <!-- 学习通账户 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_campus_card"
                 android:orientation="vertical"
-                android:paddingHorizontal="18dp"
-                android:paddingVertical="16dp">
-
+                android:paddingHorizontal="@dimen/space_3xl"
+                android:paddingVertical="@dimen/space_3xl">
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/study_account_title"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp"
                     android:textStyle="bold" />
-
                 <TextView
                     android:id="@+id/textAccountName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:text="@string/study_account_unbound"
                     android:textColor="@color/campus_ink"
-                    android:textSize="19sp"
+                    android:textSize="@dimen/text_section"
                     android:textStyle="bold" />
-
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:id="@+id/textAccountMeta"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:lineSpacingExtra="1dp"
                     android:text="@string/study_account_unbound_hint"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp" />
-
+                    />
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonSwitchAccount"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    style="@style/Widget.Unloop.OutlinedButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:layout_marginTop="12dp"
+                    android:layout_height="@dimen/touch_min"
+                    android:layout_marginTop="@dimen/space_xl"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="16dp"
+                    android:minWidth="@dimen/touch_min"
+                    android:paddingHorizontal="@dimen/space_3xl"
                     android:text="@string/study_account_switch"
                     android:textColor="@color/campus_mint_dark"
-                    android:textSize="13sp"
+                    android:textSize="@dimen/text_meta"
                     android:textStyle="bold"
-                    app:cornerRadius="14dp"
+                    app:cornerRadius="@dimen/radius_card"
                     app:icon="@drawable/ic_study_link"
                     app:iconGravity="textStart"
                     app:iconPadding="5dp"
@@ -110,88 +99,76 @@
                     app:iconTint="@color/campus_mint_dark"
                     app:strokeColor="@color/campus_card_stroke" />
             </LinearLayout>
-
             <!-- 课表 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/space_xl"
                 android:background="@drawable/bg_campus_card"
                 android:orientation="vertical"
-                android:paddingHorizontal="18dp"
-                android:paddingVertical="8dp">
-
+                android:paddingHorizontal="@dimen/space_3xl"
+                android:paddingVertical="@dimen/space_md">
                 <TextView
+                style="@style/Text.Unloop.Body"
                     android:id="@+id/textTimetableCount"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingTop="8dp"
-                    android:textColor="@color/campus_ink"
-                    android:textSize="14sp"
+                    android:paddingTop="@dimen/space_md"
                     android:textStyle="bold" />
-
                 <LinearLayout
                     android:id="@+id/rowSemesterStart"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_calendar" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
+                        style="@style/Text.Unloop.Body"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/study_semester_start_title"
-                            android:textColor="@color/campus_ink"
-                            android:textSize="14sp" />
-
+                            />
                         <TextView
+                        style="@style/Text.Unloop.Caption"
                             android:id="@+id/textSemesterStartValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_hair"
                             android:text="@string/study_semester_start_unset"
-                            android:textColor="@color/campus_muted"
-                            android:textSize="11sp" />
+                            />
                     </LinearLayout>
-
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingBottom="10dp"
+                    android:paddingBottom="@dimen/space_lg"
                     android:text="@string/study_semester_start_hint"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="10sp" />
-
+                    />
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <LinearLayout
                     android:id="@+id/rowReimport"
                     android:layout_width="match_parent"
@@ -201,35 +178,30 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_import" />
-
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:text="@string/study_timetable_import"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <LinearLayout
                     android:id="@+id/rowAddCourse"
                     android:layout_width="match_parent"
@@ -239,35 +211,30 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_add" />
-
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:text="@string/study_timetable_add"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <!-- 导出/分享只做「本机 → 文本」，不联网，也不碰日历应用的写权限 -->
                 <LinearLayout
                     android:id="@+id/rowExportIcs"
@@ -278,35 +245,30 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_calendar" />
-
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:text="@string/study_timetable_export_ics"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <LinearLayout
                     android:id="@+id/rowCopyShareCode"
                     android:layout_width="match_parent"
@@ -316,35 +278,30 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_link" />
-
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:text="@string/study_timetable_share_code"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <LinearLayout
                     android:id="@+id/rowImportShareCode"
                     android:layout_width="match_parent"
@@ -354,35 +311,30 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_import" />
-
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:text="@string/study_timetable_import_code"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <!-- 学期是课表的容器：切换=换一整份数据，所以放在「调课与节假日」之前。 -->
                 <LinearLayout
                     android:id="@+id/rowSemesters"
@@ -393,50 +345,43 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_refresh" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
+                        style="@style/Text.Unloop.Body"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/study_semester_manage_title"
-                            android:textColor="@color/campus_ink"
-                            android:textSize="14sp" />
-
+                            />
                         <TextView
+                        style="@style/Text.Unloop.Caption"
                             android:id="@+id/textSemesterValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_hair"
                             android:text="@string/study_semester_manage_none"
-                            android:textColor="@color/campus_muted"
-                            android:textSize="11sp" />
+                            />
                     </LinearLayout>
-
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <!-- 调课与节假日按具体日期生效，与小组件、课前提醒读同一份记录。 -->
                 <LinearLayout
                     android:id="@+id/rowAdjustments"
@@ -447,50 +392,43 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_clock" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
+                        style="@style/Text.Unloop.Body"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/study_timetable_adjust_title"
-                            android:textColor="@color/campus_ink"
-                            android:textSize="14sp" />
-
+                            />
                         <TextView
+                        style="@style/Text.Unloop.Caption"
                             android:id="@+id/textAdjustmentValue"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_hair"
                             android:text="@string/study_timetable_adjust_none"
-                            android:textColor="@color/campus_muted"
-                            android:textSize="11sp" />
+                            />
                     </LinearLayout>
-
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <LinearLayout
                     android:id="@+id/rowClearTimetable"
                     android:layout_width="match_parent"
@@ -500,88 +438,76 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_delete" />
-
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:text="@string/study_timetable_clear"
                         android:textColor="@color/campus_danger"
-                        android:textSize="14sp" />
+                        android:textSize="@dimen/text_body" />
                 </LinearLayout>
             </LinearLayout>
-
             <!-- 课前提醒：开关 + 自定义提前分钟数 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/space_xl"
                 android:background="@drawable/bg_campus_card"
                 android:orientation="vertical"
-                android:paddingHorizontal="18dp"
-                android:paddingVertical="8dp">
-
+                android:paddingHorizontal="@dimen/space_3xl"
+                android:paddingVertical="@dimen/space_md">
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:paddingTop="8dp"
+                    android:paddingTop="@dimen/space_md"
                     android:text="@string/study_reminder_title"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp"
                     android:textStyle="bold" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_clock" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
+                        style="@style/Text.Unloop.Body"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/study_reminder_switch_label"
-                            android:textColor="@color/campus_ink"
-                            android:textSize="14sp" />
-
+                            />
                         <TextView
+                        style="@style/Text.Unloop.Caption"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_hair"
                             android:text="@string/study_reminder_switch_desc"
-                            android:textColor="@color/campus_muted"
-                            android:textSize="11sp" />
+                            />
                     </LinearLayout>
-
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switchClassReminder"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp" />
+                        android:layout_marginStart="@dimen/space_md" />
                 </LinearLayout>
-
                 <LinearLayout
                     android:id="@+id/rowReminderLead"
                     android:layout_width="match_parent"
@@ -591,409 +517,356 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_reminder_lead_title"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <TextView
+                    style="@style/Text.Unloop.Meta"
                         android:id="@+id/textReminderLeadValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/campus_muted"
-                        android:textSize="13sp" />
+                        />
                 </LinearLayout>
-
                 <TextView
                     android:id="@+id/textReminderWarning"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingBottom="10dp"
+                    android:paddingBottom="@dimen/space_lg"
                     android:textColor="@color/campus_danger"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/text_caption"
                     android:visibility="gone" />
             </LinearLayout>
-
             <!-- 作业截止提醒：自建作业的开关，提前量按每条作业自己设置 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/space_xl"
                 android:background="@drawable/bg_campus_card"
                 android:orientation="vertical"
-                android:paddingHorizontal="18dp"
-                android:paddingVertical="8dp">
-
+                android:paddingHorizontal="@dimen/space_3xl"
+                android:paddingVertical="@dimen/space_md">
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:paddingTop="8dp"
+                    android:paddingTop="@dimen/space_md"
                     android:text="@string/study_homework_reminder_title"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp"
                     android:textStyle="bold" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="12dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_study_homework" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
                         android:orientation="vertical">
-
                         <TextView
+                        style="@style/Text.Unloop.Body"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/study_homework_reminder_switch_label"
-                            android:textColor="@color/campus_ink"
-                            android:textSize="14sp" />
-
+                            />
                         <TextView
+                        style="@style/Text.Unloop.Caption"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_hair"
                             android:text="@string/study_homework_reminder_switch_desc"
-                            android:textColor="@color/campus_muted"
-                            android:textSize="11sp" />
+                            />
                     </LinearLayout>
-
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switchHomeworkReminder"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp" />
+                        android:layout_marginStart="@dimen/space_md" />
                 </LinearLayout>
-
                 <TextView
                     android:id="@+id/textHomeworkReminderHint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingBottom="10dp"
+                    android:paddingBottom="@dimen/space_lg"
                     android:textColor="@color/campus_danger"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/text_caption"
                     android:visibility="gone" />
             </LinearLayout>
-
             <!-- 上课时间：冬令时与夏令时各存一套，可分别调整 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="@dimen/space_xl"
                 android:background="@drawable/bg_campus_card"
                 android:orientation="vertical"
-                android:paddingHorizontal="18dp"
-                android:paddingVertical="16dp">
-
+                android:paddingHorizontal="@dimen/space_3xl"
+                android:paddingVertical="@dimen/space_3xl">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
-
                     <TextView
+                    style="@style/Text.Unloop.Heading"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_title"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="16sp"
                         android:textStyle="bold" />
-
                     <TextView
+                    style="@style/Text.Unloop.Caption"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/study_schedule_season_note"
-                        android:textColor="@color/campus_muted"
-                        android:textSize="11sp" />
+                        />
                 </LinearLayout>
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="@dimen/space_lg"
                     android:orientation="horizontal">
-
                     <TextView
+                    style="@style/Text.Unloop.Action"
                         android:id="@+id/chipSeasonWinter"
                         android:layout_width="0dp"
-                        android:layout_height="40dp"
+                        android:layout_height="@dimen/touch_min"
                         android:layout_weight="1"
                         android:background="@drawable/bg_campus_soft_pill"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center"
                         android:text="@string/study_season_winter"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="13sp"
                         android:textStyle="bold" />
-
                     <Space
                         android:layout_width="8dp"
                         android:layout_height="1dp" />
-
                     <TextView
+                    style="@style/Text.Unloop.Action"
                         android:id="@+id/chipSeasonSummer"
                         android:layout_width="0dp"
-                        android:layout_height="40dp"
+                        android:layout_height="@dimen/touch_min"
                         android:layout_weight="1"
                         android:background="@drawable/bg_campus_soft_pill"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center"
                         android:text="@string/study_season_summer"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-
                 <!-- 每天节数：上午/下午/晚课分别可调，节次连续编号 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="@dimen/space_2xl"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
-
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_counts_title"
                         android:textColor="@color/campus_ink"
-                        android:textSize="13sp"
+                        android:textSize="@dimen/text_meta"
                         android:textStyle="bold" />
-
                     <TextView
+                    style="@style/Text.Unloop.Caption"
                         android:id="@+id/textTotalPeriods"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/campus_muted"
-                        android:textSize="11sp" />
+                        />
                 </LinearLayout>
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="@dimen/space_hair"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="6dp">
-
+                    android:paddingVertical="@dimen/space_sm">
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_count_morning"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <TextView
+                    style="@style/Text.Unloop.Section"
                         android:id="@+id/buttonMorningMinus"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="@dimen/touch_min"
+                        android:layout_height="@dimen/touch_min"
                         android:background="@drawable/bg_campus_soft_circle"
                         android:clickable="true"
                         android:contentDescription="@string/study_schedule_count_minus"
                         android:focusable="true"
                         android:gravity="center"
                         android:text="−"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="18sp" />
-
+                        />
                     <TextView
+                    style="@style/Text.Unloop.Value"
                         android:id="@+id/textMorningCount"
                         android:layout_width="42dp"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="14sp"
                         android:textStyle="bold" />
-
                     <TextView
+                    style="@style/Text.Unloop.Section"
                         android:id="@+id/buttonMorningPlus"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="@dimen/touch_min"
+                        android:layout_height="@dimen/touch_min"
                         android:background="@drawable/bg_campus_soft_circle"
                         android:clickable="true"
                         android:contentDescription="@string/study_schedule_count_plus"
                         android:focusable="true"
                         android:gravity="center"
                         android:text="+"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="18sp" />
+                        />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="6dp">
-
+                    android:paddingVertical="@dimen/space_sm">
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_count_afternoon"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <TextView
+                    style="@style/Text.Unloop.Section"
                         android:id="@+id/buttonAfternoonMinus"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="@dimen/touch_min"
+                        android:layout_height="@dimen/touch_min"
                         android:background="@drawable/bg_campus_soft_circle"
                         android:clickable="true"
                         android:contentDescription="@string/study_schedule_count_minus"
                         android:focusable="true"
                         android:gravity="center"
                         android:text="−"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="18sp" />
-
+                        />
                     <TextView
+                    style="@style/Text.Unloop.Value"
                         android:id="@+id/textAfternoonCount"
                         android:layout_width="42dp"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="14sp"
                         android:textStyle="bold" />
-
                     <TextView
+                    style="@style/Text.Unloop.Section"
                         android:id="@+id/buttonAfternoonPlus"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="@dimen/touch_min"
+                        android:layout_height="@dimen/touch_min"
                         android:background="@drawable/bg_campus_soft_circle"
                         android:clickable="true"
                         android:contentDescription="@string/study_schedule_count_plus"
                         android:focusable="true"
                         android:gravity="center"
                         android:text="+"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="18sp" />
+                        />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="6dp">
-
+                    android:paddingVertical="@dimen/space_sm">
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_count_evening"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <TextView
+                    style="@style/Text.Unloop.Section"
                         android:id="@+id/buttonEveningMinus"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="@dimen/touch_min"
+                        android:layout_height="@dimen/touch_min"
                         android:background="@drawable/bg_campus_soft_circle"
                         android:clickable="true"
                         android:contentDescription="@string/study_schedule_count_minus"
                         android:focusable="true"
                         android:gravity="center"
                         android:text="−"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="18sp" />
-
+                        />
                     <TextView
+                    style="@style/Text.Unloop.Value"
                         android:id="@+id/textEveningCount"
                         android:layout_width="42dp"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="14sp"
                         android:textStyle="bold" />
-
                     <TextView
+                    style="@style/Text.Unloop.Section"
                         android:id="@+id/buttonEveningPlus"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="@dimen/touch_min"
+                        android:layout_height="@dimen/touch_min"
                         android:background="@drawable/bg_campus_soft_circle"
                         android:clickable="true"
                         android:contentDescription="@string/study_schedule_count_plus"
                         android:focusable="true"
                         android:gravity="center"
                         android:text="+"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="18sp" />
+                        />
                 </LinearLayout>
-
                 <LinearLayout
                     android:id="@+id/rowMorningStart"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/space_sm"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="11dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_morning"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <TextView
                         android:id="@+id/textMorningValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textColor="@color/campus_mint_dark"
-                        android:textSize="16sp"
+                        android:textSize="@dimen/text_title"
                         android:textStyle="bold" />
-
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_xs"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <LinearLayout
                     android:id="@+id/rowAfternoonStart"
                     android:layout_width="match_parent"
@@ -1003,37 +876,32 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="11dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_afternoon"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <TextView
                         android:id="@+id/textAfternoonValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textColor="@color/campus_mint_dark"
-                        android:textSize="16sp"
+                        android:textSize="@dimen/text_title"
                         android:textStyle="bold" />
-
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_xs"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
-
                 <LinearLayout
                     android:id="@+id/rowEveningStart"
                     android:layout_width="match_parent"
@@ -1043,181 +911,159 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingVertical="11dp">
-
+                    android:paddingVertical="@dimen/space_xl">
                     <TextView
+                    style="@style/Text.Unloop.Body"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_evening"
-                        android:textColor="@color/campus_ink"
-                        android:textSize="14sp" />
-
+                        />
                     <TextView
                         android:id="@+id/textEveningValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textColor="@color/campus_mint_dark"
-                        android:textSize="16sp"
+                        android:textSize="@dimen/text_title"
                         android:textStyle="bold" />
-
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_xs"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/space_xl"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
-
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_period_title"
                         android:textColor="@color/campus_ink"
-                        android:textSize="13sp" />
-
+                        android:textSize="@dimen/text_meta" />
                     <TextView
+                    style="@style/Text.Unloop.Value"
                         android:id="@+id/textPeriodValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-
                 <SeekBar
                     android:id="@+id/seekPeriod"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="@dimen/space_hair"
                     android:max="90"
                     android:progress="15"
                     android:progressBackgroundTint="@color/campus_track"
                     android:progressTint="@color/campus_mint"
                     android:splitTrack="false"
                     android:thumbTint="@color/campus_mint" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/space_sm"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
-
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_break_title"
                         android:textColor="@color/campus_ink"
-                        android:textSize="13sp" />
-
+                        android:textSize="@dimen/text_meta" />
                     <TextView
+                    style="@style/Text.Unloop.Value"
                         android:id="@+id/textBreakValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-
                 <SeekBar
                     android:id="@+id/seekBreak"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="@dimen/space_hair"
                     android:max="30"
                     android:progress="10"
                     android:progressBackgroundTint="@color/campus_track"
                     android:progressTint="@color/campus_mint"
                     android:splitTrack="false"
                     android:thumbTint="@color/campus_mint" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/space_sm"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
-
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/study_schedule_long_break_title"
                         android:textColor="@color/campus_ink"
-                        android:textSize="13sp" />
-
+                        android:textSize="@dimen/text_meta" />
                     <TextView
+                    style="@style/Text.Unloop.Value"
                         android:id="@+id/textLongBreakValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/campus_mint_dark"
-                        android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-
                 <SeekBar
                     android:id="@+id/seekLongBreak"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="@dimen/space_hair"
                     android:max="30"
                     android:progress="15"
                     android:progressBackgroundTint="@color/campus_track"
                     android:progressTint="@color/campus_mint"
                     android:splitTrack="false"
                     android:thumbTint="@color/campus_mint" />
-
                 <TextView
+                style="@style/Text.Unloop.Caption"
                     android:id="@+id/textScheduleSummary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="@dimen/space_lg"
                     android:lineSpacingExtra="2dp"
-                    android:textColor="@color/campus_muted"
-                    android:textSize="11sp" />
-
+                    />
                 <TextView
                     android:id="@+id/textScheduleWarning"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_xs"
                     android:textColor="@color/campus_danger"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/text_caption"
                     android:visibility="gone" />
-
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/buttonResetPeriod"
-                    style="@style/Widget.Material3.Button.TextButton"
+                    style="@style/Widget.Unloop.TextButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="@dimen/touch_min"
                     android:layout_gravity="end"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="8dp"
+                    android:minWidth="@dimen/touch_min"
+                    android:paddingHorizontal="@dimen/space_md"
                     android:text="@string/study_schedule_reset"
                     android:textColor="@color/campus_mint_dark"
-                    android:textSize="12sp" />
+                    android:textSize="@dimen/text_label" />
             </LinearLayout>
-
             <TextView
+            style="@style/Text.Unloop.Caption"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="@dimen/space_2xl"
                 android:lineSpacingExtra="2dp"
                 android:text="@string/study_settings_hint"
-                android:textColor="@color/campus_muted"
-                android:textSize="11sp" />
+                />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

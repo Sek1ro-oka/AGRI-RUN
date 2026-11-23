@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  可复用样式。尺度一律取自 dimens.xml，这里只负责「同一类文字只定义一次」。
+  新增一处布局前先看看有没有现成的：布局里成堆的 textColor+textSize 就是尺度失控的开始。
+-->
+<resources>
+
+    <!-- 文字角色：颜色与字号绑在一起，因为「次要说明」本来就该是同一种观感。 -->
+    <style name="Text.Unloop.Body" parent="">
+        <item name="android:textColor">@color/campus_ink</item>
+        <item name="android:textSize">@dimen/text_body</item>
+    </style>
+
+    <style name="Text.Unloop.Heading" parent="">
+        <item name="android:textColor">@color/campus_ink</item>
+        <item name="android:textSize">@dimen/text_title</item>
+    </style>
+
+    <style name="Text.Unloop.Metric" parent="">
+        <item name="android:textColor">@color/campus_ink</item>
+        <item name="android:textSize">@dimen/text_metric</item>
+    </style>
+
+    <style name="Text.Unloop.Caption" parent="">
+        <item name="android:textColor">@color/campus_muted</item>
+        <item name="android:textSize">@dimen/text_caption</item>
+    </style>
+
+    <style name="Text.Unloop.Note" parent="">
+        <item name="android:textColor">@color/campus_muted</item>
+        <item name="android:textSize">@dimen/text_label</item>
+    </style>
+
+    <style name="Text.Unloop.Meta" parent="">
+        <item name="android:textColor">@color/campus_muted</item>
+        <item name="android:textSize">@dimen/text_meta</item>
+    </style>
+
+    <style name="Text.Unloop.Action" parent="">
+        <item name="android:textColor">@color/campus_mint_dark</item>
+        <item name="android:textSize">@dimen/text_meta</item>
+    </style>
+
+    <style name="Text.Unloop.Value" parent="">
+        <item name="android:textColor">@color/campus_mint_dark</item>
+        <item name="android:textSize">@dimen/text_body</item>
+    </style>
+
+    <style name="Text.Unloop.Section" parent="">
+        <item name="android:textColor">@color/campus_mint_dark</item>
+        <item name="android:textSize">@dimen/text_section</item>
+    </style>
+
+    <!-- 按钮：Material 的样式在布局里被显式 style= 顶掉后，主题的 48dp 与圆角就跟着丢了，
+         所以这几档把自己补回来，布局里不必再逐个写。 -->
+    <style name="Widget.Unloop.Button" parent="Widget.Material3.Button">
+        <item name="android:minHeight">@dimen/touch_min</item>
+        <item name="cornerRadius">@dimen/radius_card</item>
+    </style>
+
+    <style name="Widget.Unloop.TextButton" parent="Widget.Material3.Button.TextButton">
+        <item name="android:minHeight">@dimen/touch_min</item>
+    </style>
+
+    <style name="Widget.Unloop.OutlinedButton" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minHeight">@dimen/touch_min</item>
+    </style>
+
+    <style name="Widget.Unloop.TonalButton" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:minHeight">@dimen/touch_min</item>
+    </style>
+</resources>
