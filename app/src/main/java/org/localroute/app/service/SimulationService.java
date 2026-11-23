@@ -29,6 +29,8 @@ import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.diagnostics.SystemLocationReader;
 import org.localroute.app.run.PendingRunRegistry;
 import org.localroute.app.run.RouteVary;
+import org.localroute.app.run.RunHistoryStore;
+import org.localroute.app.run.RunRecord;
 import org.localroute.app.run.RunRequest;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
@@ -949,6 +951,7 @@ public class SimulationService extends Service {
         if (wasActive) {
             // 只有真正打断运行才把快照改成「已停止」；已完成/失败的状态不该被停止覆盖掉。
             publishSnapshot(RunState.STOPPED, lastProgress);
+            recordHistory(false);
         } else if (state == RunState.COMPLETED || state == RunState.ERROR) {
             DiagnosticLog.info("停止请求到达时任务已是终态 " + state + "，保留该状态");
         }
@@ -967,14 +970,35 @@ public class SimulationService extends Service {
             DiagnosticLog.warn("完成时状态异常（已忽略）：" + e.getMessage());
         }
         publishSnapshot(RunState.COMPLETED, progress);
+        recordHistory(true);
         cleanupEverything();
         updateNotification(RunState.COMPLETED, progress, true);
         stopForeground(STOP_FOREGROUND_DETACH);
         stopSelf();
     }
 
-    private void failAndStop(RunErrorCode code, String message) {
-        DiagnosticLog.error("运行失败：" + code + " / " + message, null);
+    /**
+     * 把这一次跑圈收进历史。
+     *
+     * <p>必须在 {@link #cleanupEverything()} 之前调用：那里会清掉 request、route 与进度，
+     * 而路线名、圈长、圈数正是记录要用的数。单点保持模式没有里程，中途取消也没跑出距离，
+     * 都不入库——历史页要的是「跑了多少」，不是「打开了几次」。
+     */
+    private void recordHistory(boolean finishedByGoal) {
+        if (singlePoint != null || lastProgress == null || lastProgress.distanceMeters() <= 0d) {
+            return;
+        }
+        double lapMeters = route == null ? 0d : route.lapLengthMeters();
+        int targetLoops = config == null ? 0 : config.loopCount();
+        String name = request == null ? "" : request.routeName();
+        RunHistoryStore.add(this, new RunRecord(runId, name, System.currentTimeMillis(),
+                lastElapsedMs, lastProgress.distanceMeters(), lastProgress.completedLoops(),
+                targetLoops, lapMeters, finishedByGoal));
+        DiagnosticLog.info(String.format(Locale.US, "已记入跑圈历史：%.0f 米 / %d 圈 / 有效用时 %d 秒",
+                lastProgress.distanceMeters(), lastProgress.completedLoops(), lastElapsedMs / 1000L));
+    }
+
+    private void failAndStop(RunErrorCode code, String message) {        DiagnosticLog.error("运行失败：" + code + " / " + message, null);
         PendingRunRegistry.clear();
         try {
             if (stateMachine.isActive()) {

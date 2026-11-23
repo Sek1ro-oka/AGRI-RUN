@@ -3,6 +3,7 @@ package org.localroute.app.backup;
 import androidx.annotation.NonNull;
 
 import org.localroute.app.R;
+import org.localroute.app.run.RunHistoryStore;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,6 +27,7 @@ public final class BackupCatalog {
     public static final String SECTION_SCHOOL = "school";
     public static final String SECTION_RUN_SETTINGS = "run_settings";
     public static final String SECTION_HOMEWORK_CACHE = "homework_cache";
+    public static final String SECTION_RUN_HISTORY = "run_history";
 
     /** 一个存储键：属于哪个 SharedPreferences 文件、键名、值类型（见 {@link BackupValues}）。 */
     public static final class KeyRef {
@@ -165,7 +167,11 @@ public final class BackupCatalog {
                                     new KeyRef("map", "base_layer", BackupValues.TYPE_STRING),
                                     new KeyRef("diagnostics", "log_coordinates", BackupValues.TYPE_BOOLEAN)))),
             new Section(SECTION_HOMEWORK_CACHE, 1, R.string.backup_kind_homework_cache, false, false,
-                    Arrays.asList(new KeyRef("study_homework_cache", "cache", BackupValues.TYPE_STRING))));
+                    Arrays.asList(new KeyRef("study_homework_cache", "cache", BackupValues.TYPE_STRING))),
+            // 跑步记录是纯本机历史，换机/重装后统计会归零，因此默认勾选进备份。
+            new Section(SECTION_RUN_HISTORY, 1, R.string.backup_kind_run_history, true, false,
+                    Arrays.asList(new KeyRef(RunHistoryStore.PREFS, RunHistoryStore.KEY_RECORDS,
+                            BackupValues.TYPE_STRING))));
 
     /** 明确不进备份的存储文件，用于文档与自检用例。 */
     @NonNull
