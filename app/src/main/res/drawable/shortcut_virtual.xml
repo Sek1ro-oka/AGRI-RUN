@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 与 shortcut_run 同理：桌面菜单里的图标要按品牌绿重着色。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:drawable="@drawable/ic_campus_locate_now"
+        android:tint="@color/fm_brand" />
+</layer-list>
