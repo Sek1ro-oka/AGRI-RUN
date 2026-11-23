@@ -217,20 +217,6 @@
                 android:textColor="@color/campus_muted"
                 android:textSize="10sp"
                 android:visibility="gone" />
-            <TextView
-                android:id="@+id/textTeleportHint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="top|center_horizontal"
-                android:layout_marginTop="46dp"
-                android:background="@drawable/bg_campus_chip"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="6dp"
-                android:text="@string/campus_teleport_hint"
-                android:textColor="@color/campus_mint_dark"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
             <LinearLayout
                 android:id="@+id/drawBar"
                 android:layout_width="match_parent"
@@ -430,15 +416,6 @@
                     android:text="@string/campus_end_run"
                     android:textColor="@color/campus_danger"
                     android:visibility="gone" />
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/buttonTeleport"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="76dp"
-                    android:layout_height="52dp"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="4dp"
-                    android:text="@string/campus_map_actions_label"
-                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

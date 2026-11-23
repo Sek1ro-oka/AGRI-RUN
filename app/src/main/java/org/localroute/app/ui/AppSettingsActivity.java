@@ -12,6 +12,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -20,6 +21,7 @@ import androidx.core.view.WindowInsetsCompat;
 import org.localroute.app.R;
 import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivityAppSettingsBinding;
+import org.localroute.app.settings.AppearancePreferences;
 
 /**
  * 应用设置：语言（本期只展示入口）与激活码。
@@ -51,6 +53,39 @@ public class AppSettingsActivity extends AppCompatActivity {
         PresetUnlock.migrate(prefs);
         binding.rowUpdate.setOnClickListener(v -> startActivity(new Intent(this, UpdatesActivity.class)));
         binding.rowActivation.setOnClickListener(v -> showActivationDialog());
+        refreshAppearance();
+        binding.rowAppearance.setOnClickListener(v -> showAppearanceDialog());
+    }
+
+    /** 行尾显示当前风格；切换会让系统重建本页，所以只在创建时刷新一次就够。 */
+    private void refreshAppearance() {
+        binding.textAppearanceValue.setText(
+                getString(AppearancePreferences.labelFor(AppearancePreferences.load(this))));
+    }
+
+    private void showAppearanceDialog() {
+        int[] modes = AppearancePreferences.MODES;
+        String[] labels = new String[modes.length];
+        int checked = 0;
+        int current = AppearancePreferences.load(this);
+        for (int i = 0; i < modes.length; i++) {
+            labels[i] = getString(AppearancePreferences.labelFor(modes[i]));
+            if (modes[i] == current) {
+                checked = i;
+            }
+        }
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.appearance_dialog_title)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    int mode = modes[which];
+                    AppearancePreferences.save(this, mode);
+                    dialog.dismiss();
+                    // 换模式会重建当前页面，无需在这里再刷新文案。
+                    AppCompatDelegate.setDefaultNightMode(
+                            AppearancePreferences.nightModeFor(mode));
+                })
+                .setNegativeButton(R.string.app_settings_activation_cancel, null)
+                .show();
     }
 
     @Override

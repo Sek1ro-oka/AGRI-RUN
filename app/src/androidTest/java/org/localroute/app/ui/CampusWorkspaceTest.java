@@ -203,7 +203,7 @@ public class CampusWorkspaceTest {
             SimulationService.resume(context);
             await(() -> SimulationStateRepo.get().current().state() == RunState.RUNNING);
             onView(withId(R.id.buttonRunMain)).check(matches(withText("暂停")));
-            onView(withId(R.id.buttonTeleport)).check(matches(isCompletelyDisplayed()));
+            onView(withId(R.id.mapContainer)).check(matches(isCompletelyDisplayed()));
             capture("06-running-map");
             onView(withId(R.id.buttonEndRun)).perform(click());
             await(() -> !SimulationStateRepo.get().current().isActive());
@@ -248,7 +248,7 @@ public class CampusWorkspaceTest {
             onView(withId(R.id.buttonSetupBack)).perform(click());
             onView(withId(R.id.buttonRunSport)).check(matches(withText("骑行")));
             onView(withId(R.id.textPaceValue)).check(matches(withText("配速 4:00/km")));
-            onView(withId(R.id.buttonTeleport)).check(matches(isCompletelyDisplayed()));
+            onView(withId(R.id.mapContainer)).check(matches(isCompletelyDisplayed()));
             capture("07-overlay-speed-synced");
             pressBack();
             onView(withId(R.id.cardActiveRun)).check(matches(isDisplayed()));
