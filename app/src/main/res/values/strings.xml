@@ -609,6 +609,32 @@
     <string name="study_timetable_adjust_saved">已记下：%1$s</string>
     <string name="study_timetable_adjust_removed">已删除这条例外</string>
     <string name="study_timetable_adjust_delete_title">删掉这条例外？</string>
+
+    <!-- 多学期：当前学期写在原有键上，其余学期按键值快照归档。 -->
+    <string name="study_semester_manage_title">学期管理</string>
+    <string name="study_semester_manage_none">还没分学期</string>
+    <string name="study_semester_manage_count">%1$d 个学期 · 当前「%2$s」</string>
+    <string name="study_semester_manage_hint">点一个学期可以切换、改名或删除。</string>
+    <string name="study_semester_manage_single">现在只有一学期，本机数据就是它；新建之后才谈得上切换。</string>
+    <string name="study_semester_current">当前</string>
+    <string name="study_semester_action_switch">切到这学期</string>
+    <string name="study_semester_action_rename">改名</string>
+    <string name="study_semester_action_delete">删除这学期</string>
+    <string name="study_semester_create">新建学期</string>
+    <string name="study_semester_name_empty">名字不能是空的</string>
+    <string name="study_semester_full">最多记 %1$d 个学期，先删掉不用的</string>
+    <string name="study_semester_created">已建好「%1$s」，要现在切过去吗？</string>
+    <string name="study_semester_switch_now">切过去</string>
+    <string name="study_semester_stay">先留在这学期</string>
+    <string name="study_semester_switch_title">切到「%1$s」？</string>
+    <string name="study_semester_switch_message">本机这份的 %1$d 门课会存起来，换成「%2$s」的 %3$d 门课。</string>
+    <string name="study_semester_switch_empty">本机的 %1$d 门课会存起来，切过去是一份空课表。</string>
+    <string name="study_semester_switched">已切到「%1$s」</string>
+    <string name="study_semester_renamed">名字已改成「%1$s」</string>
+    <string name="study_semester_deleted">已删除「%1$s」</string>
+    <string name="study_semester_delete_title">删掉「%1$s」？</string>
+    <string name="study_semester_delete_message">那学期存起来的课表与作息会一起删掉，本机正在看的这份不受影响。</string>
+    <string name="study_semester_cannot_delete_current">当前学期不能删：先切到别的学期</string>
     <string name="study_import_title">导入课表</string>
     <string name="study_import_dialog_hint">确认后写入本机课表；导入后仍可点击课程修改或删除。</string>
     <string name="study_import_count">识别到 %1$d 门课程：</string>

@@ -383,6 +383,60 @@
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
 
+                <!-- 学期是课表的容器：切换=换一整份数据，所以放在「调课与节假日」之前。 -->
+                <LinearLayout
+                    android:id="@+id/rowSemesters"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_study_refresh" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/study_semester_manage_title"
+                            android:textColor="@color/campus_ink"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/textSemesterValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/study_semester_manage_none"
+                            android:textColor="@color/campus_muted"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_campus_chevron_right" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/campus_card_stroke" />
+
                 <!-- 调课与节假日按具体日期生效，与小组件、课前提醒读同一份记录。 -->
                 <LinearLayout
                     android:id="@+id/rowAdjustments"
