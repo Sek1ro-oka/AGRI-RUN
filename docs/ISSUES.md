@@ -344,3 +344,25 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 已知取舍：① 折叠与位置、缩放同性质，属界面状态而非用户数据，因此不进备份段落；② 小球只有一个动作（展开），暂停／档位／收藏仍要展开才能操作——它存在的理由是不挡屏幕，不是第二个控制面；③ 折叠提示沿用面板既有的 `Toast` 通道，而 Android 12 起后台 Toast 会被系统压制，悬浮场景恰是后台，真机可能不显示，到时需要换成小球上的角标之类；④ 换算依赖 `post()` 时能量到新尺寸，量到 0 就按原位收下，顶多小球落在面板原来的左上角，下次拖动自动正；⑤ 折叠不改变摇杆解锁状态（`hide()` 才复位），展开后摇杆仍是收起前的锁定／解锁样子。
 
 验证：336 个 JVM 用例全过（45 个测试类，较上一节的 327 例 / 44 类 +9，即 `OverlayFoldTest`）；`lintRelease` 0 errors、279 warnings——小球最初直接由 `onTouch` 调 `toggleFold()`，`ClickableViewAccessibility` 涨了警告，改成「触摸里 `performClick()` + 点击监听负责展开」后回到与基线持平；`assembleDebug` 与 `:app:compileDebugAndroidTestJavaWithJavac` 通过（不带模块前缀的 androidTest 任务会连 `:location-probe` 一起编译，离线缓存里没有它的 androidTest 依赖，验证命令要写 `:app:` 前缀）。本机无 adb 也无模拟器，因此小球在刘海／状态栏区域的可见性、拖动是否跟手与涟漪反馈、后台 Toast 是否被压制、以及折叠后位置在横屏与分屏下会不会被夹过头，都还只是静态验证，真机效果待复验。
+
+## 2026-11-24 桌面长按快捷入口与快捷设置磁贴（新功能，已实现待验证）
+
+需求来源：对标审查 A 档第 6 项。四个日常动作（看跑圈、选点定位、看课表、查作业）都要先进主页再点卡片，下拉通知栏里也没有本应用的任何入口；悬浮台开关更是藏在设置页——它本来就是给「人已经在别的应用里」用的，位置反了。
+
+改动：
+
+| 位置 | 内容 |
+| --- | --- |
+| `entry/HomeTarget`（新） | 四个目标的枚举。认串（`from`，纯 Java）与跳转（`open`，只有这里碰 Android API）分开。清单里只有主页 `exported`，而快捷方式的 intent 由启动器（另一个应用）发出，直接指向内部页面会被系统拒绝，所以入口统一先进主页、由主页带 `home_target` 再跳一次 |
+| `res/xml/shortcuts.xml`（新）+ 清单 meta-data | 四条静态快捷入口：校园跑／虚拟定位／今日课表／查作业，每条都指 `MainActivity` 只换 extra。`targetPackage` 故意不写——缺省取声明方自己的包，debug 构建带 `.debug` 后缀时才不会指到别的包，写死反而要按 buildType 维护两份 |
+| `shortcut_*.xml`（新 4 个） | 图标外壳：应用内的矢量是白描边（画在深色卡片上），桌面长按菜单的背景由启动器给，白色会看不见。按品牌绿重着色后，浅色启动器拿到深绿、深色启动器拿到浅薄荷，两边都不瞎 |
+| `MainActivity` | 冷启动只认 `savedInstanceState == null`（进程被杀后恢复不该把用户又甩进别的页面），`onNewIntent` 记下目标，真正跳转放在 `onResume`——那时本页可见，启动内部页面才不会被后台限制挡下。主页四张卡片与底栏两个入口的 `startActivity` 也改走同一枚举，入口定义只剩一份 |
+| `entry/OverlayTileService`（新） | 悬浮台开关磁贴：直接调 `OverlayHost.setEnabled`，不必先进设置页。声明 `TOGGLEABLE_TILE`，TalkBack 会念成「打开／关闭」而不是一个普通按钮 |
+| `entry/OverlayTileState`（新） | 磁贴三态判定（纯 Java）：开着且已授权＝亮、关着＝灰、开着但没给「显示在其他应用上层」权限＝**不可用**并把点击带去授权页。第三种如果也显示点亮，用户点下去什么都不发生，只会以为功能坏了；切成「已开启但看不见」比不切更难解释 |
+| `entry/VirtualLocationTileService`（新） | 「虚拟定位」磁贴只把人送到选点页，不替用户开始保持定位——从下拉栏一键挪走别的应用正在读的位置，误触代价太大，这和「单点保持中选点先待确认」是同一条判断。跳转走 `startActivityAndCollapse`（磁贴属后台，Android 10 起后台不能随意起界面，这是系统给快捷设置留的口子）：34+ 用 PendingIntent 重载，34 以下只有旧的 Intent 重载 |
+| 清单 | 主页挂 `android.app.shortcuts`；两个 tile service 各带 `BIND_QUICK_SETTINGS_TILE`、`exported="true"`、`android:description`（Android 14 起磁贴编辑列表要显示描述） |
+| 测试 | `HomeTargetTest` 4 例：每个 key 认回自己、`null`/空串/大小写/整条类名都不认、key 不重复、**把 `shortcuts.xml` 与枚举逐条对账**（改了枚举忘改 XML 时，桌面点了只会回主页且看不出坏在哪）；`OverlayTileStateTest` 3 例覆盖三态 |
+
+已知取舍：① 快捷入口全部经主页中转，代价是多一次页面切换，换来内部页面继续不导出；② 旧的 `startActivityAndCollapse(Intent)` 分支必须留着（minSdk 29），而 lint 的 `StartActivityAndCollapseDeprecated` 是 error 级且不认版本判断能豁免，所以在低版本分支就地 `@SuppressLint` 并写明理由，34+ 走新写法；③ 静态快捷方式在部分国产 ROM 桌面上不显示或改由厂商自己的长按菜单接管，这不是应用能兜住的，只能真机逐家确认；④ 暂不做动态快捷方式（`ShortcutManager`），它要等「最近路线／历史」这类运行时数据才有意义；⑤ 磁贴不反映「当前是否在跑」，只反映开关，运行数值在页面和悬浮面板里看。
+
+验证：343 个 JVM 用例全过（47 个测试类，较折叠小球那版的 336 例 / 45 类 +7）；`lintRelease` 0 errors、279 warnings（与基线持平）；`assembleDebug` 与 `:app:compileDebugAndroidTestJavaWithJavac` 通过；合并后的 release 清单已确认带 `android.app.shortcuts` 与两个 tile service、`android:description` 保留。本机无 adb 也无模拟器，因此各家启动器是否真列出这四条、磁贴能否拖入下拉栏、Android 14 的描述显示、进程冷启时从磁贴切开关悬浮面板能否立刻出现，都还只是静态验证，真机效果待复验。

@@ -12,6 +12,7 @@ import org.localroute.app.R;
 import org.localroute.app.campus.CampusFormat;
 import org.localroute.app.databinding.ActivityMainBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.app.entry.HomeTarget;
 import org.localroute.app.overlay.OverlayHost;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
@@ -20,6 +21,8 @@ import org.localroute.core.RunState;
 /** Campus services and a live shortcut to the active simulation. */
 public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
+    /** 快捷入口或磁贴送进来的目标页；本页可见之后再跳，那时启动内部页面才不会被系统挡。 */
+    private HomeTarget pendingTarget;
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         DiagnosticLog.init(getApplicationContext());
@@ -32,14 +35,12 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
         binding.cardCampusRun.setOnClickListener(v -> openRun());
-        binding.cardVirtualLocation.setOnClickListener(v ->
-                startActivity(new Intent(this, VirtualLocationActivity.class)));
+        binding.cardVirtualLocation.setOnClickListener(v -> HomeTarget.VIRTUAL.open(this));
         binding.cardActiveRun.setOnClickListener(v -> openRun());
-        binding.cardStudy.setOnClickListener(v -> startActivity(new Intent(this, StudyActivity.class)));
-        binding.cardTimetable.setOnClickListener(v -> startActivity(new Intent(this, StudyActivity.class)
-                .putExtra(StudyActivity.EXTRA_TIMETABLE, true)));
+        binding.cardStudy.setOnClickListener(v -> HomeTarget.STUDY.open(this));
+        binding.cardTimetable.setOnClickListener(v -> HomeTarget.TIMETABLE.open(this));
         binding.navRun.setOnClickListener(v -> openRun());
-        binding.navStudy.setOnClickListener(v -> startActivity(new Intent(this, StudyActivity.class)));
+        binding.navStudy.setOnClickListener(v -> HomeTarget.STUDY.open(this));
         FinmoriMotion.press(binding.cardCampusRun);
         FinmoriMotion.press(binding.cardVirtualLocation);
         FinmoriMotion.press(binding.cardActiveRun);
@@ -55,10 +56,25 @@ public class MainActivity extends AppCompatActivity {
         });
         SimulationStateRepo.get().snapshot().observe(this, this::renderRun);
         OverlayHost.get(this).restore();
+        // 只认冷启动那一次：进程被杀后恢复时不该把用户又甩进别的页面。
+        if (savedInstanceState == null) {
+            pendingTarget = HomeTarget.from(getIntent().getStringExtra(HomeTarget.EXTRA_TARGET));
+        }
+    }
+    @Override protected void onResume() {
+        super.onResume();
+        if (pendingTarget == null) return;
+        HomeTarget target = pendingTarget;
+        pendingTarget = null;
+        target.open(this);
+    }
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        pendingTarget = HomeTarget.from(intent.getStringExtra(HomeTarget.EXTRA_TARGET));
     }
     private void openRun() {
-        startActivity(new Intent(this, CampusRunActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+        HomeTarget.RUN.open(this);
     }
     private void renderRun(RunSnapshot snapshot) {
         boolean justStarted = snapshot.isActive() && binding.cardActiveRun.getVisibility() != View.VISIBLE;

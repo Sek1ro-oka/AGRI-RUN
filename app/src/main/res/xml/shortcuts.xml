@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    桌面长按图标的快捷入口。
+
+    四个入口的 intent 全部指向 MainActivity，只换 extra 里 `home_target` 的值：清单里只有主页
+    对外，其它页面都不导出，启动器（别的应用）直接打开内部页面会被系统拒绝。这里的值必须与
+    HomeTarget.key() 一致，HomeTargetTest 会把这份文件和枚举逐条对账，防止改了另一边忘。
+
+    targetPackage 故意不写：缺省取声明方自己的包，debug 构建的 applicationId 带 `.debug` 后缀时
+    才不会指到别的包；写死反而要按 buildType 维护两份。
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="run"
+        android:icon="@drawable/shortcut_run"
+        android:shortcutLongLabel="@string/shortcut_run_long"
+        android:shortcutShortLabel="@string/shortcut_run_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="org.localroute.app.ui.MainActivity">
+            <extra
+                android:name="home_target"
+                android:value="run" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="virtual"
+        android:icon="@drawable/shortcut_virtual"
+        android:shortcutLongLabel="@string/shortcut_virtual_long"
+        android:shortcutShortLabel="@string/shortcut_virtual_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="org.localroute.app.ui.MainActivity">
+            <extra
+                android:name="home_target"
+                android:value="virtual" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="timetable"
+        android:icon="@drawable/shortcut_timetable"
+        android:shortcutLongLabel="@string/shortcut_timetable_long"
+        android:shortcutShortLabel="@string/shortcut_timetable_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="org.localroute.app.ui.MainActivity">
+            <extra
+                android:name="home_target"
+                android:value="timetable" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="study"
+        android:icon="@drawable/shortcut_study"
+        android:shortcutLongLabel="@string/shortcut_study_long"
+        android:shortcutShortLabel="@string/shortcut_study_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="org.localroute.app.ui.MainActivity">
+            <extra
+                android:name="home_target"
+                android:value="study" />
+        </intent>
+    </shortcut>
+</shortcuts>

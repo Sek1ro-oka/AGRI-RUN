@@ -69,6 +69,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!--
+                桌面长按图标的快捷入口。四个入口的 intent 都指回本页，只换 home_target 的值：
+                其余页面不导出，启动器（别的应用）直接打开它们会被系统拒绝，由主页替用户跳一次。
+            -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <activity
@@ -175,6 +182,40 @@
             android:exported="false"
             android:foregroundServiceType="location"
             android:stopWithTask="false" />
+
+        <!--
+            快捷设置磁贴：系统下拉面板用 BIND_QUICK_SETTINGS_TILE 拉起这两个服务，
+            所以必须 exported="true"（否则系统进不来），权限也已经限死只有系统能用。
+            label 是磁贴下方的短文字（建议 18 字符内），description 从 Android 14 起显示在
+            磁贴编辑列表里，缺了会被列成「无描述」。
+        -->
+        <service
+            android:name=".entry.OverlayTileService"
+            android:description="@string/tile_overlay_description"
+            android:exported="true"
+            android:icon="@drawable/ic_overlay_joystick"
+            android:label="@string/tile_overlay_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <!-- 开关型磁贴：TalkBack 会念成「打开／关闭」而不是一个普通按钮。 -->
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+        <service
+            android:name=".entry.VirtualLocationTileService"
+            android:description="@string/tile_virtual_description"
+            android:exported="true"
+            android:icon="@drawable/ic_campus_locate_now"
+            android:label="@string/tile_virtual_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

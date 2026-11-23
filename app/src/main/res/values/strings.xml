@@ -186,6 +186,21 @@
     <string name="overlay_starting_toast">正在启动，请稍候</string>
     <string name="overlay_idle_toast">当前没有跑圈，拖动摇杆即可手动移动</string>
     <string name="overlay_need_permission">请先授予「显示在其他应用上层」权限</string>
+
+    <!-- 桌面长按快捷入口与快捷设置磁贴 -->
+    <string name="shortcut_run_short">校园跑</string>
+    <string name="shortcut_run_long">打开跑圈地图</string>
+    <string name="shortcut_virtual_short">虚拟定位</string>
+    <string name="shortcut_virtual_long">选点并保持位置</string>
+    <string name="shortcut_timetable_short">今日课表</string>
+    <string name="shortcut_timetable_long">看今天的课</string>
+    <string name="shortcut_study_short">查作业</string>
+    <string name="shortcut_study_long">查最新作业</string>
+    <string name="tile_overlay_label">悬浮台</string>
+    <string name="tile_overlay_description">显示或隐藏跨应用的悬浮控制台</string>
+    <string name="tile_overlay_need_permission">已开启但未授权悬浮窗，点这里去授权</string>
+    <string name="tile_virtual_label">虚拟定位</string>
+    <string name="tile_virtual_description">打开虚拟定位选点页</string>
     <string name="option_connect_first">将当前末点连接到第一个点</string>
     <string name="label_end_behavior">到终点</string>
     <string name="end_stop_at_end">停止</string>

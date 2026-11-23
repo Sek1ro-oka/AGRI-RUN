@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    快捷方式图标：应用内的矢量图是白描边（画在深色卡片上），桌面长按菜单的背景由启动器给，
+    白色会看不见。这里按品牌绿重着色——浅色启动器拿到深绿、深色启动器拿到浅薄荷，两边都不瞎。
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:drawable="@drawable/ic_campus_run"
+        android:tint="@color/fm_brand" />
+</layer-list>
