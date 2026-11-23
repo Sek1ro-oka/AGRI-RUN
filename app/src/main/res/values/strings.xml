@@ -434,6 +434,10 @@
     <string name="virtual_points_rename">重命名</string>
     <string name="virtual_points_renamed">已重命名为「%1$s」</string>
     <string name="virtual_points_no_center">地图还没有准备好，稍后再试</string>
+    <string name="virtual_coord_name">粘贴的坐标</string>
+    <string name="virtual_coord_source_wgs">按「纬度, 经度」直接识别，未联网</string>
+    <string name="virtual_coord_source_gcj">识别自高德/腾讯链接，已从 GCJ-02 换算为 WGS-84</string>
+    <string name="virtual_search_attr_coordinate">这一条来自你粘贴的坐标，没有联网查询</string>
     <string name="campus_route_invalid">路线无效</string>
     <string name="campus_stopping">正在结束…</string>
     <string name="campus_hold_stopped">单点保持已结束</string>
