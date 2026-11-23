@@ -220,4 +220,18 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 
 已知取舍：跑圈中把地图拖走之后，页内没有「回到当前位置」的手动按钮了；恢复镜头只剩重新进入跑圈页或开始跑圈（这两处仍会自动对准模拟位置）。跨应用传送/定位仍走主页「虚拟定位」与悬浮控制台，功能没有减少，只是入口收敛。
 
-验证：277 个 JVM 用例全过（38 个测试类，较上一版 +4，即 `AppearancePreferencesTest`）；`lintRelease` 0 errors、279 warnings（比基线少 2 条，来自删除的文案）；`assembleRelease` 产物 74,177,165 字节、sha256 `91e1581ae35e2619d221434960dde49b4ff9a44c49f162e8efbb705f7046ab4d`、签名 `CN=UNLOOP Release`；`compileDebugAndroidTestJavaWithJavac` 通过。本机无 adb 也无模拟器，因此悬浮窗默认态、深浅色切换、两张卡片新排版、去掉按钮后的跑圈页布局都只做了静态验证，真机效果待复验。本改动尚未出包发布，是否升 0.9.9（versionCode 39）待定。
+验证：277 个 JVM 用例全过（38 个测试类，较上一版 +4，即 `AppearancePreferencesTest`）；`lintRelease` 0 errors、279 warnings（比基线少 2 条，来自删除的文案）；`assembleRelease` 产物 74,177,165 字节、签名 `CN=UNLOOP Release`；`compileDebugAndroidTestJavaWithJavac` 通过。本机无 adb 也无模拟器，因此悬浮窗默认态、深浅色切换、两张卡片新排版、去掉按钮后的跑圈页布局都只做了静态验证，真机效果待复验。
+
+## 2026-11-24 0.9.9 发布记录
+
+上一节的改动（含主页卡片图标定为 32dp）以 PR #67 `1eeeb3b`、PR #68 `afd7065` 并入 main，版本号由 PR #69 `7a9bdaa` 升到 0.9.9 / versionCode 39，轻量标签 `v0.9.9` 指向该合并提交，Release 地址 <https://github.com/Sek1ro-oka/AGRI-RUN/releases/tag/v0.9.9>。
+
+| 项 | 结果 |
+| --- | --- |
+| 附件命名 | `route-workshop-0.9.9-release.apk`，符合 `UpdateChecker` 的识别约定 |
+| 本机构建 | 74,177,165 字节，sha256 `31adaaa315775991c5c4d4751306b5e4ecfdb85d246f22a227655a9f6a65e392`，`aapt2 dump badging` 读到 `versionCode='39' versionName='0.9.9'` |
+| 签名 | `apksigner verify --print-certs` → `CN=UNLOOP Release, O=Local Dev, C=CN`，SHA-256 `01547534…82f4`，与 0.9.5–0.9.8 同一主线，老设备可覆盖安装；0.9.4 及更早仍需先卸载（见 2026-11-23 签名定案） |
+| 线上复核 | `releases/latest` 返回 `v0.9.9`；回下载附件同为 74,177,165 字节、首 2 字节 `PK`、sha256 与本机一致（GitHub API 的 `digest` 字段发布时仍为 null，摘要以下面这条实测为准） |
+| 发布前测试 | `:app:testDebugUnitTest` 277 例 0 失败；构建产物即 tag 指向的 `7a9bdaa` 状态 |
+
+仍待真机复验：悬浮窗默认开启后的首次表现、深浅色切换（尤其高德 SDK 底图与悬浮控制台配色）、主页两张 32dp 图标卡片在窄屏的换行、跑圈页去掉传送/定位后的布局与「拖走地图难以回中」的实际体验。
