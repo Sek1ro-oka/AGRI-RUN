@@ -540,3 +540,21 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 已知取舍：① **小组件布局不参与收敛**——`widget_*.xml` 的可用高度是桌面格子给的，跟着主尺度放大就会把行挤掉，所以它们保留字面值，测试也按文件名跳过；② 就近合并确实动了显示值，一次性对账脚本（未入库）按元素解析改动前后的实际数值：文字只有 12 处变化（10sp→11sp 共 11 处、19sp→18sp 1 处），间距与圆角约 84 处按阶梯就近、最大位移 4dp，其余逐值相同；③ `Widget.Unloop.Button` 把圆角定成 16dp，改前布局显式写 `style="@style/Widget.Material3.Button"` 会顶掉主题的按钮样式，圆角其实一直在 Material 默认的 20dp 上漂着；④ 只收敛布局层，Java 里 `dp()` 的字面值仍然成堆——悬浮台、课表网格那些尺寸是按内容与手势算出来的，搬进令牌只会把算法常数藏起来；⑤ 角色样式只绑颜色与字号，`android:textStyle` 与 `layout_*` 留在布局里，否则「加粗的次要说明」与「不粗的」会被拆成两套样式；⑥ 没把 `layout_width`/`layout_height` 写进样式（小组件与部分 ROM 上对此的可靠性和预期不一致），按钮样式只补最小尺寸与圆角；⑦ 测试是读源文件的静态检查，不校验渲染结果——它能保证不再出现魔法数，保证不了看着顺眼；⑧ **本轮只收了「尺度」没收「图形尺寸」**：收敛后布局里还剩 349 处 dp 字面值，其中 174 处是 `0dp`（约束/权重与清零的 inset，写令牌反而看不懂）、27 处是 1dp 分隔线（就是发丝线本身，不是阶梯上的一格）、其余 148 处是 10~56dp 的图标砖、箭头、进度条一类图形尺寸——它们跟着 drawable 走、不跟着文字阶梯走，硬塞进 `dimens.xml` 只是把 20 个不同用途的数字压成一个没人能解释的令牌。要收它们得先给每类图形定语义，那是另一轮。
 
 验证：537 个 JVM 用例全过（62 个测试类，较崩溃记录那版的 528 例 / 61 类 +9，即新增 `UiScaleTest` 9 例；首轮有 2 例失败——元素标签解析只处理了单行属性，`ImageButton` 一个都没识别出来；把标签提取换成按 `<` 后首个标识符取，才真正开始拦触摸目标。第二轮暴露的是规则本身的盲区：`clickable()` 只认 Button 一族，课程与作业两个弹窗里 1 个 `Spinner` + 5 个 `EditText` 全在 44dp 上，测试照样绿——把输入控件并进同一判定、把它们抬到 48dp 之后才算闭环）；lint 0 errors、**263 warnings（基线 280，−17：删掉未引用资源与一批硬编码字号提示）**；`assembleDebug`、`assembleRelease`（签名包 74,177,165 B，签名证书 `CN=UNLOOP Release`）与 `:app:compileDebugAndroidTestJavaWithJavac` 通过。本机无 adb 也无模拟器，属真机待复验：+1sp 与 ±4dp 的整体观感、紧凑控件抬到 48dp 后会不会顶到边界（画线工具条的撤销/取消/完成、季节两个 chip、作息节数的 −/+ 步进器、周切换的左右箭头，以及新增/编辑课程与作业弹窗里六个改成 48dp 的输入框会不会把键盘顶出屏），以及 `style=` 提供的 `minHeight` 在各 Material 版本上的实际生效情况，都必须上机逐屏看。
+
+## 2026-11-24 0.10.0 发布记录
+
+v0.9.9 之后并入 main 的功能与整改 PR 共 15 个（#71 备份/恢复、#72 常用点位收藏、#73 坐标粘贴识别、#74 预览与生效分离、#75 悬浮台折叠小球、#76 快捷入口与磁贴、#77 有序清单、#78 跑圈历史、#79 课表小组件、#80 ICS 与分享码、#81 调课与节假日、#82 多学期、#83 提醒中心、#84 本地崩溃记录、#85 尺度令牌收敛；#70 是 0.9.9 自己的发布记录文档，不算功能）由 PR #86 `c99a5d3` 升版到 0.10.0 / versionCode 40，合并提交 `a74e9f6`，附注标签 `v0.10.0` 指向它（0.9.x 用的是轻量标签，这次改为附注标签带一句版本说明；`UpdateChecker` 读的是 `releases/latest` 的 `tag_name`，与标签类型无关，不受影响）。Release 地址 <https://github.com/Sek1ro-oka/AGRI-RUN/releases/tag/v0.10.0>。
+
+| 项 | 结果 |
+| --- | --- |
+| 附件命名 | `route-workshop-0.10.0-release.apk`，符合 `UpdateChecker` 的识别约定 |
+| 本机构建 | 74,396,188 字节，sha256 `cd6d7bc3e850a64b6b18db671120cf5be827cbc45e01ad63e0927cac3984d8e5`，`aapt2 dump badging` 读到 `versionCode='40' versionName='0.10.0'` |
+| 签名 | `apksigner verify --print-certs` → `CN=UNLOOP Release, O=Local Dev, C=CN`，SHA-256 `01547534…82f4`，与 0.9.5–0.9.9 同一主线，老设备可覆盖安装；0.9.4 及更早仍需先卸载（见 2026-11-23 签名定案） |
+| 线上复核 | 发布后 `releases/tags/v0.10.0` 返回 `draft=false`、附件 `state=uploaded`、size 74,396,188；再回下载该附件，字节数与 sha256 与本机产物逐字节一致（不是只比大小） |
+| 发布前测试 | `:app:testDebugUnitTest` 537 例 / 62 类 0 失败；`lintRelease` 0 errors、263 warnings；`:app:compileDebugAndroidTestJavaWithJavac` 通过；构建产物即 tag 指向的 `a74e9f6` 状态 |
+
+**发布过程的传输事故（值得记一条）**：`github.com` 的 git 传输今天长时间拒绝 TLS 握手（schannel 报 `failed to receive handshake` / `server closed abruptly (missing close_notify)`，换 `-c http.sslBackend=openssl` 报 `unexpected eof while reading`），而 `api.github.com` 始终正常——所以能读 PR、能建 Release，却推不动分支。靠有界重试循环恢复（#85 那次是第 14 次尝试成功的，0.10.0 这次第一次就成功）。坑在于**一次重试返回过 `rc=1 Everything up-to-date`，看着像成功，实际远端 `feat/ui-scale` 并不存在**：判断是否真推上去，只能以 `git ls-remote` 或 refs API 为准，不能信 push 的一句话。
+
+仍待真机复验：备份/恢复后各页面读数是否一致、提醒中心与桌面小组件在各厂商 ROM 后台限制下能否真响、崩溃记录能否读到、课表调课与多学期切换的边界、尺度收敛后的整体观感（+1sp、±4dp）与紧凑控件抬到 48dp 后会不会顶到边界（画线工具条、季节 chip、作息 −/+ 步进器、周切换箭头、弹窗输入框与软键盘）。
+
+遗留风险一条：**新签名 key（`CN=UNLOOP Release`，2026-11-22 起用）至今没有异地备份**。0.9.4 及更早已经因为旧 key 不可追认而定了「只能卸载重装」的结论；这把 key 再丢一次，就没有「覆盖安装」这条路可走了。
