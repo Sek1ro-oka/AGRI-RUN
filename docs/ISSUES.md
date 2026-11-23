@@ -321,4 +321,4 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 
 已知取舍：① 「定位到实际位置」不经过确认——它是用户主动要求回到真实位置，再加一步只会变成摸不着头脑；② 不做「多少米以内免确认」这类阈值，规则一旦要看距离，用户就猜不到这次会不会立刻生效；③ 候选点借用 `renderRoute` 的起点样式，颜色与路线起点相同，将来这一页如果要画路线，得换成独立 marker。
 
-验证：327 个 JVM 用例全过（44 类，与上一节持平，这次改的是界面状态机）；`lintRelease` 0 errors、279 warnings（与基线持平，删掉的那条文案抵掉了新增的告警）；`assembleDebug` 与 `compileDebugAndroidTestJavaWithJavac` 通过。本机无 adb 也无模拟器，因此确认条在搜索态/键盘弹出时的挤压、`renderRoute` 单点标记在两种地图引擎上的实际观感、以及保持中确认传送后目标 App 是否真的跟着挪，都还只是静态验证，真机效果待复验。
+验证：327 个 JVM 用例全过（44 类，与上一节持平，这次改的是界面状态机）；`lintRelease` 0 errors、279 warnings（与基线持平）；`assembleDebug` 与 `compileDebugAndroidTestJavaWithJavac` 通过。本机无 adb 也无模拟器，因此确认条在搜索态/键盘弹出时的挤压、`renderRoute` 单点标记在两种地图引擎上的实际观感、以及保持中确认传送后目标 App 是否真的跟着挪，都还只是静态验证，真机效果待复验。
