@@ -17,7 +17,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/space_xl"
-        android:minHeight="48dp"
+        android:minHeight="@dimen/touch_min"
         android:text="@string/campus_preset_conflict_dont_ask"
         android:textColor="@color/campus_ink"
         android:textSize="@dimen/text_body" />

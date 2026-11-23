@@ -50,7 +50,7 @@
                 <Spinner
                     android:id="@+id/spinnerCourseWeekday"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
+                    android:layout_height="@dimen/touch_min"
                     android:layout_marginTop="@dimen/space_xs"
                     android:background="@drawable/bg_study_input"
                     android:paddingHorizontal="@dimen/space_lg"
@@ -73,7 +73,7 @@
                 <EditText
                     android:id="@+id/inputCoursePeriod"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
+                    android:layout_height="@dimen/touch_min"
                     android:layout_marginTop="@dimen/space_xs"
                     android:background="@drawable/bg_study_input"
                     android:hint="@string/study_course_period_hint"
@@ -112,7 +112,7 @@
                 <EditText
                     android:id="@+id/inputCourseWeeks"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
+                    android:layout_height="@dimen/touch_min"
                     android:layout_marginTop="@dimen/space_xs"
                     android:background="@drawable/bg_study_input"
                     android:hint="@string/study_course_weeks_hint"
@@ -141,7 +141,7 @@
                 <EditText
                     android:id="@+id/inputCourseLocation"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
+                    android:layout_height="@dimen/touch_min"
                     android:layout_marginTop="@dimen/space_xs"
                     android:background="@drawable/bg_study_input"
                     android:hint="教一101"
@@ -164,7 +164,7 @@
         <EditText
             android:id="@+id/inputCourseTeacher"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/touch_min"
             android:layout_marginTop="@dimen/space_xs"
             android:layout_marginBottom="@dimen/space_xs"
             android:background="@drawable/bg_study_input"

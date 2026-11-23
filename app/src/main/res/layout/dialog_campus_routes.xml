@@ -51,7 +51,7 @@
         android:id="@+id/buttonDrawRoute"
         style="@style/Widget.Unloop.TextButton"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/touch_min"
         android:insetTop="0dp"
         android:insetBottom="0dp"
         android:text="@string/campus_routes_draw"

@@ -56,7 +56,13 @@ public class UiScaleTest {
             return "true".equals(attrs.get("android:clickable"))
                     || tag.endsWith("Button") || tag.endsWith("ImageButton")
                     || tag.endsWith("CheckBox") || tag.endsWith("Switch")
-                    || tag.endsWith("MaterialCardView");
+                    || tag.endsWith("MaterialCardView") || isInputField();
+        }
+
+        /** 输入框和下拉框同样是手指目标，不能因为不是 Button 就漏掉。 */
+        boolean isInputField() {
+            return tag.endsWith("EditText") || tag.endsWith("Spinner")
+                    || tag.endsWith("AutoCompleteTextView");
         }
 
         boolean selfSized() {
@@ -175,9 +181,9 @@ public class UiScaleTest {
             }
             int width = element.fixed("android:layout_width");
             int height = element.minHeight();
-            assertTrue(element + " 宽 " + width + "dp，点不准的按钮等于让人多点几次",
+            assertTrue(element + " 宽 " + width + "dp，点不准的控件等于让人多点几次",
                     width < 0 || width >= 48 || element.selfSized());
-            assertTrue(element + " 高 " + height + "dp，点不准的按钮等于让人多点几次",
+            assertTrue(element + " 高 " + height + "dp，点不准的控件等于让人多点几次",
                     height < 0 || height >= 48 || element.selfSized());
         }
     }

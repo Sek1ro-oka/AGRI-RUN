@@ -13,8 +13,8 @@
         android:paddingHorizontal="@dimen/space_xl">
         <ImageButton
             android:id="@+id/buttonVirtualBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="@dimen/touch_min"
+            android:layout_height="@dimen/touch_min"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/campus_back"
             android:padding="@dimen/space_xl"
@@ -222,7 +222,7 @@
         <LinearLayout
             android:id="@+id/pendingBar"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/touch_min"
             android:baselineAligned="false"
             android:gravity="center_vertical|end"
             android:orientation="horizontal"
@@ -231,7 +231,7 @@
                 android:id="@+id/buttonPendingCancel"
                 style="@style/Widget.Unloop.TextButton"
                 android:layout_width="wrap_content"
-                android:layout_height="48dp"
+                android:layout_height="@dimen/touch_min"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="@string/virtual_pending_cancel"
@@ -241,7 +241,7 @@
                 android:id="@+id/buttonPendingConfirm"
                 style="@style/Widget.Unloop.TextButton"
                 android:layout_width="wrap_content"
-                android:layout_height="48dp"
+                android:layout_height="@dimen/touch_min"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="@string/virtual_pending_confirm"
@@ -265,7 +265,7 @@
         <LinearLayout
             android:id="@+id/searchBar"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/touch_min"
             android:layout_marginTop="@dimen/space_lg"
             android:background="@drawable/bg_virtual_search"
             android:gravity="center_vertical"
