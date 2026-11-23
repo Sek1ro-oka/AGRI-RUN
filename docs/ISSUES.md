@@ -181,4 +181,4 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 
 背景证据：用户手工从加速线路下载的 74 MB 文件首 4 字节是 `<!DO`，即拿到的是网页而非 APK；本机实测 5 条线路（GitHub 直连 + gh-proxy.com/.org + ghproxy.imciel.com/net）均返回 `PK` 且完整下载与 GitHub digest、本机构造三者 sha256 一致。
 
-验证：JVM 单元测试与 lint、`assembleRelease` 见本次构建记录；真机侧「应用内更新到 0.9.8」的路径尚未实测。
+验证：273 个 JVM 单元测试全过（37 个测试类，较上一版 +7）；`lintRelease` 0 errors、281 warnings（均为既有文案项）；`assembleRelease` 产物 74,194,505 字节、sha256 `8908a31431fdac7503533d5572f2cbdf3e77b99baa3c813869813add15b43c3c`、签名 `CN=UNLOOP Release`，已作为 v0.9.8（versionCode 38，tag 指向 `a04769f`）的附件 `route-workshop-0.9.8-release.apk` 发布，GitHub 回读的 digest 与本机构建一致。真机侧「应用内更新到 0.9.8」与拦截页提示尚未实测。
