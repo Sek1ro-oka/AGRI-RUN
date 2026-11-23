@@ -1,11 +1,16 @@
 package org.localroute.app.ui;
 
 import android.app.DatePickerDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -31,14 +36,20 @@ import org.localroute.app.study.CustomHomework;
 import org.localroute.app.study.CustomHomeworkStore;
 import org.localroute.app.study.HomeworkReminderPlanner;
 import org.localroute.app.study.HomeworkReminderScheduler;
+import org.localroute.app.study.IcsTimetableWriter;
+import org.localroute.app.study.IcsTransfer;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
 import org.localroute.app.study.StudyTimetableStore;
+import org.localroute.app.study.TimetableCourse;
+import org.localroute.app.study.TimetableImportPlan;
+import org.localroute.app.study.TimetableShareCodec;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +59,9 @@ public class StudySettingsActivity extends AppCompatActivity {
 
     /** 开学日期改过时带回课表页，让它跳到新的本周。 */
     public static final String EXTRA_WEEK_CHANGED = "week_changed";
+
+    /** 系统保存面板只看 MIME，写 .ics 用 text/calendar 才不会被改名成 .txt。 */
+    private static final String ICS_MIME = "text/calendar";
 
     private ActivityStudySettingsBinding binding;
     private StudySession session;
@@ -72,6 +86,36 @@ public class StudySettingsActivity extends AppCompatActivity {
                         }
                     });
 
+    /** 点「导出」时生成的日历文本，等系统保存面板回来后再写。 */
+    private String pendingIcsText = "";
+    private int pendingIcsEvents;
+    /** 分享码解出来的课程，冲突预演确认后才写本机课表。 */
+    private List<TimetableCourse> pendingShare = Collections.emptyList();
+
+    /** 导出 .ics 用的保存面板：文本在点「导出」时就生成好，等用户选完落点再写。 */
+    private final ActivityResultLauncher<Intent> icsLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        Uri target = result.getData() == null ? null : result.getData().getData();
+                        if (result.getResultCode() != RESULT_OK || target == null) {
+                            return; // 用户在系统面板里取消，不再多提示一次。
+                        }
+                        String text = pendingIcsText;
+                        int events = pendingIcsEvents;
+                        pendingIcsText = "";
+                        IcsTransfer.save(this, text, events, target, new IcsTransfer.SaveListener() {
+                            @Override
+                            public void onSaved(int count) {
+                                toast(getString(R.string.study_timetable_export_saved, count));
+                            }
+
+                            @Override
+                            public void onFailed(@NonNull String detail) {
+                                toast(getString(R.string.study_timetable_export_failed, detail));
+                            }
+                        });
+                    });
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -86,6 +130,9 @@ public class StudySettingsActivity extends AppCompatActivity {
         binding.rowAddCourse.setOnClickListener(view ->
                 StudyDialogs.showCourseEditor(this, null, course -> onTimetableChanged()));
         binding.rowClearTimetable.setOnClickListener(view -> confirmClearTimetable());
+        binding.rowExportIcs.setOnClickListener(view -> confirmExportIcs());
+        binding.rowCopyShareCode.setOnClickListener(view -> copyShareCode());
+        binding.rowImportShareCode.setOnClickListener(view -> showShareCodeDialog());
 
         binding.switchClassReminder.setOnClickListener(view -> {
             boolean enabled = binding.switchClassReminder.isChecked();
@@ -312,6 +359,183 @@ public class StudySettingsActivity extends AppCompatActivity {
                             Toast.LENGTH_SHORT).show();
                 })
                 .show();
+    }
+
+    /**
+     * 导出 .ics：先把「日历里没有调课与节假日」说清楚，再交给系统保存面板选落点。
+     *
+     * <p>没有开学日期时不导出——日历事件必须有具体第一天，否则整份文件都是空的。
+     */
+    private void confirmExportIcs() {
+        List<TimetableCourse> courses = StudyTimetableStore.loadCourses(this);
+        if (courses.isEmpty()) {
+            toast(getString(R.string.study_timetable_export_empty));
+            return;
+        }
+        LocalDate semesterStart = StudyTimetableStore.loadSemesterStart(this);
+        if (semesterStart == null) {
+            toast(getString(R.string.study_timetable_export_needs_start));
+            return;
+        }
+        int totalWeeks = StudyTimetableStore.loadTotalWeeks(this);
+        pendingIcsText = IcsTimetableWriter.write(courses,
+                StudyTimetableStore.loadSchedule(this), semesterStart, totalWeeks,
+                getString(R.string.study_timetable_calendar_name));
+        pendingIcsEvents = IcsTimetableWriter.exportable(courses,
+                StudyTimetableStore.loadSchedule(this), totalWeeks);
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.study_timetable_export_title)
+                .setMessage(R.string.study_timetable_export_message)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.study_timetable_export_ics, (dialog, which) -> {
+                    Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType(ICS_MIME);
+                    intent.putExtra(Intent.EXTRA_TITLE, IcsTimetableWriter.suggestedFileName(
+                            semesterStart, LocalDate.now()));
+                    icsLauncher.launch(intent);
+                })
+                .show();
+    }
+
+    /** 分享码只是把课表 JSON 压成一段文本，复制走系统剪贴板，不发网络。 */
+    private void copyShareCode() {
+        List<TimetableCourse> courses = StudyTimetableStore.loadCourses(this);
+        if (courses.isEmpty()) {
+            toast(getString(R.string.study_timetable_share_empty));
+            return;
+        }
+        String code = TimetableShareCodec.encode(courses);
+        ClipboardManager manager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (manager == null) {
+            toast(getString(R.string.study_timetable_share_failed));
+            return;
+        }
+        manager.setPrimaryClip(ClipData.newPlainText(
+                getString(R.string.study_timetable_share_code), code));
+        toast(getString(R.string.study_timetable_share_copied, courses.size(), code.length()));
+    }
+
+    /** 粘帖框预填剪贴板里现成的分享码，多数情况下用户只要点一下预览。 */
+    private void showShareCodeDialog() {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        input.setMinLines(3);
+        input.setGravity(Gravity.TOP | Gravity.START);
+        input.setTextSize(12f);
+        String clipboard = readClipboardText();
+        if (TimetableShareCodec.looksLikeShareCode(clipboard)) {
+            input.setText(clipboard);
+            input.setSelection(input.getText().length());
+        }
+        int padding = Math.round(20 * getResources().getDisplayMetrics().density);
+        FrameLayout container = new FrameLayout(this);
+        container.setPadding(padding, Math.round(8 * getResources().getDisplayMetrics().density),
+                padding, 0);
+        container.addView(input);
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.study_timetable_import_code_title)
+                .setMessage(R.string.study_timetable_import_code_hint)
+                .setView(container)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.study_timetable_import_preview_action,
+                        (dialog, which) -> previewShareImport(input.getText().toString()))
+                .show();
+    }
+
+    private void previewShareImport(String pasted) {
+        TimetableShareCodec.DecodeResult result = TimetableShareCodec.decode(pasted);
+        if (!result.ok()) {
+            toast(getString(R.string.study_timetable_import_failed, result.error()));
+            return;
+        }
+        List<TimetableCourse> existing = StudyTimetableStore.loadCourses(this);
+        TimetableImportPlan plan = TimetableImportPlan.of(result.courses(), existing);
+        if (plan.toAdd().isEmpty()) {
+            toast(getString(R.string.study_timetable_import_nothing));
+            return;
+        }
+        pendingShare = result.courses();
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.study_timetable_import_preview_title,
+                        plan.toAdd().size()))
+                .setMessage(importPreviewMessage(plan, result.skipped()))
+                .setNeutralButton(R.string.campus_cancel, null)
+                .setNegativeButton(R.string.study_timetable_import_replace,
+                        (dialog, which) -> confirmReplace())
+                .setPositiveButton(R.string.study_timetable_import_append,
+                        (dialog, which) -> applyImport(false))
+                .show();
+    }
+
+    /** 冲突一行一条，最多列 4 条，剩下的报个数——对话框不是课表全览。 */
+    private String importPreviewMessage(TimetableImportPlan plan, int skipped) {
+        StringBuilder text = new StringBuilder();
+        text.append(getString(R.string.study_timetable_import_preview,
+                plan.toAdd().size(), plan.duplicates()));
+        if (skipped > 0) {
+            text.append('\n').append(getString(R.string.study_timetable_import_skipped, skipped));
+        }
+        if (plan.hasConflicts()) {
+            List<String> conflicts = plan.conflicts();
+            int shown = Math.min(4, conflicts.size());
+            StringBuilder lines = new StringBuilder();
+            for (int i = 0; i < shown; i++) {
+                if (i > 0) {
+                    lines.append('\n');
+                }
+                lines.append("· ").append(conflicts.get(i));
+            }
+            if (conflicts.size() > shown) {
+                lines.append('\n')
+                        .append(getString(R.string.study_timetable_import_more_conflicts,
+                                conflicts.size() - shown));
+            }
+            text.append('\n').append(getString(R.string.study_timetable_import_conflicts,
+                    conflicts.size(), lines));
+        }
+        return text.toString();
+    }
+
+    /** 替换会清掉本机课表，所以单独确认一次，并写明会少掉几门。 */
+    private void confirmReplace() {
+        int kept = StudyTimetableStore.loadCourses(this).size();
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.study_timetable_import_replace)
+                .setMessage(getString(R.string.study_timetable_import_replace_confirm,
+                        kept, pendingShare.size()))
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.study_timetable_import_replace,
+                        (dialog, which) -> applyImport(true))
+                .show();
+    }
+
+    private void applyImport(boolean replace) {
+        List<TimetableCourse> courses = StudyTimetableStore.loadCourses(this);
+        List<TimetableCourse> merged = replace ? pendingShare
+                : TimetableImportPlan.appendTo(courses, pendingShare);
+        int added = merged.size() - courses.size();
+        StudyTimetableStore.saveCourses(this, merged);
+        pendingShare = Collections.emptyList();
+        onTimetableChanged();
+        // 替换后「多了几门」没有意义（课变少也是正常的），报最终门数。
+        toast(replace ? getString(R.string.study_timetable_import_replaced, merged.size())
+                : getString(R.string.study_timetable_import_done, Math.max(0, added)));
+    }
+
+    @Nullable
+    private String readClipboardText() {
+        ClipboardManager manager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (manager == null || !manager.hasPrimaryClip() || manager.getPrimaryClip() == null
+                || manager.getPrimaryClip().getItemCount() == 0) {
+            return "";
+        }
+        CharSequence text = manager.getPrimaryClip().getItemAt(0).coerceToText(this);
+        return text == null ? "" : text.toString();
+    }
+
+    private void toast(String text) {
+        Toast.makeText(this, text, Toast.LENGTH_LONG).show();
     }
 
     // ------------------------------------------------------------------ 作息
