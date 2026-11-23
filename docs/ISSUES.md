@@ -215,7 +215,7 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 | `AppearancePreferences`（新） | `ui`/`night_mode` 存三种模式，默认 `MODE_FOLLOW_SYSTEM`；`nightModeFor` 映射到 `AppCompatDelegate` 常量，纯函数便于 JVM 测试 |
 | `UnloopApplication`（新）+ `AndroidManifest` | 应用启动时 `AppearancePreferences.apply(this)`，冷启动即恢复用户选的风格；此前从不调用 `setDefaultNightMode`，深浅色一直靠系统隐式跟随，本次只是把选择权交给用户，默认值不变 |
 | `AppSettingsActivity` + `activity_app_settings.xml` + `ic_fm_display.xml` | 「通用」卡片第一行新增「界面风格」（图标 44dp + 当前值 + 箭头），点击弹单选对话框，选中后立即 `setDefaultNightMode` 并刷新行内文案。放在设置页而非主页，是因为主页本身没有设置类卡片 |
-| `activity_main.xml` | 「校园快跑」「虚拟定位」两张卡片去掉 92dp 色块头部，改为卡内 36dp 圆底图标 + 右侧标题（18sp→15sp），说明与入口文案移到下方，11sp |
+| `activity_main.xml` | 「校园快跑」「虚拟定位」两张卡片去掉 92dp 色块头部，保持左右并排，改为卡内 32dp 圆角图标块（`bg_campus_entry_icon`，内缩 7dp）放在标题左侧，标题 18sp→15sp，说明与入口文案移到下方、11sp |
 | `CampusWorkspaceTest` | 两处 `buttonTeleport` 可见性断言改为断言 `mapContainer` 完整显示 |
 
 已知取舍：跑圈中把地图拖走之后，页内没有「回到当前位置」的手动按钮了；恢复镜头只剩重新进入跑圈页或开始跑圈（这两处仍会自动对准模拟位置）。跨应用传送/定位仍走主页「虚拟定位」与悬浮控制台，功能没有减少，只是入口收敛。
