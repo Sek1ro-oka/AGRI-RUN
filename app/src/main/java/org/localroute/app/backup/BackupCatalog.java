@@ -20,6 +20,7 @@ public final class BackupCatalog {
 
     public static final String SECTION_ROUTES = "routes";
     public static final String SECTION_ROUTE_FILES = "route_files";
+    public static final String SECTION_MAP_POINTS = "map_points";
     public static final String SECTION_TIMETABLE = "timetable";
     public static final String SECTION_HOMEWORK = "homework";
     public static final String SECTION_SCHOOL = "school";
@@ -107,6 +108,8 @@ public final class BackupCatalog {
                     Arrays.asList(new KeyRef("campus_run", "custom_routes", BackupValues.TYPE_STRING))),
             new Section(SECTION_ROUTE_FILES, 1, R.string.backup_kind_route_files, true, true,
                     Collections.<KeyRef>emptyList()),
+            new Section(SECTION_MAP_POINTS, 1, R.string.backup_kind_map_points, true, true,
+                    Arrays.asList(new KeyRef("map", "favorites", BackupValues.TYPE_STRING))),
             new Section(SECTION_TIMETABLE, 1, R.string.backup_kind_timetable, true, false,
                     Arrays.asList(
                             new KeyRef("study_timetable", "courses", BackupValues.TYPE_STRING),

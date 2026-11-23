@@ -10,6 +10,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.localroute.app.campus.CampusRoute;
 import org.localroute.app.campus.CampusRouteCodec;
+import org.localroute.app.map.MapPoint;
+import org.localroute.app.map.MapPointCodec;
+import org.localroute.app.map.MapPointStore;
 import org.localroute.app.model.RouteDefinition;
 import org.localroute.app.model.RouteJsonCodec;
 import org.localroute.app.storage.RouteRepository;
@@ -95,6 +98,8 @@ public final class BackupStore {
                 putIfPresent(bundle, collectRoutes(context));
             } else if (BackupCatalog.SECTION_ROUTE_FILES.equals(id)) {
                 putIfPresent(bundle, collectRouteFiles(context));
+            } else if (BackupCatalog.SECTION_MAP_POINTS.equals(id)) {
+                putIfPresent(bundle, collectMapPoints(context));
             } else {
                 putIfPresent(bundle, collectPrefs(context, section));
             }
@@ -171,6 +176,17 @@ public final class BackupStore {
                 BackupCatalog.byId(BackupCatalog.SECTION_ROUTE_FILES).schema(), count, data);
     }
 
+    /** 收藏点位：字段名只在 {@link MapPointCodec} 里定义一次，这里直接复用它的输出。 */
+    private static BackupSection collectMapPoints(Context context) throws JSONException {
+        List<MapPoint> points = MapPointStore.load(context);
+        JSONArray array = new JSONObject(MapPointCodec.encode(points)).optJSONArray("points");
+        JSONObject data = new JSONObject();
+        data.put("points", array == null ? new JSONArray() : array);
+        return new BackupSection(BackupCatalog.SECTION_MAP_POINTS,
+                BackupCatalog.byId(BackupCatalog.SECTION_MAP_POINTS).schema(),
+                points.size(), data);
+    }
+
     /**
      * 写回备份内容。
      *
@@ -190,6 +206,8 @@ public final class BackupStore {
                 results.add(applyRoutes(context, section));
             } else if (BackupCatalog.SECTION_ROUTE_FILES.equals(id)) {
                 results.add(applyRouteFiles(context, section));
+            } else if (BackupCatalog.SECTION_MAP_POINTS.equals(id)) {
+                results.add(applyMapPoints(context, section));
             } else {
                 results.add(applyPrefs(context, section));
             }
@@ -271,6 +289,62 @@ public final class BackupStore {
         }
         context.getSharedPreferences(routesKey.prefs(), Context.MODE_PRIVATE)
                 .edit().putString(routesKey.key(), CampusRouteCodec.encode(merged)).apply();
+        return result;
+    }
+
+    /** 收藏点位按 id 只补缺：本机改过的名字不该被备份里的旧名顶掉，理由与自建路线相同。 */
+    private static SectionResult applyMapPoints(Context context, BackupSection section) {
+        SectionResult result = new SectionResult(section.name());
+        JSONArray array = section.payload().optJSONArray("points");
+        if (array == null) {
+            return result;
+        }
+        List<MapPoint> incoming = new ArrayList<>();
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject entry = array.optJSONObject(i);
+            if (entry == null) {
+                result.skipped++;
+                continue;
+            }
+            List<MapPoint> parsed = MapPointCodec.decode("{\"version\":"
+                    + MapPointCodec.SCHEMA_VERSION + ",\"points\":[" + entry + "]}");
+            if (parsed.isEmpty()) {
+                result.skipped++;
+            } else {
+                incoming.add(parsed.get(0));
+            }
+        }
+        List<BackupMerge.Entry> localIds = new ArrayList<>();
+        List<MapPoint> local = MapPointStore.load(context);
+        for (MapPoint point : local) {
+            localIds.add(new BackupMerge.Entry(point.id(), point.createdAtMillis()));
+        }
+        List<BackupMerge.Entry> incomingIds = new ArrayList<>();
+        for (MapPoint point : incoming) {
+            incomingIds.add(new BackupMerge.Entry(point.id(), point.createdAtMillis()));
+        }
+        BackupMerge.Plan plan = BackupMerge.plan(localIds, incomingIds,
+                BackupCatalog.policyOf(section.name()));
+        List<MapPoint> merged = new ArrayList<>(local);
+        Map<String, MapPoint> incomingById = new TreeMap<>();
+        for (MapPoint point : incoming) {
+            incomingById.put(point.id(), point);
+        }
+        for (int i = 0; i < plan.actions().size(); i++) {
+            if (plan.actions().get(i) != BackupMerge.Action.ADD) {
+                result.skipped++;
+                continue;
+            }
+            MapPoint candidate = incomingById.get(plan.entries().get(i).id());
+            // 超过上限就不再补：本机列表的长度是用户能翻完的长度。
+            if (candidate == null || merged.size() >= MapPointCodec.MAX_POINTS) {
+                result.skipped++;
+            } else {
+                merged.add(candidate);
+                result.applied++;
+            }
+        }
+        MapPointStore.save(context, merged);
         return result;
     }
 

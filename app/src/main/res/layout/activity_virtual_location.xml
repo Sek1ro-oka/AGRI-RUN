@@ -132,6 +132,20 @@
             android:visibility="gone" />
 
         <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/buttonMapPoints"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="84dp"
+            android:contentDescription="@string/virtual_points"
+            app:backgroundTint="@color/fm_surface"
+            app:elevation="3dp"
+            app:maxImageSize="24dp"
+            app:srcCompat="@drawable/ic_campus_bookmark"
+            app:tint="@color/fm_link" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/buttonLocateNow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

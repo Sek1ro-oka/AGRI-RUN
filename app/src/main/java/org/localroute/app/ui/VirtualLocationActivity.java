@@ -3,6 +3,7 @@ package org.localroute.app.ui;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -11,11 +12,16 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -25,6 +31,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
@@ -32,15 +39,22 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+
 import org.localroute.app.BuildConfig;
 import org.localroute.app.R;
 import org.localroute.app.campus.CampusFormat;
 import org.localroute.app.campus.CampusGeo;
 import org.localroute.app.databinding.ActivityVirtualLocationBinding;
+import org.localroute.app.databinding.DialogMapPointsBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.diagnostics.SystemLocationReader;
 import org.localroute.app.map.AmapRouteMapView;
 import org.localroute.app.map.MapBackendPolicy;
+import org.localroute.app.map.MapPoint;
+import org.localroute.app.map.MapPointCodec;
+import org.localroute.app.map.MapPointStore;
 import org.localroute.app.map.RouteMapController;
 import org.localroute.app.map.RouteMapHost;
 import org.localroute.app.overlay.OverlayHost;
@@ -140,6 +154,7 @@ public final class VirtualLocationActivity extends AppCompatActivity {
         binding.textMapLayer.setOnClickListener(v -> showMapLayerDialog());
         binding.buttonVirtualMain.setOnClickListener(v -> onMainAction());
         binding.buttonLocateNow.setOnClickListener(v -> locateNow());
+        binding.buttonMapPoints.setOnClickListener(v -> showMapPointsSheet());
         binding.inputPlaceSearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -277,6 +292,201 @@ public final class VirtualLocationActivity extends AppCompatActivity {
         }
         render();
         return true;
+    }
+
+    // ---------------------------------------------------------------- 常用点位收藏
+
+    /**
+     * 收藏点位列表：点一行就把选点移到那里，「收藏当前地图中心」把镜头对准的位置记下来。
+     *
+     * <p>重命名与删除放在横向滑动出来的按钮里，和路线列表一致：轻触只做选中，
+     * 销毁性动作不该出现在最容易误碰的位置。
+     */
+    private void showMapPointsSheet() {
+        DialogMapPointsBinding sheet = DialogMapPointsBinding.inflate(getLayoutInflater());
+        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        List<MapPoint> saved = MapPointStore.load(this);
+        boolean empty = saved.isEmpty();
+        sheet.pointsScroll.setVisibility(empty ? View.GONE : View.VISIBLE);
+        sheet.textNoPoints.setVisibility(empty ? View.VISIBLE : View.GONE);
+        if (!empty) {
+            for (MapPoint point : saved) {
+                addMapPointRow(sheet.pointList, point, dialog);
+            }
+            // 收藏多了就在列表内部滚动，底部两个按钮始终露在外面（算法与路线列表一致）。
+            ViewGroup.LayoutParams scrollParams = sheet.pointsScroll.getLayoutParams();
+            int available = getResources().getDisplayMetrics().heightPixels;
+            WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(binding.getRoot());
+            if (windowInsets != null) {
+                Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+                available -= bars.top + bars.bottom;
+            }
+            int maxListHeight = Math.max(dp(100), Math.min(dp(380), available - dp(240)));
+            scrollParams.height = Math.min(saved.size() * dp(66), maxListHeight);
+            sheet.pointsScroll.setLayoutParams(scrollParams);
+        }
+        sheet.buttonSaveCenter.setOnClickListener(v -> {
+            dialog.dismiss();
+            saveMapCenterAsPoint();
+        });
+        sheet.buttonClosePoints.setOnClickListener(v -> dialog.dismiss());
+        WindowInsetsCompat activityInsets = ViewCompat.getRootWindowInsets(binding.getRoot());
+        final Insets activityBars = activityInsets == null ? Insets.NONE
+                : activityInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+        sheet.getRoot().setPadding(dp(20) + activityBars.left, dp(18),
+                dp(20) + activityBars.right, dp(12) + activityBars.bottom);
+        ViewCompat.setOnApplyWindowInsetsListener(sheet.getRoot(), (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(dp(20) + Math.max(bars.left, activityBars.left), dp(18),
+                    dp(20) + Math.max(bars.right, activityBars.right),
+                    dp(12) + Math.max(bars.bottom, activityBars.bottom));
+            return insets;
+        });
+        dialog.setContentView(sheet.getRoot());
+        dialog.getBehavior().setSkipCollapsed(true);
+        dialog.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
+        dialog.show();
+        ViewCompat.requestApplyInsets(sheet.getRoot());
+    }
+
+    private void addMapPointRow(LinearLayout list, MapPoint point, BottomSheetDialog dialog) {
+        boolean selected = target != null
+                && target.isNear(point.point(), MapPointStore.DUPLICATE_METERS);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.HORIZONTAL);
+        content.setGravity(Gravity.CENTER_VERTICAL);
+        content.setPadding(dp(6), dp(13), dp(6), dp(13));
+        // 内容层必须不透明，收起时才会盖住下面的滑动按钮。
+        android.graphics.drawable.GradientDrawable base =
+                new android.graphics.drawable.GradientDrawable();
+        base.setColor(ContextCompat.getColor(this, R.color.campus_row_bg));
+        content.setBackground(new android.graphics.drawable.RippleDrawable(
+                ColorStateList.valueOf(0x1F000000), base, null));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setLayoutParams(new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView title = new TextView(this);
+        title.setText(point.name());
+        title.setTextColor(ContextCompat.getColor(this, R.color.campus_ink));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        texts.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText(point.point().format());
+        subtitle.setTextColor(ContextCompat.getColor(this, R.color.campus_muted));
+        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f);
+        texts.addView(subtitle);
+        content.addView(texts);
+
+        TextView check = new TextView(this);
+        check.setText(selected ? "✓" : "");
+        check.setContentDescription(
+                selected ? getString(R.string.campus_row_check) : null);
+        check.setTextColor(ContextCompat.getColor(this, R.color.campus_mint_dark));
+        check.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f);
+        check.setTypeface(null, android.graphics.Typeface.BOLD);
+        check.setPadding(dp(10), 0, dp(4), 0);
+        content.addView(check);
+
+        content.setOnClickListener(v -> {
+            boolean movingHold = snapshot.isActive() && snapshot.singlePoint();
+            if (applyPoint(point.point()) && movingHold) {
+                toast(getString(R.string.virtual_teleport_sent));
+            }
+            dialog.dismiss();
+        });
+
+        SwipeActionRow swipe = new SwipeActionRow(this);
+        swipe.setContent(content);
+        // 先加「重命名」再加「删除」：删除落在最右侧，离轻触选中的距离最远。
+        swipe.addAction(getString(R.string.virtual_points_rename),
+                ContextCompat.getColor(this, R.color.campus_mint_dark),
+                () -> renameMapPoint(point, dialog));
+        swipe.addAction(getString(R.string.campus_route_delete),
+                ContextCompat.getColor(this, R.color.campus_danger),
+                () -> deleteMapPoint(point, dialog));
+
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowParams.topMargin = dp(2);
+        list.addView(swipe, rowParams);
+    }
+
+    private void saveMapCenterAsPoint() {
+        GeoPoint center = mapHost == null ? null : mapHost.cameraCenter();
+        if (center == null) {
+            toast(getString(R.string.virtual_points_no_center));
+            return;
+        }
+        promptMapPointName(center, null);
+    }
+
+    private void renameMapPoint(MapPoint point, BottomSheetDialog dialog) {
+        dialog.dismiss();
+        promptMapPointName(point.point(), point);
+    }
+
+    /**
+     * 收藏/重命名共用一个输入框。
+     *
+     * <p>{@code existing} 为 null 表示新增：坐标重复或已达上限时只提示，不写存储。
+     */
+    private void promptMapPointName(GeoPoint point, @Nullable MapPoint existing) {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setSingleLine(true);
+        input.setHint(R.string.virtual_points_name_hint);
+        input.setText(existing == null ? "" : existing.name());
+        input.setSelection(input.getText().length());
+        FrameLayout container = new FrameLayout(this);
+        container.setPadding(dp(20), dp(8), dp(20), 0);
+        container.addView(input);
+
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(existing == null
+                        ? R.string.virtual_points_name_title : R.string.virtual_points_rename_title)
+                .setMessage(point.format())
+                .setView(container)
+                .setPositiveButton(R.string.campus_save, null)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    String name = input.getText().toString().trim();
+                    if (existing == null) {
+                        MapPointStore.AddResult result =
+                                MapPointStore.add(this, name, point, System.currentTimeMillis());
+                        if (result == MapPointStore.AddResult.DUPLICATE) {
+                            toast(getString(R.string.virtual_points_duplicate));
+                            return;
+                        }
+                        if (result == MapPointStore.AddResult.LIMIT) {
+                            toast(getString(R.string.virtual_points_limit, MapPointCodec.MAX_POINTS));
+                            return;
+                        }
+                        dialog.dismiss();
+                        toast(getString(R.string.virtual_points_saved, MapPoint.displayName(name)));
+                        showMapPointsSheet();
+                        return;
+                    }
+                    MapPointStore.rename(this, existing.id(), name);
+                    dialog.dismiss();
+                    toast(getString(R.string.virtual_points_renamed, MapPoint.displayName(name)));
+                    showMapPointsSheet();
+                }));
+        dialog.show();
+    }
+
+    private void deleteMapPoint(MapPoint point, BottomSheetDialog dialog) {
+        MapPointStore.remove(this, point.id());
+        dialog.dismiss();
+        toast(getString(R.string.virtual_points_deleted, point.name()));
+        showMapPointsSheet();
     }
 
     // ---------------------------------------------------------------- 地点搜索

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingTop="18dp"
+    android:paddingBottom="12dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/virtual_points_title"
+        android:textColor="@color/campus_ink"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="@string/virtual_points_hint"
+        android:textColor="@color/campus_muted"
+        android:textSize="12sp" />
+
+    <ScrollView
+        android:id="@+id/pointsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:fillViewport="true"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/pointList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <TextView
+        android:id="@+id/textNoPoints"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingVertical="14dp"
+        android:text="@string/virtual_points_empty"
+        android:textColor="@color/campus_muted"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/campus_card_stroke" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/buttonSaveCenter"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        android:text="@string/virtual_points_save"
+        android:textColor="@color/campus_mint_dark"
+        android:textSize="14sp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/buttonClosePoints"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        android:text="@string/virtual_points_close"
+        android:textColor="@color/campus_muted"
+        android:textSize="13sp" />
+</LinearLayout>
