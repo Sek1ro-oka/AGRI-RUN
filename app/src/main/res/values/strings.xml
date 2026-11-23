@@ -225,6 +225,7 @@
     <!-- 备份与恢复 -->
     <string name="backup_kind_routes">校园快跑自建路线</string>
     <string name="backup_kind_route_files">路线工坊路线文件</string>
+    <string name="backup_kind_map_points">常用点位收藏</string>
     <string name="backup_kind_timetable">本地课表与课表设置</string>
     <string name="backup_kind_homework">自建作业与作业提醒</string>
     <string name="backup_kind_school">教务学校信息</string>
@@ -417,6 +418,22 @@
     <string name="virtual_locate_moved">已移动到实际位置</string>
     <string name="virtual_locate_unavailable">模拟定位中读不到真实位置，请先结束定位</string>
     <string name="virtual_locate_failed">没有获取到真实位置，请稍后重试</string>
+    <string name="virtual_points">常用点位</string>
+    <string name="virtual_points_title">常用点位</string>
+    <string name="virtual_points_hint">点选即可回到该点；向左滑动可重命名或删除</string>
+    <string name="virtual_points_empty">还没有收藏的点位。移动地图到想记的位置，再点下面的「收藏当前地图中心」。</string>
+    <string name="virtual_points_save">收藏当前地图中心</string>
+    <string name="virtual_points_close">关闭</string>
+    <string name="virtual_points_saved">已收藏「%1$s」</string>
+    <string name="virtual_points_duplicate">这个点已经在收藏里了</string>
+    <string name="virtual_points_limit">收藏最多 %1$d 个，先删掉不用的</string>
+    <string name="virtual_points_name_title">收藏这个点</string>
+    <string name="virtual_points_rename_title">重命名点位</string>
+    <string name="virtual_points_name_hint">留空则记作「未命名点位」</string>
+    <string name="virtual_points_deleted">已删除「%1$s」</string>
+    <string name="virtual_points_rename">重命名</string>
+    <string name="virtual_points_renamed">已重命名为「%1$s」</string>
+    <string name="virtual_points_no_center">地图还没有准备好，稍后再试</string>
     <string name="campus_route_invalid">路线无效</string>
     <string name="campus_stopping">正在结束…</string>
     <string name="campus_hold_stopped">单点保持已结束</string>

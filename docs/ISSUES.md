@@ -260,3 +260,25 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 
 验证：303 个 JVM 用例全过（42 个测试类，较 0.9.9 的 277 例 / 38 类 +26，即上述四个新测试类）；`lintRelease` 0 errors、279 warnings（与基线持平，新增文案与资源没引入新告警）；`assembleDebug` 通过，`ActivityAppSettingsBinding` 能读到 `rowBackupExport`/`rowBackupImport`。本机无 adb 也无模拟器，因此 SAF 保存面板的实际落盘、各家文件管理器对 `application/json` 这个 MIME 的接受度、恢复后课表/路线/悬浮窗位置是否真的生效，都还只是静态验证，真机效果待复验。
 
+
+## 2026-11-24 常用点位收藏（新功能，已实现待验证）
+
+需求来源：对标审查 B 档第 2 项。虚拟定位页每次都要重新搜索或拖地图才能回到「宿舍楼下」「东门」这类点，`docs/11_使用手册.md` 11.4 写的悬浮条 A/B/C 快捷传送点是 0.2.x 的菜单形态，代码里早已不存在（Explore 全仓确认无残留存储），所以这次把它做成真正的一等功能：可命名、可增删的点位列表，而不是三个固定槽位。
+
+改动：
+
+| 位置 | 内容 |
+| --- | --- |
+| `map/MapPoint`（新） | 不可变模型：`id`/`name`/`GeoPoint`/`createdAtMillis`。名称在这里收敛一次——去空白、超 40 字截断、空值退成「未命名点位」，界面和反序列化共用同一条路，列表里不会出现空白行。改名是换新对象而不是就地改 |
+| `map/MapPointCodec`（新） | JSON 格式 `{version:1, points:[{id,name,latitude,longitude,createdAt}]}`，与 `CampusRouteCodec` 同一套约定：整体读不动返回空列表，单条坐标越界／非有限数／缺 `id` 只跳过该条，重复 `id` 只留第一条，超过 100 条截断。上限是为备份文件可读，不是存储放不进 |
+| `map/MapPointStore`（新） | 存进 `map` 文件的 `favorites` 键（与底图图层同文件、不同键：图层是界面状态，收藏是用户数据）。`add()` 返回 `AddResult{SAVED,DUPLICATE,LIMIT}` 而不是 `null`，界面才能说清「没存进去」的原因是重复还是满额。5 米内算重复收藏同一个点 |
+| `activity_virtual_location.xml` | 新增第二枚 FAB「常用点位」，坐在「定位当前位置」正上方（`marginBottom=84dp`），默认 FAB 尺寸 56dp 满足触摸目标；不占纵向面板空间，跑圈页与悬浮台都不受影响 |
+| `dialog_map_points.xml`（新）+ `ic_campus_bookmark.xml`（新） | 与路线列表同款底部弹层：标题＋滑动提示＋列表＋空态文案＋两个按钮。列表内部滚动、按钮始终外露的高度和 insets 算法照抄路线弹层 |
+| `VirtualLocationActivity` | `showMapPointsSheet()`／`addMapPointRow()`／`promptMapPointName()`／`saveMapCenterAsPoint()`／`deleteMapPoint()`。点一行＝走既有的 `applyPoint()`，因此「单点保持中直接移动、跑圈中拒绝、空闲只预览」这套判定不重复实现；重命名与删除放在 `SwipeActionRow` 的横向按钮里，轻触碰不到销毁性动作；删除后 toast + 重新弹层，与路线列表行为一致 |
+| `BackupCatalog` + `BackupStore` | 新增第 8 个段落 `map_points`（`keyed=true` → 导入策略 `KEEP_MINE`，只补缺不顶掉本机改过的名字）。收集复用 `MapPointCodec.encode` 的输出，恢复时逐条经 `MapPointCodec.decode` 校验、按 id 合并、到 100 条就停。上一节刚做的备份因此顺带覆盖收藏，不用再改一次格式 |
+| `strings.xml` | 新增 16 条文案（含「重命名」「已重命名为」两条滑动动作与提示） |
+| `MapPointCodecTest`（新） | 10 个用例：完整往返、空/坏 JSON/结构不符、坏一条只丢一条、重复 id、超上限截断、名称兜底与截断、`create()` 随机 id 与负时间归零、缺 id 直接拒 |
+
+已知取舍：① 收藏页只在虚拟定位页开放，跑圈页没有入口——跑圈靠路线，点位在那里会和「选起点」打架；② 名称硬编码兜底串 `未命名点位` 留在 Java 里，是为了让 `MapPointCodecTest` 保持纯 JVM 用例（不碰 `R`），代价是这条串不随语言切换；③ 删除不二次确认，误删后重新收藏同一个点成本很低，路线删除本来也没有确认；④ 不做「按收藏时间排序」以外的分组、备注、图标——先让「记住一个点」这件事成立；⑤ `docs/11_使用手册.md` 没有同步——它首页写明「适用版本 0.3.3」，整篇按当前界面重写属于另一件事，这次的说明先落在本节。
+
+验证：313 个 JVM 用例全过（43 个测试类，较备份那版的 303 例 / 42 类 +10，即 `MapPointCodecTest`）；`lintRelease` 0 errors、279 warnings（与基线持平）；`assembleDebug` 通过，`DialogMapPointsBinding` 与 `binding.buttonMapPoints` 能读到。本机无 adb 也无模拟器，因此底部弹层在高机型上的 insets 内缩、`SwipeActionRow` 与地图手势抢不抢触摸、`mapHost.cameraCenter()` 在首帧未就绪时是否真的返回 null（提示「地图还没有准备好」）、以及从旧版本升级后 `map` 文件新增键是否与图层键互不干扰，都还只是静态验证，真机效果待复验。
