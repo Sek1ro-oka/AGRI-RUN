@@ -16,7 +16,11 @@ import org.localroute.app.entry.HomeTarget;
 import org.localroute.app.overlay.OverlayHost;
 import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
+import org.localroute.app.settings.SetupGuide;
+import org.localroute.app.settings.SettingsInspector;
 import org.localroute.core.RunState;
+
+import java.util.List;
 
 /** Campus services and a live shortcut to the active simulation. */
 public class MainActivity extends AppCompatActivity {
@@ -41,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
         binding.cardTimetable.setOnClickListener(v -> HomeTarget.TIMETABLE.open(this));
         binding.navRun.setOnClickListener(v -> openRun());
         binding.navStudy.setOnClickListener(v -> HomeTarget.STUDY.open(this));
+        binding.cardSetupGuide.setOnClickListener(v ->
+                startActivity(new Intent(this, SettingsCheckActivity.class)));
         FinmoriMotion.press(binding.cardCampusRun);
         FinmoriMotion.press(binding.cardVirtualLocation);
         FinmoriMotion.press(binding.cardActiveRun);
@@ -48,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
         FinmoriMotion.press(binding.cardTimetable);
         FinmoriMotion.press(binding.navRun);
         FinmoriMotion.press(binding.navStudy);
+        FinmoriMotion.press(binding.cardSetupGuide);
         binding.toolbar.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.action_settings) {
                 startActivity(new Intent(this, AppSettingsActivity.class)); return true;
@@ -56,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
         });
         SimulationStateRepo.get().snapshot().observe(this, this::renderRun);
         OverlayHost.get(this).restore();
+        renderSetupGuide();
         // 只认冷启动那一次：进程被杀后恢复时不该把用户又甩进别的页面。
         if (savedInstanceState == null) {
             pendingTarget = HomeTarget.from(getIntent().getStringExtra(HomeTarget.EXTRA_TARGET));
@@ -63,6 +71,8 @@ public class MainActivity extends AppCompatActivity {
     }
     @Override protected void onResume() {
         super.onResume();
+        // 从系统授权页或设置检查页回来，环境状态可能已经变了。
+        renderSetupGuide();
         if (pendingTarget == null) return;
         HomeTarget target = pendingTarget;
         pendingTarget = null;
@@ -72,6 +82,16 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         pendingTarget = HomeTarget.from(intent.getStringExtra(HomeTarget.EXTRA_TARGET));
+    }
+    /** 环境还差阻塞项时提示「下一步做什么」，全部就绪后卡片自己收起来。 */
+    private void renderSetupGuide() {
+        List<SettingsInspector.Check> checks = SettingsInspector.inspect(this);
+        SettingsInspector.Check next = SetupGuide.next(checks);
+        boolean needed = next != null && next.item().blocking();
+        binding.cardSetupGuide.setVisibility(needed ? View.VISIBLE : View.GONE);
+        if (!needed) return;
+        binding.textSetupGuideTitle.setText(getString(R.string.guide_home_title, next.title()));
+        binding.textSetupGuideDetail.setText(getString(R.string.guide_home_detail, SetupGuide.pendingBlocking(checks)));
     }
     private void openRun() {
         HomeTarget.RUN.open(this);

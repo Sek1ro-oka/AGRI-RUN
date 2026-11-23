@@ -1,5 +1,6 @@
 package org.localroute.app.ui;
 
+import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -7,6 +8,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -20,6 +22,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -30,8 +33,11 @@ import org.localroute.app.R;
 import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivitySettingsCheckBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
+import org.localroute.app.entry.HomeTarget;
 import org.localroute.app.overlay.OverlayPanel;
 import org.localroute.app.run.SimulationStateRepo;
+import org.localroute.app.settings.SetupGuide;
+import org.localroute.app.settings.SetupItem;
 import org.localroute.app.settings.SettingsInspector;
 
 import java.util.List;
@@ -45,6 +51,8 @@ import java.util.List;
  * 这里只展示授权状态并提供跳转，避免两处开关状态不一致。
  */
 public class SettingsCheckActivity extends AppCompatActivity {
+
+    private static final int REQUEST_NOTIFICATIONS = 41;
 
     private ActivitySettingsCheckBinding binding;
     private SharedPreferences prefs;
@@ -73,11 +81,18 @@ public class SettingsCheckActivity extends AppCompatActivity {
 
         binding.buttonRecheck.setOnClickListener(v -> renderChecks());
         binding.buttonProbe.setOnClickListener(v -> runProbe());
-        binding.buttonOverlayGrant.setOnClickListener(v -> OverlayPanel.requestPermission(this));
-        binding.buttonDevOptions.setOnClickListener(v -> openDeveloperOptions());
         binding.buttonAppDetails.setOnClickListener(v -> openAppDetails());
 
         renderChecks();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_NOTIFICATIONS) {
+            renderChecks();
+        }
     }
 
     @Override
@@ -103,6 +118,9 @@ public class SettingsCheckActivity extends AppCompatActivity {
     private void renderChecks() {
         binding.checkContainer.removeAllViews();
         List<SettingsInspector.Check> checks = SettingsInspector.inspect(this);
+        SettingsInspector.Check next = SetupGuide.next(checks);
+        binding.textGuideNext.setText(next == null ? getString(R.string.guide_all_ready)
+                : getString(R.string.guide_next_step, next.title(), SetupGuide.pending(checks)));
         for (int i = 0; i < checks.size(); i++) {
             binding.checkContainer.addView(row(checks.get(i)));
             if (i < checks.size() - 1) {
@@ -151,7 +169,97 @@ public class SettingsCheckActivity extends AppCompatActivity {
         detail.setLineSpacing(dp(1), 1f);
         detail.setPadding(0, dp(3), 0, 0);
         row.addView(detail);
+
+        addEntryPoint(row, check);
         return row;
+    }
+
+    /**
+     * 未就绪的检查项自带跳转入口。
+     *
+     * <p>放在行内而不是页面底部，是为了让「看到问题」和「去处理」之间没有第二次寻找：
+     * 底部那排按钮无论当前缺什么都一直亮着，用户分不清该点哪个。
+     */
+    private void addEntryPoint(LinearLayout row, SettingsInspector.Check check) {
+        SetupItem.Entry entry = check.item().entry();
+        if (check.status() == SettingsInspector.Status.OK || entry == SetupItem.Entry.NONE) {
+            return;
+        }
+        TextView action = new TextView(this);
+        action.setText(entryLabel(check.item()));
+        action.setTextSize(12f);
+        action.setTypeface(Typeface.DEFAULT_BOLD);
+        action.setTextColor(ContextCompat.getColor(this, R.color.campus_mint_dark));
+        action.setGravity(Gravity.CENTER);
+        action.setPadding(dp(12), 0, dp(12), 0);
+        GradientDrawable border = new GradientDrawable();
+        border.setCornerRadius(dp(12));
+        border.setStroke(dp(1), ContextCompat.getColor(this, R.color.campus_mint_dark));
+        action.setBackground(border);
+        action.setClickable(true);
+        action.setFocusable(true);
+        action.setOnClickListener(v -> openEntry(entry));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(44));
+        params.topMargin = dp(7);
+        row.addView(action, params);
+    }
+
+    private String entryLabel(SetupItem item) {
+        switch (item) {
+            case LOCATION_PERMISSION:
+                return getString(R.string.guide_action_run);
+            case LOCATION_SWITCH:
+                return getString(R.string.guide_action_location_switch);
+            case MOCK_APP:
+                return getString(R.string.settings_open_dev_options);
+            case OVERLAY:
+                return getString(R.string.settings_overlay_grant);
+            case NOTIFICATIONS:
+                return getString(R.string.guide_action_notification);
+            default:
+                return getString(R.string.settings_recheck);
+        }
+    }
+
+    private void openEntry(SetupItem.Entry entry) {
+        switch (entry) {
+            case RUN:
+                // 运行时授权只能在跑圈页发起：那里才知道用户点「开始」时该弹什么。
+                HomeTarget.RUN.open(this);
+                break;
+            case SYSTEM_LOCATION_SETTINGS:
+                openSystemSettings(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                break;
+            case DEVELOPER_OPTIONS:
+                openDeveloperOptions();
+                break;
+            case OVERLAY_SETTINGS:
+                OverlayPanel.requestPermission(this);
+                break;
+            case NOTIFICATION_SETTINGS:
+                requestNotificationPermission();
+                break;
+            case NONE:
+            default:
+                break;
+        }
+    }
+
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+        ActivityCompat.requestPermissions(this,
+                new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
+    }
+
+    private void openSystemSettings(String action) {
+        try {
+            startActivity(new Intent(action));
+        } catch (ActivityNotFoundException e) {
+            startActivity(new Intent(Settings.ACTION_SETTINGS));
+        }
     }
 
     private String statusLabel(SettingsInspector.Status status) {
@@ -226,6 +334,8 @@ public class SettingsCheckActivity extends AppCompatActivity {
                 break;
         }
         DiagnosticLog.info("设置检查页探测结果：" + result);
+        // 探测会改写「最近一次确认」的时间戳，列表要立刻反映成已就绪/待确认。
+        renderChecks();
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(title)
                 .setMessage(message)
@@ -235,11 +345,7 @@ public class SettingsCheckActivity extends AppCompatActivity {
     }
 
     private void openDeveloperOptions() {
-        try {
-            startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
-        } catch (ActivityNotFoundException e) {
-            startActivity(new Intent(Settings.ACTION_SETTINGS));
-        }
+        openSystemSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
     }
 
     private void openAppDetails() {
