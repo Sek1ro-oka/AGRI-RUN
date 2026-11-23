@@ -925,5 +925,28 @@
     <string name="app_settings_widget_title">桌面课表小组件</string>
     <string name="app_settings_widget_subtitle">桌面上直接看今天几节课、下一节还有多久</string>
     <string name="widget_pin_requested">已请求添加，请在桌面弹出的确认框里点「添加到桌面」</string>
+
+    <!-- 提醒中心：所有会主动通知的事，加上不发通知但会改上课安排的事。 -->
+    <string name="app_settings_reminders_title">提醒中心</string>
+    <string name="app_settings_reminders_subtitle">%1$d 项会主动通知 · %2$d 项已排到下一次</string>
+    <string name="app_settings_reminders_subtitle_none">目前没有会主动通知的提醒</string>
+    <string name="app_settings_reminders_intro">这里列出所有会主动通知你的事，以及不发通知但会改上课安排的事。</string>
+    <string name="reminder_kind_class">课前提醒</string>
+    <string name="reminder_kind_homework">作业截止提醒</string>
+    <string name="reminder_kind_adjustment">调课与节假日</string>
+    <string name="reminder_kind_season">作息换季</string>
+    <string name="reminder_kind_update">版本更新</string>
+    <string name="reminder_status_off">没开，不会通知</string>
+    <string name="reminder_status_off_no_start">开关开着，但没设开学日期，算不出哪天有课</string>
+    <string name="reminder_status_fire">下次 %1$s</string>
+    <string name="reminder_status_nothing">开着，但近期没有可提醒的内容</string>
+    <string name="reminder_status_adjust_none">近期没有安排</string>
+    <string name="reminder_status_adjust_next">%1$d 条待生效，最近一条：%2$s</string>
+    <string name="reminder_status_season_next">%1$s自动换成%2$s作息</string>
+    <string name="reminder_status_season_pinned">手动选过作息，不会自己变</string>
+    <string name="reminder_status_update">不自动检查，只在设置里手动点的时候提示</string>
+    <string name="reminder_center_open_notifications">系统通知设置</string>
+    <string name="reminder_center_open_study">课表与作业提醒设置</string>
+    <string name="reminder_center_open_failed">这台系统没给通知设置留入口，请在系统设置里找「应用 → UNLOOP → 通知」</string>
     <string name="widget_pin_unsupported">当前桌面不支持应用直接添加。请长按桌面空白处 → 「小组件」 → 找到 UNLOOP 的「课表」。</string>
 </resources>

@@ -212,6 +212,19 @@ public class TimetableDayTest {
     }
 
     @Test
+    public void nextAheadIncludesTodayAndIgnoresThePast() {
+        List<DayAdjustment> items = adjustments(
+                DayAdjustment.holiday(MONDAY.minusDays(3)),
+                DayAdjustment.cancel(WEDNESDAY, "a"),
+                DayAdjustment.holiday(FRIDAY));
+        assertEquals(WEDNESDAY, TimetableDay.nextAhead(items, WEDNESDAY).date());
+        assertEquals(WEDNESDAY, TimetableDay.nextAhead(items, MONDAY).date());
+        assertEquals(FRIDAY, TimetableDay.nextAhead(items, FRIDAY).date());
+        assertNull(TimetableDay.nextAhead(items, FRIDAY.plusDays(1)));
+        assertNull(TimetableDay.nextAhead(adjustments(), WEDNESDAY));
+    }
+
+    @Test
     public void adjustmentsRoundTripThroughJson() {
         // 编码会把过期记录清掉，所以这组用例全部用将来的日期。
         LocalDate base = LocalDate.now().plusDays(3);

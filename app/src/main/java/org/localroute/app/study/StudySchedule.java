@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.time.LocalDate;
 import java.util.Calendar;
 import java.util.Locale;
 
@@ -104,6 +105,28 @@ public final class StudySchedule {
 
     public static int currentSeason() {
         return seasonForMonth(Calendar.getInstance().get(Calendar.MONTH) + 1);
+    }
+
+    /**
+     * 下一次「按月推断」会翻面的日期：5 月 1 日进夏令时、11 月 1 日回冬令时。
+     *
+     * <p>用户没手动锁定作息时，作息在这一天自己变；提醒中心据此提前把「哪天会换季」讲出来，
+     * 免得有人按旧钟点去教室。已经手动选过作息则返回 {@code null}——那是用户自己钉死的，
+     * 不会自己变，说个日期反而是骗人。
+     */
+    @Nullable
+    public static LocalDate nextSeasonChange(@Nullable LocalDate today, boolean manuallyChosen) {
+        if (manuallyChosen || today == null) {
+            return null;
+        }
+        int month = today.getMonthValue();
+        if (month < 5) {
+            return LocalDate.of(today.getYear(), 5, 1);
+        }
+        if (month < 11) {
+            return LocalDate.of(today.getYear(), 11, 1);
+        }
+        return LocalDate.of(today.getYear() + 1, 5, 1);
     }
 
     public int morningStart() {

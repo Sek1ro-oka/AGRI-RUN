@@ -1,11 +1,13 @@
 package org.localroute.app.ui;
 
 import android.appwidget.AppWidgetManager;
+import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.InputType;
 import android.view.MenuItem;
 import android.widget.EditText;
@@ -33,9 +35,22 @@ import org.localroute.app.backup.BackupTransfer;
 import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivityAppSettingsBinding;
 import org.localroute.app.settings.AppearancePreferences;
+import org.localroute.app.study.ClassReminderPlanner;
+import org.localroute.app.study.CustomHomework;
+import org.localroute.app.study.CustomHomeworkStore;
+import org.localroute.app.study.DayAdjustment;
+import org.localroute.app.study.DayAdjustmentLabel;
+import org.localroute.app.study.HomeworkReminderPlanner;
+import org.localroute.app.study.ReminderCenter;
+import org.localroute.app.study.StudySchedule;
+import org.localroute.app.study.StudyTimetableStore;
+import org.localroute.app.study.TimetableCourse;
+import org.localroute.app.study.TimetableDay;
 import org.localroute.app.widget.TimetableWidgetProvider;
 import org.localroute.app.widget.TimetableWidgetSync;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -117,6 +132,8 @@ public class AppSettingsActivity extends AppCompatActivity {
         binding.rowRunHistory.setOnClickListener(v ->
                 startActivity(new Intent(this, RunHistoryActivity.class)));
         binding.rowTimetableWidget.setOnClickListener(v -> requestTimetableWidgetPin());
+        refreshReminders();
+        binding.rowReminders.setOnClickListener(v -> showReminderCenter());
     }
 
     /**
@@ -307,6 +324,151 @@ public class AppSettingsActivity extends AppCompatActivity {
             }
         }
         return ids;
+    }
+
+    // ------------------------------------------------------------- 提醒中心
+
+    /** 行副标题只说结论：几项会主动通知、几项已经排到下一次；一项都没有就直说。 */
+    private void refreshReminders() {
+        ReminderCenter.State state = reminderState();
+        int firing = ReminderCenter.firingCount(state);
+        binding.textRemindersValue.setText(firing == 0
+                ? getString(R.string.app_settings_reminders_subtitle_none)
+                : getString(R.string.app_settings_reminders_subtitle, firing,
+                        ReminderCenter.scheduledCount(ReminderCenter.entries(state))));
+    }
+
+    private void showReminderCenter() {
+        ReminderCenter.State state = reminderState();
+        refreshReminders();
+        LocalDate today = LocalDate.now();
+        StringBuilder text = new StringBuilder(getString(R.string.app_settings_reminders_intro));
+        for (ReminderCenter.Entry entry : ReminderCenter.entries(state)) {
+            text.append('\n').append("· ")
+                    .append(getString(kindLabelRes(entry.kind)))
+                    .append('：').append(reminderDetail(entry, state, today));
+        }
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.app_settings_reminders_title)
+                .setMessage(text.toString())
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setNeutralButton(R.string.reminder_center_open_study,
+                        (dialog, which) -> startActivity(
+                                new Intent(this, StudySettingsActivity.class)))
+                .setPositiveButton(R.string.reminder_center_open_notifications,
+                        (dialog, which) -> openNotificationSettings())
+                .show();
+    }
+
+    /**
+     * 各功能当前的真实状态：只问已经存在的计划器「下一次是什么时候」，
+     * 中心自己不排闹钟，也不会因为展示过一次就改动任何设置。
+     */
+    private ReminderCenter.State reminderState() {
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+        List<TimetableCourse> courses = StudyTimetableStore.loadCourses(this);
+        List<DayAdjustment> adjustments = StudyTimetableStore.loadAdjustments(this);
+        LocalDate semesterStart = StudyTimetableStore.loadSemesterStart(this);
+        ReminderCenter.State state = new ReminderCenter.State();
+        state.classEnabled = StudyTimetableStore.loadClassReminderEnabled(this);
+        state.semesterStartKnown = semesterStart != null;
+        state.courseCount = courses.size();
+        if (state.classEnabled) {
+            ClassReminderPlanner.Reminder next = ClassReminderPlanner.next(courses,
+                    StudyTimetableStore.loadSchedule(this), semesterStart,
+                    StudyTimetableStore.loadTotalWeeks(this), now,
+                    StudyTimetableStore.loadClassReminderLeadMinutes(this),
+                    ClassReminderPlanner.DEFAULT_HORIZON_DAYS, adjustments);
+            state.nextClassReminder = next == null ? null : next.remindAt;
+        }
+        List<CustomHomework> homework = CustomHomeworkStore.load(this);
+        state.homeworkEnabled = CustomHomeworkStore.loadReminderEnabled(this);
+        state.openHomeworkCount = homework.size();
+        if (state.homeworkEnabled) {
+            HomeworkReminderPlanner.Reminder next = HomeworkReminderPlanner.next(homework, now,
+                    HomeworkReminderPlanner.DEFAULT_HORIZON_DAYS);
+            state.nextHomeworkReminder = next == null ? null : next.remindAt;
+        }
+        // 存储时已经清掉过期记录，所以这里的条数就是「还在等着生效」的条数。
+        state.adjustmentCount = adjustments.size();
+        DayAdjustment nextAdjustment = TimetableDay.nextAhead(adjustments, today);
+        state.nextAdjustmentDate = nextAdjustment == null ? null : nextAdjustment.date();
+        state.nextAdjustmentLabel = nextAdjustment == null ? null
+                : DayAdjustmentLabel.label(nextAdjustment, courses, today);
+        state.seasonManuallyPinned = StudyTimetableStore.seasonChosenManually(this);
+        state.nextSeasonChange = StudySchedule.nextSeasonChange(today, state.seasonManuallyPinned);
+        return state;
+    }
+
+    private String reminderDetail(@NonNull ReminderCenter.Entry entry,
+                                  @NonNull ReminderCenter.State state,
+                                  @NonNull LocalDate today) {
+        switch (entry.kind) {
+            case CLASS:
+                if (entry.nextAt != null) {
+                    return getString(R.string.reminder_status_fire,
+                            ReminderCenter.momentLabel(entry.nextAt));
+                }
+                // 开关开着却没设开学日期，跟「没开」是两回事，用户要做的动作完全不同。
+                return getString(state.classEnabled ? R.string.reminder_status_off_no_start
+                        : R.string.reminder_status_off);
+            case HOMEWORK:
+                if (entry.nextAt != null) {
+                    return getString(R.string.reminder_status_fire,
+                            ReminderCenter.momentLabel(entry.nextAt));
+                }
+                return getString(entry.enabled ? R.string.reminder_status_nothing
+                        : R.string.reminder_status_off);
+            case ADJUSTMENT:
+                return entry.nextDate == null
+                        ? getString(R.string.reminder_status_adjust_none)
+                        : getString(R.string.reminder_status_adjust_next, entry.pendingCount,
+                                state.nextAdjustmentLabel);
+            case SEASON:
+                if (entry.nextDate == null) {
+                    return getString(R.string.reminder_status_season_pinned);
+                }
+                return getString(R.string.reminder_status_season_next,
+                        ReminderCenter.dateLabel(entry.nextDate, today),
+                        getString(StudySchedule.seasonForMonth(entry.nextDate.getMonthValue())
+                                == StudySchedule.SEASON_SUMMER
+                                ? R.string.study_season_summer : R.string.study_season_winter));
+            case UPDATE:
+            default:
+                return getString(R.string.reminder_status_update);
+        }
+    }
+
+    private int kindLabelRes(@NonNull ReminderCenter.Kind kind) {
+        switch (kind) {
+            case HOMEWORK:
+                return R.string.reminder_kind_homework;
+            case ADJUSTMENT:
+                return R.string.reminder_kind_adjustment;
+            case SEASON:
+                return R.string.reminder_kind_season;
+            case UPDATE:
+                return R.string.reminder_kind_update;
+            case CLASS:
+            default:
+                return R.string.reminder_kind_class;
+        }
+    }
+
+    /** 直达本应用的通知设置；ROM 不认这个入口时退回应用详情页，两级都失败才算没救。 */
+    private void openNotificationSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+        } catch (ActivityNotFoundException missing) {
+            try {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", getPackageName(), null)));
+            } catch (ActivityNotFoundException stillMissing) {
+                toast(getString(R.string.reminder_center_open_failed));
+            }
+        }
     }
 
     private void toast(String text) {

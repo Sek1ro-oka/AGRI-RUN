@@ -254,4 +254,29 @@ public class StudyScheduleTest {
         assertEquals("00:00", StudySchedule.formatMinutes(24 * 60));
         assertEquals("08:05", StudySchedule.formatMinutes(8 * 60 + 5));
     }
+
+    /** 换季日：5 月 1 日进夏令时、11 月 1 日回冬令时，手动钉住后就不该再说「某天会变」。 */
+    @Test
+    public void seasonChangesLandOnTheFirstOfTheSwitchMonth() {
+        assertEquals(java.time.LocalDate.of(2026, 5, 1),
+                StudySchedule.nextSeasonChange(java.time.LocalDate.of(2026, 3, 9), false));
+        assertEquals(java.time.LocalDate.of(2026, 11, 1),
+                StudySchedule.nextSeasonChange(java.time.LocalDate.of(2026, 6, 1), false));
+        assertEquals(java.time.LocalDate.of(2026, 11, 1),
+                StudySchedule.nextSeasonChange(java.time.LocalDate.of(2026, 10, 31), false));
+        assertEquals(java.time.LocalDate.of(2027, 5, 1),
+                StudySchedule.nextSeasonChange(java.time.LocalDate.of(2026, 12, 25), false));
+        // 换季日本身已经换了，下一个就是再翻回去那天。
+        assertEquals(java.time.LocalDate.of(2026, 11, 1),
+                StudySchedule.nextSeasonChange(java.time.LocalDate.of(2026, 5, 1), false));
+        assertNull(StudySchedule.nextSeasonChange(java.time.LocalDate.of(2026, 3, 9), true));
+    }
+
+    @Test
+    public void seasonForMonthStillSplitsTheYearInTwo() {
+        assertEquals(StudySchedule.SEASON_SUMMER, StudySchedule.seasonForMonth(5));
+        assertEquals(StudySchedule.SEASON_SUMMER, StudySchedule.seasonForMonth(10));
+        assertEquals(StudySchedule.SEASON_WINTER, StudySchedule.seasonForMonth(4));
+        assertEquals(StudySchedule.SEASON_WINTER, StudySchedule.seasonForMonth(11));
+    }
 }
