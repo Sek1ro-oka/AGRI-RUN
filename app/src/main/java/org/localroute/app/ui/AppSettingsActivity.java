@@ -110,6 +110,8 @@ public class AppSettingsActivity extends AppCompatActivity {
         binding.rowAppearance.setOnClickListener(v -> showAppearanceDialog());
         binding.rowBackupExport.setOnClickListener(v -> showExportDialog());
         binding.rowBackupImport.setOnClickListener(v -> startImportPick());
+        binding.rowRunHistory.setOnClickListener(v ->
+                startActivity(new Intent(this, RunHistoryActivity.class)));
     }
 
     /** 导出：先让用户勾选段落，再由系统保存面板决定落到哪个文件。 */
