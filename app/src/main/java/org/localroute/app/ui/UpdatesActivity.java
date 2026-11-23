@@ -14,7 +14,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
@@ -50,6 +49,10 @@ public class UpdatesActivity extends AppCompatActivity {
     private ActivityUpdatesBinding binding;
     private boolean checking;
     private boolean awaitingInstallPermission;
+    /** 已通过校验的安装包路径；点「立即安装」时不必再算一次 SHA-256。 */
+    private String verifiedPath = "";
+    /** 最近一次检查到的发布页；元数据走镜像时，发布页也用同一个镜像。 */
+    private String releasePageUrl = UpdateChecker.RELEASES_PAGE;
 
     private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override
@@ -59,14 +62,52 @@ public class UpdatesActivity extends AppCompatActivity {
                 return;
             }
             updateUpdateCard();
-            if (UpdateManager.downloadedFile(UpdatesActivity.this) != null) {
-                promptInstall(UpdateManager.pendingVersion(UpdatesActivity.this));
-            } else if (!UpdateManager.isDownloadActive(UpdatesActivity.this)) {
-                Toast.makeText(UpdatesActivity.this, R.string.home_update_download_failed,
-                        Toast.LENGTH_LONG).show();
+            if (UpdateManager.isDownloadActive(UpdatesActivity.this)) {
+                return;
             }
+            File apk = UpdateManager.downloadedFile(UpdatesActivity.this);
+            if (apk == null) {
+                reportDownloadFailure();
+                return;
+            }
+            binding.textUpdateSubtitle.setText(R.string.home_update_verifying);
+            executor.execute(() -> {
+                UpdateVerifier.Issue issue =
+                        UpdateManager.verifyDownload(UpdatesActivity.this, apk);
+                mainHandler.post(() -> onDownloadVerified(issue, apk));
+            });
         }
     };
+
+    /** 系统下载器报失败：把状态、原因、进度与线路写进日志并显示出来。 */
+    private void reportDownloadFailure() {
+        String detail = UpdateManager.describeDownload(this);
+        DiagnosticLog.warn("更新下载结束但未取得安装包"
+                + (detail == null ? "（系统下载记录已不可读）" : "：" + detail));
+        Toast.makeText(this, detail == null
+                ? getString(R.string.home_update_download_failed)
+                : getString(R.string.home_update_download_failed_reason, detail),
+                Toast.LENGTH_LONG).show();
+        updateUpdateCard();
+    }
+
+    /** 下载完成后的首道校验：拦下被网络拦截页替换的假安装包。 */
+    private void onDownloadVerified(@NonNull UpdateVerifier.Issue issue,
+                                    @NonNull File apk) {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        if (issue == UpdateVerifier.Issue.OK) {
+            verifiedPath = apk.getAbsolutePath();
+            updateUpdateCard();
+            promptInstall(UpdateManager.pendingVersion(this));
+            return;
+        }
+        UpdateManager.discardDownload(this);
+        verifiedPath = "";
+        updateUpdateCard();
+        showVerifyFailed(issue, apk);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,6 +123,9 @@ public class UpdatesActivity extends AppCompatActivity {
             return insets;
         });
         binding.cardUpdate.setOnClickListener(v -> onUpdateCardTapped());
+        binding.buttonReleasePage.setOnClickListener(v -> openReleasePage(releasePageUrl));
+        binding.buttonDiagnostics.setOnClickListener(v -> startActivity(
+                new Intent(this, DiagnosticsActivity.class)));
         binding.toolbar.setNavigationOnClickListener(v -> finish());
         updateUpdateCard();
     }
@@ -214,6 +258,7 @@ public class UpdatesActivity extends AppCompatActivity {
             return;
         }
         DiagnosticLog.info("检查更新线路：" + UpdateChecker.sourceLabel(release.source()));
+        releasePageUrl = release.pageUrl();
         if (UpdateChecker.isNewer(release.versionName(), BuildConfig.VERSION_NAME)) {
             binding.textUpdateSubtitle.setText(getString(
                     R.string.home_update_found, release.versionName()));
@@ -233,20 +278,17 @@ public class UpdatesActivity extends AppCompatActivity {
         }
         String message = getString(R.string.home_update_dialog_message,
                 BuildConfig.VERSION_NAME, release.versionName(), notes);
-        AlertDialog.Builder builder = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+        // 只留两个按钮：三个按钮在窄屏上会被 Material 竖排，「打开发布页」放到页面下方。
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.home_update_dialog_title, release.versionName()))
                 .setMessage(message)
-                .setNegativeButton(R.string.campus_cancel, null);
-        if (release.apkUrl() != null) {
-            builder.setPositiveButton(R.string.home_update_download,
-                    (dialog, which) -> startDownload(release));
-            builder.setNeutralButton(R.string.home_update_release_page,
-                    (dialog, which) -> openReleasePage(release.pageUrl()));
-        } else {
-            builder.setPositiveButton(R.string.home_update_release_page,
-                    (dialog, which) -> openReleasePage(release.pageUrl()));
-        }
-        builder.show();
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(release.apkUrl() == null
+                        ? R.string.home_update_release_page : R.string.home_update_download,
+                        release.apkUrl() == null
+                                ? (dialog, which) -> openReleasePage(release.pageUrl())
+                                : (dialog, which) -> startDownload(release))
+                .show();
     }
 
     private void startDownload(@NonNull UpdateChecker.Release release) {
@@ -296,6 +338,7 @@ public class UpdatesActivity extends AppCompatActivity {
     private void requestInstall() {
         File apk = UpdateManager.downloadedFile(this);
         if (apk == null) {
+            verifiedPath = "";
             updateUpdateCard();
             return;
         }
@@ -310,6 +353,10 @@ public class UpdatesActivity extends AppCompatActivity {
                     .show();
             return;
         }
+        if (apk.getAbsolutePath().equals(verifiedPath)) {
+            launchInstaller(apk);
+            return;
+        }
         binding.textUpdateSubtitle.setText(R.string.home_update_verifying);
         executor.execute(() -> {
             UpdateVerifier.Issue issue = UpdateManager.verifyDownload(this, apk);
@@ -322,16 +369,27 @@ public class UpdatesActivity extends AppCompatActivity {
             return;
         }
         if (issue == UpdateVerifier.Issue.OK) {
-            updateUpdateCard();
-            if (!UpdateManager.launchInstaller(this, apk)) {
-                Toast.makeText(this, R.string.home_update_install_failed,
-                        Toast.LENGTH_LONG).show();
-            }
+            verifiedPath = apk.getAbsolutePath();
+            launchInstaller(apk);
             return;
         }
+        verifiedPath = "";
         UpdateManager.discardDownload(this);
         updateUpdateCard();
-        DiagnosticLog.warn("更新包校验未通过：" + issue.name());
+        showVerifyFailed(issue, apk);
+    }
+
+    private void launchInstaller(@NonNull File apk) {
+        updateUpdateCard();
+        if (!UpdateManager.launchInstaller(this, apk)) {
+            Toast.makeText(this, R.string.home_update_install_failed,
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showVerifyFailed(@NonNull UpdateVerifier.Issue issue, @NonNull File apk) {
+        DiagnosticLog.warn("更新包校验未通过：" + issue.name()
+                + "，是否 APK 魔数=" + UpdateManager.looksLikeApk(apk));
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.home_update_verify_failed_title)
                 .setMessage(getString(R.string.home_update_verify_failed_message,

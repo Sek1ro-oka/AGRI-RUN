@@ -161,3 +161,24 @@ A 预设路线预览与选择后地图展示、B 精确输入、C 地图主页�
 | Manifest | 注册 `.study.HomeworkReminderReceiver`（exported=false，复用已声明的 `SCHEDULE_EXACT_ALARM`/`RECEIVE_BOOT_COMPLETED`/通知权限） |
 
 验证：新增 `HomeworkReminderPlannerTest` 10 例、`CustomHomeworkCodecTest` 7 例，全量 JVM 测试 266 例 0 失败；lint 0 error（281 warning 与基线一致）；`assembleRelease` 出包并用 apksigner 核对签名证书 `CN=UNLOOP Release`。通知实际弹出、省电策略下的准点性、真机闹钟行为均未实测。
+
+## 2026-11-23 App 内检查更新找不到附件（缺陷修复）
+
+现象：装了 0.9.5/0.9.6 的设备点「检查更新」能发现新版本，但弹窗提示「未找到 apk，可前往发布页」，无法在应用内下载。
+
+定位：`UpdateChecker` 只认名字以 `route-workshop-` 开头的附件（用来排除定位探针包），而 0.9.5–0.9.7 发布时把附件命名为 `app-release.apk`，于是这三版在应用内更新看来等于「没有安装包」。0.9.4 及更早用的 `route-workshop-<版本>-release.apk` 一直正常。
+
+处置：
+
+| 项 | 内容 |
+| --- | --- |
+| 线上数据 | 直接把 v0.9.7 附件改名为 `route-workshop-0.9.7-release.apk`（GitHub 只改元数据，字节与 sha256 不变，实测首字节 `PK`、`releases/latest` 已返回新名）；旧链接 `app-release.apk` 随之 404 |
+| 约定 | 今后 Release 附件一律命名 `route-workshop-<版本>-release.apk` |
+| `UpdateChecker` | 附件匹配放宽为「`route-workshop-` 前缀或 `app-release` 前缀，且不含 probe」，避免再次出现整版不可更新；新增 2 个 JVM 用例 |
+| `UpdateManager` | 新增 `describeDownload`：读系统下载器的状态、原因码、进度与线路，纯函数 `describe` 可 JVM 测试；新增 `looksLikeApk` 判断 ZIP 魔数 |
+| `UpdatesActivity` | 下载完成后先校验再提示安装（此前要点「立即安装」才校验）；失败提示带上面那条摘要并写入诊断日志；校验未通过时区分「线路返回的是网页拦截页」；更新弹窗由 3 枚按钮改 2 枚，窄屏不再竖排 |
+| 布局/字符串 | 检查更新页下方新增「打开发布页」「诊断日志」两个入口（`DiagnosticsActivity` 此前只在 Manifest 注册、界面上无入口）；新增失败摘要与诊断入口文案 |
+
+背景证据：用户手工从加速线路下载的 74 MB 文件首 4 字节是 `<!DO`，即拿到的是网页而非 APK；本机实测 5 条线路（GitHub 直连 + gh-proxy.com/.org + ghproxy.imciel.com/net）均返回 `PK` 且完整下载与 GitHub digest、本机构造三者 sha256 一致。
+
+验证：JVM 单元测试与 lint、`assembleRelease` 见本次构建记录；真机侧「应用内更新到 0.9.8」的路径尚未实测。

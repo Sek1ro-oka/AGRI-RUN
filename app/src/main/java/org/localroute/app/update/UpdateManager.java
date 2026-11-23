@@ -19,12 +19,14 @@ import org.localroute.app.R;
 import org.localroute.app.diagnostics.DiagnosticLog;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
@@ -160,6 +162,137 @@ public final class UpdateManager {
         }
         File file = new File(path);
         return file.isFile() && file.length() > 0 ? file : null;
+    }
+
+    /**
+     * 最近一次下载在系统侧的状态摘要，供失败提示与诊断日志使用。
+     * 下载记录已被系统清理时返回 null，由调用方退回通用文案。
+     */
+    @Nullable
+    public static String describeDownload(@NonNull Context context) {
+        long id = pendingDownloadId(context);
+        if (id < 0) {
+            return null;
+        }
+        DownloadManager manager =
+                (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) {
+            return null;
+        }
+        try (Cursor cursor = manager.query(
+                new DownloadManager.Query().setFilterById(id))) {
+            if (cursor == null || !cursor.moveToFirst()) {
+                return null;
+            }
+            int status = intColumn(cursor, DownloadManager.COLUMN_STATUS, -1);
+            int reason = intColumn(cursor, DownloadManager.COLUMN_REASON, 0);
+            long done = longColumn(cursor, DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR, 0);
+            long total = longColumn(cursor, DownloadManager.COLUMN_TOTAL_SIZE_BYTES, 0);
+            String url = stringColumn(cursor, DownloadManager.COLUMN_URI, null);
+            return describe(status, reason, done, total,
+                    url == null ? null : UpdateChecker.sourceLabel(url));
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    /** 文件头两个字节是否为 ZIP 魔数：用来区分「线路给了网页」与「安装包真坏了」。 */
+    public static boolean looksLikeApk(@NonNull File apk) {
+        try (InputStream input = new FileInputStream(apk)) {
+            byte[] magic = new byte[2];
+            int read = input.read(magic);
+            return read == 2 && magic[0] == 'P' && magic[1] == 'K';
+        } catch (IOException error) {
+            return false;
+        }
+    }
+
+    /** 把系统下载器的状态码与原因码翻成人话，并保留原始编号便于回报排查。 */
+    @NonNull
+    static String describe(int status, int reason, long bytesSoFar, long totalBytes,
+                           @Nullable String sourceLabel) {
+        StringBuilder text = new StringBuilder(statusLabel(status));
+        if (status == DownloadManager.STATUS_FAILED) {
+            text.append("，原因 ").append(reasonLabel(reason));
+        }
+        if (totalBytes > 0) {
+            text.append("，已下 ").append(mebibytes(bytesSoFar))
+                    .append('/').append(mebibytes(totalBytes)).append(" MiB");
+        } else if (bytesSoFar > 0) {
+            text.append("，已下 ").append(mebibytes(bytesSoFar)).append(" MiB");
+        }
+        if (sourceLabel != null && !sourceLabel.isEmpty()) {
+            text.append("，线路 ").append(sourceLabel);
+        }
+        return text.toString();
+    }
+
+    private static String statusLabel(int status) {
+        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+            return "系统下载已完成";
+        }
+        if (status == DownloadManager.STATUS_FAILED) {
+            return "系统下载失败";
+        }
+        if (status == DownloadManager.STATUS_PAUSED) {
+            return "系统下载已暂停";
+        }
+        if (status == DownloadManager.STATUS_RUNNING) {
+            return "系统下载中";
+        }
+        if (status == DownloadManager.STATUS_PENDING) {
+            return "系统下载排队中";
+        }
+        return "下载记录不可用";
+    }
+
+    private static String reasonLabel(int reason) {
+        switch (reason) {
+            case DownloadManager.ERROR_CANNOT_RESUME:
+                return "无法续传（原因码 " + reason + "）";
+            case DownloadManager.ERROR_DEVICE_NOT_FOUND:
+                return "找不到外部存储（原因码 " + reason + "）";
+            case DownloadManager.ERROR_FILE_ALREADY_EXISTS:
+                return "同名文件已存在（原因码 " + reason + "）";
+            case DownloadManager.ERROR_FILE_ERROR:
+                return "写文件失败（原因码 " + reason + "）";
+            case DownloadManager.ERROR_HTTP_DATA_ERROR:
+                return "HTTP 数据传输错误（原因码 " + reason + "）";
+            case DownloadManager.ERROR_INSUFFICIENT_SPACE:
+                return "存储空间不足（原因码 " + reason + "）";
+            case DownloadManager.ERROR_TOO_MANY_REDIRECTS:
+                return "重定向次数过多（原因码 " + reason + "）";
+            case DownloadManager.ERROR_UNHANDLED_HTTP_CODE:
+                return "服务器返回未处理的 HTTP 状态（原因码 " + reason + "）";
+            case DownloadManager.ERROR_UNKNOWN:
+                return "系统下载器未知错误（原因码 " + reason + "）";
+            default:
+                // 失败原因是 HTTP 状态码时（例如 404）也走这里，保留原始数字便于回报。
+                return "原因码 " + reason;
+        }
+    }
+
+    private static String mebibytes(long bytes) {
+        return String.format(Locale.ROOT, "%.1f", bytes / 1048576.0);
+    }
+
+    private static int intColumn(@NonNull Cursor cursor, @NonNull String column,
+                                 int fallback) {
+        int index = cursor.getColumnIndex(column);
+        return index < 0 ? fallback : cursor.getInt(index);
+    }
+
+    private static long longColumn(@NonNull Cursor cursor, @NonNull String column,
+                                   long fallback) {
+        int index = cursor.getColumnIndex(column);
+        return index < 0 ? fallback : cursor.getLong(index);
+    }
+
+    @Nullable
+    private static String stringColumn(@NonNull Cursor cursor, @NonNull String column,
+                                       @Nullable String fallback) {
+        int index = cursor.getColumnIndex(column);
+        return index < 0 ? fallback : cursor.getString(index);
     }
 
     /** 安装器已拉起或用户放弃后清除记录，避免下次进入又提示。 */

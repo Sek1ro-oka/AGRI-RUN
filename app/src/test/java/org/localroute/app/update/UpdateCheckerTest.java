@@ -112,6 +112,30 @@ public class UpdateCheckerTest {
     }
 
     @Test
+    public void appReleaseAssetNameIsAlsoMainApk() throws JSONException {
+        UpdateChecker.Release release = UpdateChecker.parseRelease(
+                "{\"tag_name\":\"v0.9.8\",\"assets\":["
+                        + "{\"name\":\"location-probe-0.1.4-debug.apk\","
+                        + "\"browser_download_url\":\"https://example.com/probe.apk\"},"
+                        + "{\"name\":\"app-release.apk\","
+                        + "\"browser_download_url\":\"https://github.com/o/r/releases/"
+                        + "download/v0.9.8/app-release.apk\",\"size\":74177693}]}");
+        assertEquals("https://github.com/o/r/releases/download/v0.9.8/app-release.apk",
+                release.apkUrl());
+        assertEquals("app-release.apk", release.apkName());
+        assertEquals(74177693, release.apkSize());
+    }
+
+    @Test
+    public void unknownAssetNameIsIgnored() throws JSONException {
+        UpdateChecker.Release release = UpdateChecker.parseRelease(
+                "{\"tag_name\":\"v0.9.8\",\"assets\":[{\"name\":\"bundle.zip\","
+                        + "\"content_type\":\"application/vnd.android.package-archive\","
+                        + "\"browser_download_url\":\"https://example.com/bundle.zip\"}]}");
+        assertNull(release.apkUrl());
+    }
+
+    @Test
     public void isNewerComparesNumericSegments() {
         assertTrue(UpdateChecker.isNewer("v0.7.0", "0.6.0"));
         assertTrue(UpdateChecker.isNewer("0.6.1", "0.6.0"));
