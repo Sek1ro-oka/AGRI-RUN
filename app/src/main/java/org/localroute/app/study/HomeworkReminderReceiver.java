@@ -58,7 +58,8 @@ public class HomeworkReminderReceiver extends BroadcastReceiver {
         LocalDateTime windowRight = trigger.plusMinutes(
                 HomeworkReminderScheduler.FIRE_WINDOW_AFTER_MINUTES);
         List<HomeworkReminderPlanner.Reminder> due = HomeworkReminderPlanner.dueBetween(
-                CustomHomeworkStore.load(app), windowLeft, windowRight);
+                CustomHomeworkStore.load(app), windowLeft, windowRight,
+                StudyTimetableStore.loadHomeworkReminderLeadMinutes(app));
         ensureChannel(app);
         NotificationManagerCompat manager = NotificationManagerCompat.from(app);
         for (HomeworkReminderPlanner.Reminder reminder : due) {

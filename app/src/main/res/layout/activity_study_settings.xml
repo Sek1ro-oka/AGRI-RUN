@@ -524,7 +524,7 @@
                     android:textSize="@dimen/text_caption"
                     android:visibility="gone" />
             </LinearLayout>
-            <!-- 作业截止提醒：自建作业的开关，提前量按每条作业自己设置 -->
+            <!-- 作业截止提醒：开关 + 全局提前分钟数，与课前提醒同一套做法 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -575,6 +575,28 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_md" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/rowHomeworkReminderLead"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingVertical="@dimen/space_xl">
+                    <TextView
+                        style="@style/Text.Unloop.Body"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/study_homework_reminder_lead_title" />
+                    <TextView
+                        style="@style/Text.Unloop.Meta"
+                        android:id="@+id/textHomeworkReminderLeadValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
                 </LinearLayout>
                 <TextView
                     android:id="@+id/textHomeworkReminderHint"

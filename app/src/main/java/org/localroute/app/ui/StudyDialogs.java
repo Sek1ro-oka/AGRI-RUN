@@ -21,6 +21,7 @@ import org.localroute.app.databinding.DialogStudyCourseBinding;
 import org.localroute.app.databinding.DialogStudyHomeworkBinding;
 import org.localroute.app.databinding.DialogStudyImportBinding;
 import org.localroute.app.study.CustomHomework;
+import org.localroute.app.study.HomeworkReminderPlanner;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
@@ -47,16 +48,20 @@ public final class StudyDialogs {
      * 展示从教务系统读取到的课程预览，确认后覆盖或追加到课表。
      *
      * <p>只保存课程本身，不保存教务系统的登录状态；来源与学期仅用于预览说明。
+     *
+     * @param unparsed 节次没能识别、因而被跳过的课程名；必须在预览里报出来，
+     *                 否则用户拿到的是一张看起来完整、实际少了几节课的课表
      */
     public static void showImportPreview(@NonNull Activity activity,
                                          @NonNull List<TimetableCourse> imported,
                                          @Nullable String sourceLabel,
+                                         @NonNull List<String> unparsed,
                                          @Nullable Runnable onImported) {
         DialogStudyImportBinding binding =
                 DialogStudyImportBinding.inflate(LayoutInflater.from(activity));
         int existing = StudyTimetableStore.loadCourses(activity).size();
         binding.textImportFile.setText(sourceLabel == null ? "" : sourceLabel);
-        binding.textImportSummary.setText(preview(activity, imported));
+        binding.textImportSummary.setText(preview(activity, imported, unparsed));
         binding.checkImportAppend.setVisibility(existing > 0 ? View.VISIBLE : View.GONE);
         updateImportHint(activity, binding, existing);
         binding.checkImportAppend.setOnCheckedChangeListener(
@@ -107,7 +112,8 @@ public final class StudyDialogs {
         dialog.show();
     }
 
-    private static String preview(Activity activity, List<TimetableCourse> imported) {
+    private static String preview(Activity activity, List<TimetableCourse> imported,
+                                 List<String> unparsed) {
         StringBuilder builder = new StringBuilder(activity.getString(
                 R.string.study_import_count, imported.size()));
         int limit = Math.min(5, imported.size());
@@ -124,6 +130,15 @@ public final class StudyDialogs {
         if (imported.size() > limit) {
             builder.append(activity.getString(R.string.study_import_more,
                     imported.size() - limit));
+        }
+        if (!unparsed.isEmpty()) {
+            List<String> shown = unparsed.subList(0, Math.min(3, unparsed.size()));
+            builder.append('\n').append(activity.getString(
+                    R.string.study_import_unparsed,
+                    unparsed.size(),
+                    String.join("、", shown)
+                            + (unparsed.size() > shown.size()
+                            ? activity.getString(R.string.study_import_unparsed_more) : "")));
         }
         return builder.toString();
     }
@@ -345,7 +360,10 @@ public final class StudyDialogs {
     // ------------------------------------------------------------------ 自建作业
 
     /**
-     * 自建作业编辑器：名称 + 截止时间（先选日期再选时间）+ 提前提醒分钟数。
+     * 自建作业编辑器：名称 + 截止时间（先选日期再选时间）。
+     *
+     * <p>提前提醒的分钟数不在这里填：它是全局设置，和课前提醒一样在作息设置里改，
+     * 对话框只显示按该提前量算出的提醒时刻。
      *
      * <p>这里只负责收集与校验，落库与闹钟重排由调用方在 {@code onSaved} 里做，
      * 因为列表刷新和调度都归查询作业页管。
@@ -365,11 +383,8 @@ public final class StudyDialogs {
         Calendar initial = Calendar.getInstance();
         if (existing != null) {
             binding.inputHomeworkName.setText(existing.title());
-            binding.inputHomeworkLead.setText(String.valueOf(existing.leadMinutes()));
             initial.setTimeInMillis(existing.deadlineEpochMillis());
         } else {
-            binding.inputHomeworkLead.setText(
-                    String.valueOf(CustomHomework.DEFAULT_LEAD_MINUTES));
             // 新建默认次日 23:59：作业绝大多数是「今晚之前交」。
             initial.add(Calendar.DAY_OF_MONTH, 1);
             initial.set(Calendar.HOUR_OF_DAY, 23);
@@ -381,20 +396,6 @@ public final class StudyDialogs {
         showDeadlineValue(activity, binding, deadline[0]);
         binding.rowHomeworkDeadline.setOnClickListener(view ->
                 pickDeadline(activity, binding, deadline));
-        binding.inputHomeworkLead.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence text, int start, int count, int after) {
-            }
-
-            @Override
-            public void onTextChanged(CharSequence text, int start, int before, int count) {
-            }
-
-            @Override
-            public void afterTextChanged(Editable text) {
-                updateRemindPreview(activity, binding, deadline[0], leadOf(binding));
-            }
-        });
 
         AlertDialog.Builder builder =
                 new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
@@ -426,21 +427,14 @@ public final class StudyDialogs {
                             Toast.LENGTH_SHORT).show();
                     return;
                 }
-                int lead = leadOf(binding);
-                if (lead < CustomHomework.MIN_LEAD_MINUTES
-                        || lead > CustomHomework.MAX_LEAD_MINUTES) {
-                    Toast.makeText(activity, R.string.study_homework_error_lead,
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
                 if (deadline[0] <= System.currentTimeMillis()) {
                     Toast.makeText(activity, R.string.study_homework_error_deadline,
                             Toast.LENGTH_SHORT).show();
                     return;
                 }
                 CustomHomework saved = existing == null
-                        ? CustomHomework.create(title, deadline[0], lead)
-                        : new CustomHomework(existing.id(), title, deadline[0], lead);
+                        ? CustomHomework.create(title, deadline[0])
+                        : new CustomHomework(existing.id(), title, deadline[0]);
                 dialog.dismiss();
                 onSaved.accept(saved);
             });
@@ -494,14 +488,15 @@ public final class StudyDialogs {
         binding.textHomeworkDeadlineValue.setText(CustomHomework.formatDateTime(deadlineMillis));
         binding.textHomeworkDeadlineValue.setTextColor(
                 ContextCompat.getColor(activity, R.color.campus_ink));
-        updateRemindPreview(activity, binding, deadlineMillis, leadOf(binding));
+        updateRemindPreview(activity, binding, deadlineMillis);
     }
 
+    /** 提醒时刻按全局提前量算：这里只展示，改提前量去作息设置页。 */
     private static void updateRemindPreview(@NonNull Activity activity,
                                             @NonNull DialogStudyHomeworkBinding binding,
-                                            long deadlineMillis, int leadMinutes) {
-        long remindAt = deadlineMillis
-                - CustomHomework.clampLead(leadMinutes) * 60_000L;
+                                            long deadlineMillis) {
+        int leadMinutes = StudyTimetableStore.loadHomeworkReminderLeadMinutes(activity);
+        long remindAt = deadlineMillis - leadMinutes * 60_000L;
         if (remindAt <= System.currentTimeMillis()) {
             // 提醒点已经过去：作业仍会保存，只是不再发通知，先说清楚免得用户以为会提醒。
             binding.textHomeworkRemindPreview.setText(
@@ -512,16 +507,9 @@ public final class StudyDialogs {
         }
         binding.textHomeworkRemindPreview.setText(activity.getString(
                 R.string.study_homework_remind_preview,
+                HomeworkReminderPlanner.leadLabel(leadMinutes),
                 CustomHomework.formatShortDateTime(remindAt)));
         binding.textHomeworkRemindPreview.setTextColor(
                 ContextCompat.getColor(activity, R.color.campus_muted));
-    }
-
-    private static int leadOf(@NonNull DialogStudyHomeworkBinding binding) {
-        try {
-            return Integer.parseInt(binding.inputHomeworkLead.getText().toString().trim());
-        } catch (NumberFormatException error) {
-            return CustomHomework.DEFAULT_LEAD_MINUTES;
-        }
     }
 }

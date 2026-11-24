@@ -387,6 +387,7 @@ public class AppSettingsActivity extends AppCompatActivity {
         state.openHomeworkCount = homework.size();
         if (state.homeworkEnabled) {
             HomeworkReminderPlanner.Reminder next = HomeworkReminderPlanner.next(homework, now,
+                    StudyTimetableStore.loadHomeworkReminderLeadMinutes(this),
                     HomeworkReminderPlanner.DEFAULT_HORIZON_DAYS);
             state.nextHomeworkReminder = next == null ? null : next.remindAt;
         }

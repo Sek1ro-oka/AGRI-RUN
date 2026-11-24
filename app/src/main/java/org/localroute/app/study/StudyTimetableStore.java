@@ -32,6 +32,8 @@ public final class StudyTimetableStore {
     static final String KEY_SEMESTER_START = "semester_start";
     private static final String KEY_CLASS_REMINDER_ENABLED = "class_reminder_enabled";
     private static final String KEY_CLASS_REMINDER_LEAD = "class_reminder_lead_minutes";
+    /** 作业截止提醒的提前量：全局一条，和课前提醒同样处理。 */
+    private static final String KEY_HOMEWORK_REMINDER_LEAD = "homework_reminder_lead_minutes";
     /** 调课、停课、补课：按日期生效的例外清单。 */
     private static final String KEY_ADJUSTMENTS = "day_adjustments";
     /** 旧版本只保存了每节课分钟数，读取时迁移后删除。 */
@@ -208,6 +210,20 @@ public final class StudyTimetableStore {
     public static void saveClassReminderLeadMinutes(Context context, int minutes) {
         prefs(context).edit()
                 .putInt(KEY_CLASS_REMINDER_LEAD, ClassReminderPlanner.clampLead(minutes))
+                .apply();
+    }
+
+    /** 作业截止提醒的全局提前分钟数，与课前提醒同样收进合法范围。 */
+    public static int loadHomeworkReminderLeadMinutes(Context context) {
+        return HomeworkReminderPlanner.clampLead(prefs(context)
+                .getInt(KEY_HOMEWORK_REMINDER_LEAD,
+                        HomeworkReminderPlanner.DEFAULT_LEAD_MINUTES));
+    }
+
+    /** 改提前量后必须重排闹钟，否则已安排的提醒点仍按旧值触发。 */
+    public static void saveHomeworkReminderLeadMinutes(Context context, int minutes) {
+        prefs(context).edit()
+                .putInt(KEY_HOMEWORK_REMINDER_LEAD, HomeworkReminderPlanner.clampLead(minutes))
                 .apply();
     }
 

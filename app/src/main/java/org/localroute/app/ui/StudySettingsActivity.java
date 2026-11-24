@@ -21,6 +21,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -60,6 +61,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.IntConsumer;
 
 /** 作业查询的独立设置页：学习通账户、课表导入与冬夏令时作息。 */
 public class StudySettingsActivity extends AppCompatActivity {
@@ -155,6 +157,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         });
         binding.rowReminderLead.setOnClickListener(view -> pickReminderLead());
 
+        binding.rowHomeworkReminderLead.setOnClickListener(view -> pickHomeworkReminderLead());
         binding.switchHomeworkReminder.setOnClickListener(view -> {
             boolean enabled = binding.switchHomeworkReminder.isChecked();
             CustomHomeworkStore.saveReminderEnabled(this, enabled);
@@ -1151,6 +1154,10 @@ public class StudySettingsActivity extends AppCompatActivity {
     private void renderHomeworkReminder() {
         boolean enabled = CustomHomeworkStore.loadReminderEnabled(this);
         binding.switchHomeworkReminder.setChecked(enabled);
+        int leadMinutes = StudyTimetableStore.loadHomeworkReminderLeadMinutes(this);
+        binding.textHomeworkReminderLeadValue.setText(getString(
+                R.string.study_homework_reminder_lead_value,
+                HomeworkReminderPlanner.leadLabel(leadMinutes)));
         // 自建作业或开关可能刚改过，每次回到本页按存储重排一次闹钟（幂等）。
         HomeworkReminderScheduler.update(this);
         if (!enabled) {
@@ -1164,16 +1171,16 @@ public class StudySettingsActivity extends AppCompatActivity {
             return;
         }
         HomeworkReminderPlanner.Reminder next = HomeworkReminderPlanner.next(items,
-                LocalDateTime.now(), HomeworkReminderPlanner.DEFAULT_HORIZON_DAYS);
+                LocalDateTime.now(), leadMinutes, HomeworkReminderPlanner.DEFAULT_HORIZON_DAYS);
         if (next == null) {
             showHomeworkReminderHint(getString(
                     R.string.study_homework_reminder_no_upcoming), true);
             return;
         }
         showHomeworkReminderHint(getString(R.string.study_homework_reminder_next_hint,
-                CustomHomework.formatShortDateTime(next.homework.remindEpochMillis()),
+                CustomHomework.formatShortDateTime(next.homework.remindEpochMillis(leadMinutes)),
                 next.homework.title(),
-                getString(R.string.study_reminder_lead_value, next.homework.leadMinutes())),
+                getString(R.string.study_reminder_lead_value, leadMinutes)),
                 false);
     }
 
@@ -1185,7 +1192,35 @@ public class StudySettingsActivity extends AppCompatActivity {
     }
 
     private void pickReminderLead() {
-        int current = StudyTimetableStore.loadClassReminderLeadMinutes(this);
+        promptLead(R.string.study_reminder_lead_dialog_title,
+                R.string.study_reminder_lead_invalid,
+                StudyTimetableStore.loadClassReminderLeadMinutes(this),
+                ClassReminderPlanner.MIN_LEAD_MINUTES, ClassReminderPlanner.MAX_LEAD_MINUTES,
+                minutes -> {
+                    StudyTimetableStore.saveClassReminderLeadMinutes(this, minutes);
+                    ClassReminderScheduler.update(this);
+                    renderReminder();
+                    notifyChanged();
+                });
+    }
+
+    /** 作业截止提前量：与课前提醒同一套做法，改一次即影响全部自建作业。 */
+    private void pickHomeworkReminderLead() {
+        promptLead(R.string.study_homework_reminder_lead_dialog_title,
+                R.string.study_homework_reminder_lead_invalid,
+                StudyTimetableStore.loadHomeworkReminderLeadMinutes(this),
+                HomeworkReminderPlanner.MIN_LEAD_MINUTES,
+                HomeworkReminderPlanner.MAX_LEAD_MINUTES,
+                minutes -> {
+                    StudyTimetableStore.saveHomeworkReminderLeadMinutes(this, minutes);
+                    HomeworkReminderScheduler.update(this);
+                    renderHomeworkReminder();
+                    notifyChanged();
+                });
+    }
+
+    private void promptLead(@StringRes int titleRes, @StringRes int invalidRes, int current,
+                            int min, int max, IntConsumer onSaved) {
         EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setText(String.valueOf(current));
@@ -1195,7 +1230,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         container.setPadding(padding, padding / 2, padding, 0);
         container.addView(input);
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.study_reminder_lead_dialog_title)
+                .setTitle(titleRes)
                 .setView(container)
                 .setNegativeButton(R.string.campus_cancel, null)
                 .setPositiveButton(R.string.campus_save, (dialog, which) -> {
@@ -1205,16 +1240,11 @@ public class StudySettingsActivity extends AppCompatActivity {
                     } catch (NumberFormatException error) {
                         minutes = -1;
                     }
-                    if (minutes < ClassReminderPlanner.MIN_LEAD_MINUTES
-                            || minutes > ClassReminderPlanner.MAX_LEAD_MINUTES) {
-                        Toast.makeText(this, R.string.study_reminder_lead_invalid,
-                                Toast.LENGTH_SHORT).show();
+                    if (minutes < min || minutes > max) {
+                        Toast.makeText(this, invalidRes, Toast.LENGTH_SHORT).show();
                         return;
                     }
-                    StudyTimetableStore.saveClassReminderLeadMinutes(this, minutes);
-                    ClassReminderScheduler.update(this);
-                    renderReminder();
-                    notifyChanged();
+                    onSaved.accept(minutes);
                 })
                 .show();
     }

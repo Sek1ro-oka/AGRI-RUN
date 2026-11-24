@@ -166,6 +166,72 @@ public class JwTimetableParserTest {
         assertEquals("2026-2027 学年学期 1", JwTimetableParser.termLabel("2026", "1"));
     }
 
+    /**
+     * 三节连堂在不同教务系统里写成「3-5」「3-4-5」「030405」「3,4,5」，
+     * 每一种都必须占满三节课，不能只占一节，也不能整条丢掉。
+     */
+    @Test
+    public void spansAllPeriodsOfATripleSession() throws Exception {
+        assertTriple("3-5");
+        assertTriple("3-4-5");
+        assertTriple("030405");
+        assertTriple("3,4,5");
+        assertTriple("03-04-05");
+        assertTriple("第3-4-5节");
+        assertTriple("3~5");
+    }
+
+    private void assertTriple(String sectionText) throws Exception {
+        JSONArray kbList = new JSONArray();
+        kbList.put(new JSONObject()
+                .put("kcmc", "测绘程序设计")
+                .put("xqj", 4)
+                .put("jc", sectionText)
+                .put("zcd", "1-16周"));
+
+        List<TimetableCourse> courses = JwTimetableParser.parse(kbList.toString()).courses();
+
+        assertEquals(sectionText, 1, courses.size());
+        assertEquals(sectionText, 3, courses.get(0).startPeriod());
+        assertEquals(sectionText, 5, courses.get(0).endPeriod());
+        assertEquals(sectionText, "第3-5节", courses.get(0).periodLabel());
+    }
+
+    /** 同一门课拆成多条记录时（连堂被写成两段），相邻节次要合成一块。 */
+    @Test
+    public void mergesSameCourseSplitAcrossRows() throws Exception {
+        JSONArray kbList = new JSONArray();
+        kbList.put(new JSONObject().put("kcmc", "测量学").put("xqj", 5)
+                .put("jc", "1-2").put("zcd", "1-16周"));
+        kbList.put(new JSONObject().put("kcmc", "测量学").put("xqj", 5)
+                .put("jc", "3").put("zcd", "1-16周"));
+        kbList.put(new JSONObject().put("kcmc", "测量学").put("xqj", 5)
+                .put("jc", "7-8").put("zcd", "1-16周"));
+
+        List<TimetableCourse> courses = JwTimetableParser.parse(kbList.toString()).courses();
+
+        assertEquals(2, courses.size());
+        assertEquals(1, courses.get(0).startPeriod());
+        assertEquals(3, courses.get(0).endPeriod());
+        assertEquals(7, courses.get(1).startPeriod());
+        assertEquals(8, courses.get(1).endPeriod());
+    }
+
+    /** 节次读不出来时必须把课程名报出来，否则用户拿到的是一张看起来完整的课表。 */
+    @Test
+    public void reportsCoursesWithUnreadableSections() throws Exception {
+        JSONArray kbList = new JSONArray();
+        kbList.put(new JSONObject().put("kcmc", "形势与政策").put("xqj", 1)
+                .put("jc", "第1大节").put("zcd", "1-8周"));
+        kbList.put(new JSONObject().put("kcmc", "高等数学").put("xqj", 2)
+                .put("jc", "1-2").put("zcd", "1-16周"));
+
+        JwTimetableParser.Result result = JwTimetableParser.parse(kbList.toString());
+
+        assertEquals(1, result.courses().size());
+        assertEquals(List.of("形势与政策"), result.unparsedCourses());
+    }
+
     @Test
     public void parsesSectionAndWeekHelpers() {
         assertEquals("1-16", JwTimetableParser.parseWeeks(null));
