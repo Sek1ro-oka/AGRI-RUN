@@ -641,6 +641,10 @@
     <string name="study_import_more">\n…另有 %1$d 门</string>
     <string name="study_import_unparsed">\n%1$d 门课的节次没能识别，未导入：%2$s</string>
     <string name="study_import_unparsed_more"> 等</string>
+    <string name="study_import_semester_calendar">\n教务校历：第 1 周自 %2$s 起，导入后自动定位到本周第 %1$d 周。</string>
+    <string name="study_import_semester_derived">\n教务显示本周第 %1$d 周，第 1 周按今天倒推为 %2$s，导入后自动定位。</string>
+    <string name="study_import_semester_outside">\n教务校历：第 1 周自 %1$s 起（今天不在教学周内，不改动当前查看的周）。</string>
+    <string name="study_import_semester_replaces">\n手设的开学日期 %1$s 已被替换，可在「学习 · 设置」里改回。</string>
     <string name="study_import_confirm">导入</string>
     <string name="study_import_append">追加到现有课表</string>
     <string name="study_import_replace_hint">未勾选追加时会覆盖现有 %1$d 门课程。</string>

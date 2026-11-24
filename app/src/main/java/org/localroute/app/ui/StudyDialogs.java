@@ -22,11 +22,13 @@ import org.localroute.app.databinding.DialogStudyHomeworkBinding;
 import org.localroute.app.databinding.DialogStudyImportBinding;
 import org.localroute.app.study.CustomHomework;
 import org.localroute.app.study.HomeworkReminderPlanner;
+import org.localroute.app.study.JwSemesterInfo;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
 import org.localroute.app.study.TimetableText;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashSet;
@@ -51,17 +53,24 @@ public final class StudyDialogs {
      *
      * @param unparsed 节次没能识别、因而被跳过的课程名；必须在预览里报出来，
      *                 否则用户拿到的是一张看起来完整、实际少了几节课的课表
+     * @param semester 教务课表自带的本周周次与校历日期；导入确认时据此自动定位本周，
+     *                 用户不必再去设置页手填开学日期。推算结果会写在预览里，替换手设值也不藏着
      */
     public static void showImportPreview(@NonNull Activity activity,
                                          @NonNull List<TimetableCourse> imported,
                                          @Nullable String sourceLabel,
                                          @NonNull List<String> unparsed,
+                                         @NonNull JwSemesterInfo semester,
                                          @Nullable Runnable onImported) {
         DialogStudyImportBinding binding =
                 DialogStudyImportBinding.inflate(LayoutInflater.from(activity));
         int existing = StudyTimetableStore.loadCourses(activity).size();
+        LocalDate previousStart = StudyTimetableStore.loadSemesterStart(activity);
+        JwSemesterInfo.Plan previewPlan = semester.plan(LocalDate.now(),
+                plannedTotalWeeks(activity, imported));
         binding.textImportFile.setText(sourceLabel == null ? "" : sourceLabel);
-        binding.textImportSummary.setText(preview(activity, imported, unparsed));
+        binding.textImportSummary.setText(
+                preview(activity, imported, unparsed, previewPlan, previousStart));
         binding.checkImportAppend.setVisibility(existing > 0 ? View.VISIBLE : View.GONE);
         updateImportHint(activity, binding, existing);
         binding.checkImportAppend.setOnCheckedChangeListener(
@@ -97,9 +106,10 @@ public final class StudyDialogs {
                     for (TimetableCourse course : courses) {
                         maxWeek = Math.max(maxWeek, TimetableText.maxWeek(course.weeks()));
                     }
-                    if (maxWeek > StudyTimetableStore.loadTotalWeeks(activity)) {
-                        StudyTimetableStore.saveTotalWeeks(activity, maxWeek);
-                    }
+                    int totalWeeks = Math.max(StudyTimetableStore.loadTotalWeeks(activity), maxWeek);
+                    JwSemesterInfo.Plan plan = semester.plan(LocalDate.now(), totalWeeks);
+                    StudyTimetableStore.applySemesterAnchor(activity, plan.semesterStart,
+                            Math.max(totalWeeks, plan.totalWeeks), plan.week);
                     Toast.makeText(activity, added == 0
                                     ? activity.getString(R.string.study_import_no_new)
                                     : activity.getString(R.string.study_import_result, added),
@@ -112,8 +122,19 @@ public final class StudyDialogs {
         dialog.show();
     }
 
+    /** 预览阶段用的总周数：按导入课程覆盖的最大周扩展后的值。 */
+    private static int plannedTotalWeeks(@NonNull Activity activity,
+                                         @NonNull List<TimetableCourse> imported) {
+        int maxWeek = 0;
+        for (TimetableCourse course : imported) {
+            maxWeek = Math.max(maxWeek, TimetableText.maxWeek(course.weeks()));
+        }
+        return Math.max(StudyTimetableStore.loadTotalWeeks(activity), maxWeek);
+    }
+
     private static String preview(Activity activity, List<TimetableCourse> imported,
-                                 List<String> unparsed) {
+                                 List<String> unparsed, @NonNull JwSemesterInfo.Plan plan,
+                                 @Nullable LocalDate previousStart) {
         StringBuilder builder = new StringBuilder(activity.getString(
                 R.string.study_import_count, imported.size()));
         int limit = Math.min(5, imported.size());
@@ -140,7 +161,35 @@ public final class StudyDialogs {
                             + (unparsed.size() > shown.size()
                             ? activity.getString(R.string.study_import_unparsed_more) : "")));
         }
+        builder.append(semesterLine(activity, plan, previousStart));
         return builder.toString();
+    }
+
+    /**
+     * 教务自带的周次与校历日期推算出的定位结果。
+     *
+     * <p>取不到锚点时这一行整段消失，不做「没定位上」的碎碎念——课表页顶部本来就有
+     * 设置开学日期的引导入口。手设的开学日期被替换时必须说清楚，否则用户会发现
+     * 自己调好的日期无声无息变了。
+     */
+    private static String semesterLine(@NonNull Activity activity,
+                                       @NonNull JwSemesterInfo.Plan plan,
+                                       @Nullable LocalDate previousStart) {
+        if (plan.semesterStart == null) {
+            return "";
+        }
+        String line = plan.week > 0
+                ? activity.getString(plan.fromCalendar
+                        ? R.string.study_import_semester_calendar
+                        : R.string.study_import_semester_derived, plan.week,
+                        plan.semesterStart.toString())
+                : activity.getString(R.string.study_import_semester_outside,
+                        plan.semesterStart.toString());
+        if (previousStart != null && !previousStart.equals(plan.semesterStart)) {
+            line += activity.getString(R.string.study_import_semester_replaces,
+                    previousStart.toString());
+        }
+        return line;
     }
 
     private static void updateImportHint(Activity activity, DialogStudyImportBinding binding,
