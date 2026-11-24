@@ -606,3 +606,21 @@ v0.9.9 之后并入 main 的功能与整改 PR 共 15 个（#71 备份/恢复、
 已知取舍：① **字段名没有真机证据**：`xnWeeks`／`dates`／`#xq` 是正方 kbcx 页面的常见形态而不是各校统一的接口约定，脚本按候选键与页面变量逐个试；全部落空时功能整体退化为原状（不写锚点、不报错、预览不多这一行），用户仍须手填开学日期；② 已经导入过的课表不会补定位——锚点只在导入确认那一刻推算，历史数据没有周次来源，不猜；③ 往学期课表只在「按周次倒推」这条路上拦（校历日期明确给出就照实记），判断依据是 `xnm`/`xqm` 推知的学期窗口，写法另立短学期的学校会误放行；④ 总周数按校历条目数／周次下拉数算，仍收进 1–30，与手动设置同一约束；⑤ 归档学期（`SemesterArchive`）的起始日期由归档快照决定，导入推算只影响当前偏好文件；⑥ 不做「按课程日期反推开学日」——正方课表里根本没有具体上课日期，只有周次。
 
 验证：561 个 JVM 用例全过（63 个测试类，较上一节基线 543 例 / 62 类 +18，全在新增的 `JwSemesterInfoTest`：候选键与带字周次、四种日期写法与占位值、倒推锚点 2026-11-23 → 2026-09-28、校历一致／不一致时取谁、只给校历且今天不在学期内、总周数只增不减、学年学期把关）；抓取脚本另用 Node 搭 DOM／fetch 桩跑通六种形态——只有首页脚本变量（`xnWeeks=9`、`weekCount=3`、`dates=[2026-09-28,2026-10-05]`）、页面就在课表页（`#xq` 选中值 11 优先于 `window.xnWeeks`，`window.dates` 里混着 `Date` 对象与坏值仍只收到两条合法日期）、校历日期写成字符串且 kbList 嵌在 `data` 下、日历请求失败但学期已知（仍 `ok:true` 且三个周次字段为空）、日历请求失败且学期未知（照旧报 `NETWORK_ERROR` 而不是静默导入半份）、首页没有 `#xq` 下拉（只拿到校历日期）。lint 0 errors、263 warnings（与基线持平）；`assembleDebug` 与 `:app:compileDebugAndroidTestJavaWithJavac` 通过。桩里的 HTML 是我按公开形态写的，不是学校真实页面；本机无 adb 也无模拟器，属真机待复验：教务页面到底把周次放在哪、导入后课表页是否直接落在本周、预览里新增那行在窄屏会不会把对话框撑出滚动、`applySemesterAnchor` 一次提交后小组件与课前提醒是否按新周次重排。
+
+## 2026-11-24 0.10.1 发布记录
+
+v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位修复 + 作业统一提前量）与 #89 `d4288ee`（教务导入自动定位本周）——由 PR #90 的 `def327f` 升版到 0.10.1 / versionCode 41（只动 `app/build.gradle` 两行），合并提交 `d02de50`，附注标签 `v0.10.1`（标签对象 `61a3caaf`，解引用指向 `d02de50`）。Release 地址 <https://github.com/Sek1ro-oka/AGRI-RUN/releases/tag/v0.10.1>，`releases/latest` 已返回 `v0.10.1`。
+
+| 项 | 结果 |
+| --- | --- |
+| 附件命名 | `route-workshop-0.10.1-release.apk`，符合 `UpdateChecker` 的识别前缀，0.10.0 设备能认出主包 |
+| 本机构建 | 74,397,540 字节，sha256 `5c271cd82d5ba114d13d9b07de80b6c64d67e57beefe4d3f8cfec7fa9882c72d`；`aapt2 dump badging` 读到 `versionCode='41' versionName='0.10.1'` |
+| 签名 | `apksigner verify --print-certs` → v2 方案通过，`CN=UNLOOP Release, O=Local Dev, C=CN`，证书 SHA-256 `01547534…82f4`——与 0.9.5–0.10.0 同一把 key，**0.10.0 可直接覆盖安装，不需要卸载** |
+| 发布前测试 | `:app:testDebugUnitTest` 561 例 / 63 类 0 失败（数字从 `app/build/test-results/testDebugUnitTest/*.xml` 现汇总，不抄旧文档）；`lintRelease` 0 errors、263 warnings（与 0.10.0 持平）；`assembleRelease` 成功，产物即 tag 指向的 `d02de50` 状态 |
+| 线上复核 | 发布后 `releases/tags/v0.10.1` 返回 `draft=false`、附件 `state=uploaded`、`size=74397540` 与本机一致；`git ls-remote`／refs API 确认远端分支 `def327f`、标签 `61a3caaf` |
+
+**这一版没做到的一条**：0.10.0 那次发布把附件重新下载回来做过逐字节 sha256 比对，这次暂时做不到——发布后从 `github.com` 回下载 74 MB 附件，第一次 180 秒只收到 3,681,088 字节就超时，之后 `curl -C -` 断点续传也在推进（记录时约 7.3 MB / 74,397,540），有效速度只有约 20 KB/s；单独请求前 64 KB 分段三次全部拿不到字节。所以**线上附件的 sha256 尚未经复核**，目前只能证明「附件名、`state=uploaded`、size 与本机一致」，不能证明「字节一致」——历史上出现过镜像返回大小恰好相同的 HTML 页面的情况，只比大小不足以判定线上就是本机构建产物。推送分支与打标签各一次成功，只有下行下载受阻；续传完成后以补充提交把这条证据补齐。
+
+仍待真机复验（本机无 adb、无模拟器）：连堂课在网格里是否真的占了应有的格数、`unparsedCourses()` 报出的课名是否与实际丢课一致、作业统一提前量到点是否真响且只响一次、教务导入后课表页是否直接落在本周、预览新增那行在窄屏会不会撑出滚动、`applySemesterAnchor` 一次提交后小组件与课前提醒是否按新周次重排。0.10.0 的整批复验项（备份恢复、提醒中心与各厂商 ROM 后台限制、崩溃记录可读性、ICS 与分享码、调课与多学期边界、悬浮台折叠小球、Android 12+ 的 Toast 压制、+1sp/±4dp 观感与 48dp 控件顶边界）一并继承下来，见 2026-11-24 0.10.0 发布记录一节。
+
+遗留风险照旧一条：**`CN=UNLOOP Release` 这把 key 至今没有异地备份**（旧 key 不可追认的经过见 2026-11-23「旧签名无法追认」一节）。0.9.4 及更早因为签名换过 key 已经定了「只能卸载重装」，这把再丢一次就没有覆盖安装这条路；本次发布顺带确认 `keystore.properties`（`.gitignore:29`）与 `unloop-release.jks`（`*.jks`，`.gitignore:26`）从未进过任何提交——`git log --all -- keystore.properties unloop-release.jks` 为空，`app/build.gradle` 里只有 `keystoreProperties['storePassword']` 这类引用，没有明文口令。
