@@ -39,6 +39,7 @@ import org.json.JSONObject;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityJwImportBinding;
 import org.localroute.app.study.JwSchools;
+import org.localroute.app.study.JwSemesterInfo;
 import org.localroute.app.study.JwTimetableJavascript;
 import org.localroute.app.study.JwTimetableParser;
 import org.localroute.app.study.TimetableCourse;
@@ -345,10 +346,11 @@ public class JwImportActivity extends AppCompatActivity {
                 JwTimetableParser.termLabel(root.optString("xnm", ""),
                         root.optString("xqm", "")),
                 courses.size());
-        StudyDialogs.showImportPreview(this, courses, source, result.unparsedCourses(), () -> {
-            setResult(RESULT_OK);
-            finish();
-        });
+        StudyDialogs.showImportPreview(this, courses, source, result.unparsedCourses(),
+                JwSemesterInfo.read(root), () -> {
+                    setResult(RESULT_OK);
+                    finish();
+                });
     }
 
     private void finishFetch() {

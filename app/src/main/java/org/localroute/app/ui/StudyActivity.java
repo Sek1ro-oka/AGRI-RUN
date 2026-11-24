@@ -131,6 +131,8 @@ public class StudyActivity extends AppCompatActivity {
         jwLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(), result -> {
                     if (result.getResultCode() == RESULT_OK) {
+                        // 导入已按教务数据定位本周，回到课表页要丢掉进入前翻到的那一周。
+                        initializeWeek();
                         renderTimetable();
                     }
                 });

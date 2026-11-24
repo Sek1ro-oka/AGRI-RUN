@@ -162,6 +162,30 @@ public final class StudyTimetableStore {
         prefs(context).edit().remove(KEY_SEMESTER_START).apply();
     }
 
+    /**
+     * 一次写全学期锚点：开学日期、总周数、当前查看的周。
+     *
+     * <p>教务导入用得上——三项必须一起生效，否则「本周第 9 周」会配着旧的开学日期，
+     * 网格上的日期与周次标签就对不上了。传 null 或 0 的项保持本机原值，周次按总周数收窄。
+     */
+    public static void applySemesterAnchor(Context context, @Nullable LocalDate start,
+                                           int totalWeeks, int week) {
+        int effectiveTotal = totalWeeks > 0
+                ? Math.max(MIN_TOTAL_WEEKS, Math.min(MAX_TOTAL_WEEKS, totalWeeks))
+                : loadTotalWeeks(context);
+        SharedPreferences.Editor editor = prefs(context).edit();
+        if (start != null) {
+            editor.putLong(KEY_SEMESTER_START, start.toEpochDay());
+        }
+        if (totalWeeks > 0 && effectiveTotal != loadTotalWeeks(context)) {
+            editor.putInt(KEY_TOTAL_WEEKS, effectiveTotal);
+        }
+        if (week > 0) {
+            editor.putInt(KEY_CURRENT_WEEK, Math.max(1, Math.min(effectiveTotal, week)));
+        }
+        editor.apply();
+    }
+
     /** 今天所在的教学周；未设置开学日期或不在学期内时为 0。 */
     public static int currentTeachingWeek(Context context) {
         return SemesterCalendar.teachingWeek(loadSemesterStart(context), LocalDate.now(),
