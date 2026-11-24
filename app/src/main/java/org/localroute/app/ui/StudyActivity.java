@@ -36,6 +36,7 @@ import org.localroute.app.study.CustomHomeworkStore;
 import org.localroute.app.study.DayAdjustment;
 import org.localroute.app.study.HomeworkFilter;
 import org.localroute.app.study.HomeworkItem;
+import org.localroute.app.study.HomeworkReminderPlanner;
 import org.localroute.app.study.HomeworkReminderScheduler;
 import org.localroute.app.study.SemesterCalendar;
 import org.localroute.app.study.StudyHomeworkCache;
@@ -661,10 +662,13 @@ public class StudyActivity extends AppCompatActivity {
                         : R.string.study_homework_status_custom),
                 expired ? R.color.study_state_expired_fill : R.color.campus_mint_pale,
                 expired ? R.color.campus_muted : R.color.campus_mint_dark);
-        itemBinding.textHomeworkTag.setVisibility(
-                CustomHomeworkStore.loadReminderEnabled(this) ? View.VISIBLE : View.GONE);
-        itemBinding.textHomeworkTag.setText(
-                getString(R.string.study_homework_tag_lead, item.leadLabel()));
+        boolean remind = CustomHomeworkStore.loadReminderEnabled(this);
+        itemBinding.textHomeworkTag.setVisibility(remind ? View.VISIBLE : View.GONE);
+        if (remind) {
+            itemBinding.textHomeworkTag.setText(getString(R.string.study_homework_tag_lead,
+                    HomeworkReminderPlanner.leadLabel(
+                            StudyTimetableStore.loadHomeworkReminderLeadMinutes(this))));
+        }
     }
 
     private void paintStatusChip(@NonNull TextView chipView, @NonNull String label,

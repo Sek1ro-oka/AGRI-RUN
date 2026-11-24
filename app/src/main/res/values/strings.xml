@@ -639,6 +639,8 @@
     <string name="study_import_dialog_hint">确认后写入本机课表；导入后仍可点击课程修改或删除。</string>
     <string name="study_import_count">识别到 %1$d 门课程：</string>
     <string name="study_import_more">\n…另有 %1$d 门</string>
+    <string name="study_import_unparsed">\n%1$d 门课的节次没能识别，未导入：%2$s</string>
+    <string name="study_import_unparsed_more"> 等</string>
     <string name="study_import_confirm">导入</string>
     <string name="study_import_append">追加到现有课表</string>
     <string name="study_import_replace_hint">未勾选追加时会覆盖现有 %1$d 门课程。</string>
@@ -674,6 +676,7 @@
     <string name="study_jw_error_term">没有识别到学年学期，请先在教务系统课表页选择学期。</string>
     <string name="study_jw_error_network">读取课表请求失败，请检查网络或 VPN 后重试。</string>
     <string name="study_jw_error_format">教务系统返回的课表格式无法识别，请稍后重试。</string>
+    <string name="study_jw_sections_unparsed">这些课的节次没能识别，请手动添加：%1$s</string>
     <string name="study_course_saved">课程已保存</string>
     <string name="study_course_add_title">添加课程或事件</string>
     <string name="study_course_edit_title">修改课程</string>
@@ -762,14 +765,13 @@
     <string name="study_homework_name_hint">数据结构实验报告</string>
     <string name="study_homework_deadline">截止时间</string>
     <string name="study_homework_deadline_pick">选择日期与时间</string>
-    <string name="study_homework_lead">提前多少分钟提醒</string>
-    <string name="study_homework_remind_preview">将在 %1$s 提醒你</string>
+    <string name="study_homework_lead_global">提前量在「学习设置 → 作业截止提醒」里统一设置</string>
+    <string name="study_homework_remind_preview">提前%1$s，将在 %2$s 提醒你</string>
     <string name="study_homework_remind_preview_past">提醒时间已经过了，只会保留作业不提醒。</string>
     <string name="study_homework_pick_date">选择截止日期</string>
     <string name="study_homework_pick_time">选择截止时间</string>
     <string name="study_homework_error_name">请填写作业名称。</string>
     <string name="study_homework_error_deadline">截止时间要在现在之后。</string>
-    <string name="study_homework_error_lead">提前分钟数要在 1–10080（7 天）之间。</string>
     <string name="study_homework_saved">作业已保存</string>
     <string name="study_homework_deleted">作业已删除</string>
     <string name="study_homework_delete_title">删除这条自建作业？</string>
@@ -780,7 +782,11 @@
     <string name="study_homework_custom_course">自建作业</string>
     <string name="study_homework_reminder_title">作业截止提醒</string>
     <string name="study_homework_reminder_switch_label">作业将截止时提醒</string>
-    <string name="study_homework_reminder_switch_desc">只对自建作业发送通知，提前量按每条作业自己设置</string>
+    <string name="study_homework_reminder_switch_desc">只对自建作业发送通知，提前量在下方统一设置</string>
+    <string name="study_homework_reminder_lead_title">提前提醒时间</string>
+    <string name="study_homework_reminder_lead_dialog_title">提前多少分钟提醒（1–10080，即最长 7 天）</string>
+    <string name="study_homework_reminder_lead_invalid">请输入 1–10080 之间的分钟数（最长 7 天）。</string>
+    <string name="study_homework_reminder_lead_value">提前 %1$s</string>
     <string name="study_homework_reminder_next_hint">下一个提醒：%1$s（%2$s，%3$s）</string>
     <string name="study_homework_reminder_no_items">还没有自建作业，在「查询作业」页底部点「新增作业」添加。</string>
     <string name="study_homework_reminder_no_upcoming">未来 30 天内没有需要提醒的作业。</string>

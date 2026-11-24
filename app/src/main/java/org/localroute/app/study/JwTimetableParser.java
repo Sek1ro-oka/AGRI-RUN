@@ -7,10 +7,13 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -23,9 +26,9 @@ import java.util.regex.Pattern;
  */
 public final class JwTimetableParser {
 
-    private static final Pattern SECTION_RANGE = Pattern.compile(
-            "^(\\d{1,2})(?:[-~至到](\\d{1,2}))?$");
-    private static final Pattern COMPACT_SECTIONS = Pattern.compile("^\\d{3,4}$");
+    /** 节次里的区间连接符，教务系统会用「-」「~」「至」「到」四种写法。 */
+    private static final Pattern SECTION_SEPARATOR = Pattern.compile("[-~至到]");
+    private static final Pattern SECTION_NUMBER = Pattern.compile("^\\d{1,2}$");
 
     private JwTimetableParser() {
     }
@@ -33,10 +36,13 @@ public final class JwTimetableParser {
     public static final class Result {
         private final List<TimetableCourse> courses;
         private final int rawCount;
+        private final List<String> unparsedCourses;
 
-        Result(@NonNull List<TimetableCourse> courses, int rawCount) {
+        Result(@NonNull List<TimetableCourse> courses, int rawCount,
+                @NonNull List<String> unparsedCourses) {
             this.courses = courses;
             this.rawCount = rawCount;
+            this.unparsedCourses = unparsedCourses;
         }
 
         @NonNull
@@ -47,6 +53,15 @@ public final class JwTimetableParser {
         public int rawCount() {
             return rawCount;
         }
+
+        /**
+         * 因为节次读不出来而被丢掉的课程名。教务系统换一种写法就静默少几节课，
+         * 用户看到的是一张「看起来完整」的课表，所以这里必须把漏掉的课程报出来。
+         */
+        @NonNull
+        public List<String> unparsedCourses() {
+            return unparsedCourses;
+        }
     }
 
     /**
@@ -56,15 +71,15 @@ public final class JwTimetableParser {
      */
     @NonNull
     public static Result parse(@Nullable String json) {
-        List<TimetableCourse> courses = new ArrayList<>();
+        List<String> unparsedNames = new ArrayList<>();
         if (json == null || json.trim().isEmpty()) {
-            return new Result(courses, 0);
+            return new Result(List.of(), 0, List.of());
         }
         JSONArray array = findKbList(json.trim());
         if (array == null) {
-            return new Result(courses, 0);
+            return new Result(List.of(), 0, List.of());
         }
-        Set<String> keys = new HashSet<>();
+        Map<String, Group> groups = new LinkedHashMap<>();
         for (int i = 0; i < array.length(); i++) {
             JSONObject item = array.optJSONObject(i);
             if (item == null) {
@@ -81,21 +96,55 @@ public final class JwTimetableParser {
                 continue;
             }
             String sectionText = firstString(item, "jc", "jcs", "classSessions");
-            String weeks = parseWeeks(firstString(item, "zcd", "kkzc", "zc"));
             List<int[]> ranges = parseSections(sectionText);
-            for (int[] range : ranges) {
-                TimetableCourse course = TimetableCourse.create(
-                        name, teacher, location, weekday, range[0], range[1], weeks);
-                if (!course.isValid()) {
-                    continue;
+            if (ranges.isEmpty()) {
+                if (!sectionText.isEmpty() && !unparsedNames.contains(name)) {
+                    unparsedNames.add(name);
                 }
-                String key = courseKey(course);
-                if (keys.add(key)) {
+                continue;
+            }
+            String weeks = parseWeeks(firstString(item, "zcd", "kkzc", "zc"));
+            String key = name + '|' + teacher + '|' + location + '|' + weekday + '|' + weeks;
+            Group group = groups.get(key);
+            if (group == null) {
+                group = new Group(name, teacher, location, weekday, weeks);
+                groups.put(key, group);
+            }
+            for (int[] range : ranges) {
+                for (int period = range[0]; period <= range[1]; period++) {
+                    group.periods.add(period);
+                }
+            }
+        }
+        List<TimetableCourse> courses = new ArrayList<>();
+        for (Group group : groups.values()) {
+            for (int[] range : mergeConsecutive(group.periods)) {
+                TimetableCourse course = TimetableCourse.create(group.name, group.teacher,
+                        group.location, group.weekday, range[0], range[1], group.weeks);
+                if (course.isValid()) {
                     courses.add(course);
                 }
             }
         }
-        return new Result(courses, array.length());
+        return new Result(courses, array.length(), unparsedNames);
+    }
+
+    /** 同一门课在同一天的所有节次；教务系统可能把连堂拆成多条记录。 */
+    private static final class Group {
+        private final String name;
+        private final String teacher;
+        private final String location;
+        private final int weekday;
+        private final String weeks;
+        private final Set<Integer> periods = new TreeSet<>();
+
+        Group(String name, String teacher, String location, int weekday, String weeks) {
+            this.name = name;
+            this.teacher = teacher;
+            this.location = location;
+            this.weekday = weekday;
+            this.weeks = weeks;
+        }
     }
 
     /** 把学年与学期代码转成展示文本，例如「2026-2027 学年第一学期」。 */
@@ -225,7 +274,7 @@ public final class JwTimetableParser {
     }
 
     /**
-     * 解析 jc 节次：支持「1-2」「第1-2节」「3-4,6-7」「0102」等常见形态。
+     * 解析 jc 节次：支持「1-2」「第1-2节」「3-4,6-7」「1-2-3」「0102」「030405」「345」。
      * 返回的每段都保证在 1..15 内且开始不晚于结束。
      */
     @NonNull
@@ -246,32 +295,128 @@ public final class JwTimetableParser {
             return result;
         }
         for (String part : value.split(",")) {
-            if (part.isEmpty()) {
-                continue;
-            }
-            Matcher matcher = SECTION_RANGE.matcher(part);
-            int start;
-            int end;
-            if (matcher.matches()) {
-                start = Integer.parseInt(matcher.group(1));
-                end = matcher.group(2) == null ? start : Integer.parseInt(matcher.group(2));
-            } else if (COMPACT_SECTIONS.matcher(part).matches()) {
-                int half = part.length() / 2;
-                try {
-                    start = Integer.parseInt(part.substring(0, half));
-                    end = Integer.parseInt(part.substring(half));
-                } catch (NumberFormatException ignored) {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-            if (start >= TimetableCourse.MIN_PERIOD && end <= TimetableCourse.MAX_PERIOD
-                    && start <= end) {
-                result.add(new int[]{start, end});
+            if (!part.isEmpty()) {
+                result.addAll(parseSectionSegment(part));
             }
         }
         return result;
+    }
+
+    /**
+     * 单段节次。各校教务系统对连堂的写法并不统一：区间写「3-5」，逐节罗列写
+     * 「3-4-5」，紧凑拼接写「030405」，三种都得占成三节课。
+     */
+    private static List<int[]> parseSectionSegment(String part) {
+        String text = SECTION_SEPARATOR.matcher(part).replaceAll("-");
+        if (!text.contains("-")) {
+            Integer single = toPeriod(text);
+            if (single != null) {
+                return List.of(new int[]{single, single});
+            }
+            return mergeConsecutive(periodsOf(text));
+        }
+        String[] tokens = text.split("-");
+        List<List<Integer>> groups = new ArrayList<>();
+        for (String token : tokens) {
+            List<Integer> periods = periodsOf(token);
+            if (periods.isEmpty()) {
+                return List.of();
+            }
+            groups.add(periods);
+        }
+        // 「2-11」是节次区间，两端各自只代表一节课；写成两端之外都要按逐个罗列处理。
+        if (groups.size() == 2 && groups.get(0).size() == 1 && groups.get(1).size() == 1) {
+            int start = groups.get(0).get(0);
+            int end = groups.get(1).get(0);
+            return start <= end ? List.of(new int[]{start, end}) : List.of();
+        }
+        List<Integer> periods = new ArrayList<>();
+        for (List<Integer> group : groups) {
+            periods.addAll(group);
+        }
+        return mergeConsecutive(periods);
+    }
+
+    /**
+     * 一个节次片段包含的节次：单位数就是它自己，「0304」按两位一节，
+     * 「345」按一位一节。「12」优先当作第 12 节，只有超出范围才拆成 1、2 节。
+     */
+    @NonNull
+    private static List<Integer> periodsOf(@NonNull String token) {
+        Integer single = toPeriod(token);
+        if (single != null) {
+            return List.of(single);
+        }
+        List<Integer> pairs = splitPairs(token);
+        return pairs.isEmpty() ? splitDigits(token) : pairs;
+    }
+
+    /** 单个节次号；非数字或越界返回 null。 */
+    @Nullable
+    private static Integer toPeriod(@Nullable String token) {
+        if (token == null || !SECTION_NUMBER.matcher(token).matches()) {
+            return null;
+        }
+        int value = Integer.parseInt(token);
+        return value >= TimetableCourse.MIN_PERIOD && value <= TimetableCourse.MAX_PERIOD
+                ? value : null;
+    }
+
+    /** 两位一节的紧凑写法：030405 → 3,4,5。任何一节越界就不算这种写法。 */
+    @NonNull
+    private static List<Integer> splitPairs(String text) {
+        List<Integer> periods = new ArrayList<>();
+        if (text.length() < 4 || !text.matches("^\\d+$")) {
+            return periods;
+        }
+        for (int i = 0; i + 2 <= text.length(); i += 2) {
+            Integer period = toPeriod(text.substring(i, i + 2));
+            if (period == null) {
+                return List.of();
+            }
+            periods.add(period);
+        }
+        return periods;
+    }
+
+    /**
+     * 一位一节的紧凑写法：345 → 3,4,5。含 0 就不成立。
+     *
+     * <p>两位数字不参与：「16」「17」是越界的节次号，不是 1、6 节，
+     * 拆开会凭空多出课程，丢掉才能让界面提示用户核对。
+     */
+    @NonNull
+    private static List<Integer> splitDigits(String text) {
+        List<Integer> periods = new ArrayList<>();
+        if (text.length() < 3 || !text.matches("^\\d+$")) {
+            return periods;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            Integer period = toPeriod(String.valueOf(text.charAt(i)));
+            if (period == null) {
+                return List.of();
+            }
+            periods.add(period);
+        }
+        return periods;
+    }
+
+    /** 把逐个节次压成连续区间，中间断开就分成多段。 */
+    @NonNull
+    private static List<int[]> mergeConsecutive(@NonNull Collection<Integer> periods) {
+        List<Integer> sorted = new ArrayList<>(new TreeSet<>(periods));
+        List<int[]> ranges = new ArrayList<>();
+        int index = 0;
+        while (index < sorted.size()) {
+            int start = sorted.get(index);
+            int end = start;
+            while (index + 1 < sorted.size() && sorted.get(index + 1) == end + 1) {
+                end = sorted.get(++index);
+            }
+            ranges.add(new int[]{start, end});
+            index++;
+        }
+        return ranges;
     }
 
     /** zcd（如 1-16周、1-16周(单)）转成应用内的周次文本。 */
@@ -308,12 +453,5 @@ public final class JwTimetableParser {
             return normalized + "双";
         }
         return normalized;
-    }
-
-    @NonNull
-    private static String courseKey(@NonNull TimetableCourse course) {
-        return course.name() + '|' + course.teacher() + '|' + course.location() + '|'
-                + course.weekday() + '|' + course.startPeriod() + '|'
-                + course.endPeriod() + '|' + course.weeks();
     }
 }

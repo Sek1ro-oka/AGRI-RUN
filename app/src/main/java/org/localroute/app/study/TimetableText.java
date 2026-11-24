@@ -13,13 +13,17 @@ public final class TimetableText {
             "\\d+(?:-\\d+)?(?:,\\d+(?:-\\d+)?)*(?:单|双)?");
     private static final Pattern WEEK_RANGE = Pattern.compile(
             "^(\\d{1,2})(?:-(\\d{1,2}))?$");
-    private static final Pattern PERIODS = Pattern.compile(
-            "^(\\d{1,2})\\s*(?:[-~至到]\\s*(\\d{1,2}))?$");
+    private static final Pattern PERIOD_NUMBER = Pattern.compile("^\\d{1,2}$");
 
     private TimetableText() {
     }
 
-    /** 1-2 / 1 / 第1-2节。返回 [开始, 结束]。 */
+    /**
+     * 1-2 / 1 / 第1-2节 / 3-4-5（把三节连堂逐个列出）。返回 [开始, 结束]。
+     *
+     * <p>三个以上数字只有在连续递增时才当作一段连堂；「1-3-5」这种断开的写法
+     * 一条记录表达不了，返回 null 让界面报错，而不是悄悄占成 1-5。
+     */
     @Nullable
     public static int[] parsePeriods(@Nullable String raw) {
         if (raw == null) {
@@ -28,14 +32,31 @@ public final class TimetableText {
         String value = raw.trim()
                 .replace("第", "")
                 .replace("节", "")
-                .replace(" ", "");
-        Matcher matcher = PERIODS.matcher(value);
-        if (!matcher.matches()) {
+                .replace(" ", "")
+                .replaceAll("[~至到]", "-");
+        if (value.isEmpty()) {
             return null;
         }
-        int start = Integer.parseInt(matcher.group(1));
-        int end = matcher.group(2) == null ? start : Integer.parseInt(matcher.group(2));
-        return validPeriods(start, end);
+        String[] tokens = value.split("-");
+        int[] numbers = new int[tokens.length];
+        for (int i = 0; i < tokens.length; i++) {
+            if (!PERIOD_NUMBER.matcher(tokens[i]).matches()) {
+                return null;
+            }
+            numbers[i] = Integer.parseInt(tokens[i]);
+        }
+        if (numbers.length == 1) {
+            return validPeriods(numbers[0], numbers[0]);
+        }
+        if (numbers.length == 2) {
+            return validPeriods(numbers[0], numbers[1]);
+        }
+        for (int i = 1; i < numbers.length; i++) {
+            if (numbers[i] != numbers[i - 1] + 1) {
+                return null;
+            }
+        }
+        return validPeriods(numbers[0], numbers[numbers.length - 1]);
     }
 
     /** 第1-16周 / 1-16 / 1-16单。默认 1-16。 */

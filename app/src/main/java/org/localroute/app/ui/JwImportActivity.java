@@ -333,7 +333,10 @@ public class JwImportActivity extends AppCompatActivity {
         List<TimetableCourse> courses = result.courses();
         if (courses.isEmpty()) {
             finishFetch();
-            showStatus(getString(R.string.study_jw_error_format));
+            showStatus(result.unparsedCourses().isEmpty()
+                    ? getString(R.string.study_jw_error_format)
+                    : getString(R.string.study_jw_sections_unparsed,
+                            String.join("、", result.unparsedCourses())));
             return;
         }
         finishFetch();
@@ -342,7 +345,7 @@ public class JwImportActivity extends AppCompatActivity {
                 JwTimetableParser.termLabel(root.optString("xnm", ""),
                         root.optString("xqm", "")),
                 courses.size());
-        StudyDialogs.showImportPreview(this, courses, source, () -> {
+        StudyDialogs.showImportPreview(this, courses, source, result.unparsedCourses(), () -> {
             setResult(RESULT_OK);
             finish();
         });

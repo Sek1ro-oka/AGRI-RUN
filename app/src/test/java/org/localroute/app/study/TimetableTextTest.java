@@ -18,6 +18,11 @@ public class TimetableTextTest {
         assertArrayEquals(new int[]{5, 6}, TimetableText.parsePeriods("5~6"));
         assertArrayEquals(new int[]{1, 2}, TimetableText.parsePeriods("1 - 2"));
         assertArrayEquals(new int[]{13, 14}, TimetableText.parsePeriods("13-14"));
+        // 手动照着教务网页抄「第3-4-5节」时也要占三节，不能只落第一节。
+        assertArrayEquals(new int[]{3, 5}, TimetableText.parsePeriods("3-4-5"));
+        assertArrayEquals(new int[]{3, 5}, TimetableText.parsePeriods("第3-4-5节"));
+        assertArrayEquals(new int[]{1, 3}, TimetableText.parsePeriods("1至2至3"));
+        assertNull(TimetableText.parsePeriods("1-3-5"));
         assertNull(TimetableText.parsePeriods("0-1"));
         assertNull(TimetableText.parsePeriods("16-17"));
         assertNull(TimetableText.parsePeriods("5-3"));

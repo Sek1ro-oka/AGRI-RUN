@@ -12,39 +12,28 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * 用户自建的一条作业：只有名称、截止时间和提前提醒分钟数，不来自学习通。
+ * 用户自建的一条作业：只有名称和截止时间，不来自学习通。
  *
- * <p>纯 Java + org.json，可在 JVM 单元测试里直接验证编解码与提醒时刻推算。
+ * <p>提前提醒的分钟数是全局设置（和课前提醒一样），不存在每条作业一份上，
+ * 这样改一次设置就能影响全部作业。
+ *
+ * <p>纯 Java + org.json，可在 JVM 单元测试里直接验证编码与提醒时刻推算。
  */
 public final class CustomHomework {
-
-    public static final int MIN_LEAD_MINUTES = 1;
-    /** 最多提前 7 天提醒；再早的需求属于日历而不是本功能。 */
-    public static final int MAX_LEAD_MINUTES = 7 * 24 * 60;
-    public static final int DEFAULT_LEAD_MINUTES = 60;
 
     private final String id;
     private final String title;
     private final long deadlineEpochMillis;
-    private final int leadMinutes;
 
     public CustomHomework(@NonNull String id, @NonNull String title,
-                          long deadlineEpochMillis, int leadMinutes) {
+                          long deadlineEpochMillis) {
         this.id = id;
         this.title = title;
         this.deadlineEpochMillis = deadlineEpochMillis;
-        this.leadMinutes = clampLead(leadMinutes);
     }
 
-    public static CustomHomework create(@NonNull String title, long deadlineEpochMillis,
-                                        int leadMinutes) {
-        return new CustomHomework(UUID.randomUUID().toString(), title,
-                deadlineEpochMillis, leadMinutes);
-    }
-
-    /** 提前分钟数收进合法范围。 */
-    public static int clampLead(int minutes) {
-        return Math.max(MIN_LEAD_MINUTES, Math.min(MAX_LEAD_MINUTES, minutes));
+    public static CustomHomework create(@NonNull String title, long deadlineEpochMillis) {
+        return new CustomHomework(UUID.randomUUID().toString(), title, deadlineEpochMillis);
     }
 
     @NonNull
@@ -61,16 +50,12 @@ public final class CustomHomework {
         return deadlineEpochMillis;
     }
 
-    public int leadMinutes() {
-        return leadMinutes;
-    }
-
-    /** 提醒时刻；截止时间本身已过期时没有提醒点。 */
-    public long remindEpochMillis() {
+    /** 提醒时刻：截止时间减去全局提前量；没有截止时间时没有提醒点。 */
+    public long remindEpochMillis(int leadMinutes) {
         if (deadlineEpochMillis <= 0) {
             return 0L;
         }
-        return deadlineEpochMillis - leadMinutes * 60_000L;
+        return deadlineEpochMillis - HomeworkReminderPlanner.clampLead(leadMinutes) * 60_000L;
     }
 
     @NonNull
@@ -101,23 +86,12 @@ public final class CustomHomework {
                 .format(new Date(epochMillis));
     }
 
-    /** 提前量的人话描述，只给时长本身：30 分钟 / 2 小时 / 1 天。 */
-    @NonNull
-    public String leadLabel() {
-        if (leadMinutes >= 60 && leadMinutes % 60 == 0) {
-            int hours = leadMinutes / 60;
-            return hours >= 24 && hours % 24 == 0 ? (hours / 24) + " 天" : hours + " 小时";
-        }
-        return leadMinutes + " 分钟";
-    }
-
     @NonNull
     public JSONObject toJson() throws JSONException {
         JSONObject json = new JSONObject();
         json.put("id", id);
         json.put("title", title);
         json.put("deadline", deadlineEpochMillis);
-        json.put("lead", leadMinutes);
         return json;
     }
 
@@ -133,21 +107,16 @@ public final class CustomHomework {
         }
         String id = json.optString("id", "");
         return new CustomHomework(id.isEmpty() ? UUID.randomUUID().toString() : id,
-                title, deadline, json.optInt("lead", DEFAULT_LEAD_MINUTES));
+                title, deadline);
     }
 
     @NonNull
     public CustomHomework withTitle(@NonNull String title) {
-        return new CustomHomework(id, title, deadlineEpochMillis, leadMinutes);
+        return new CustomHomework(id, title, deadlineEpochMillis);
     }
 
     @NonNull
     public CustomHomework withDeadline(long deadlineEpochMillis) {
-        return new CustomHomework(id, title, deadlineEpochMillis, leadMinutes);
-    }
-
-    @NonNull
-    public CustomHomework withLeadMinutes(int leadMinutes) {
-        return new CustomHomework(id, title, deadlineEpochMillis, leadMinutes);
+        return new CustomHomework(id, title, deadlineEpochMillis);
     }
 }

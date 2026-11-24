@@ -133,7 +133,10 @@ public final class BackupCatalog {
                     Arrays.asList(
                             new KeyRef("custom_homework", "items", BackupValues.TYPE_STRING),
                             new KeyRef("custom_homework", "homework_reminder_enabled",
-                                    BackupValues.TYPE_BOOLEAN))),
+                                    BackupValues.TYPE_BOOLEAN),
+                            // 全局提前量跟着作业走，但它存在课表同一份偏好文件里。
+                            new KeyRef("study_timetable", "homework_reminder_lead_minutes",
+                                    BackupValues.TYPE_INT))),
             new Section(SECTION_SCHOOL, 1, R.string.backup_kind_school, true, false,
                     Arrays.asList(
                             new KeyRef("study_jw", "school_name", BackupValues.TYPE_STRING),

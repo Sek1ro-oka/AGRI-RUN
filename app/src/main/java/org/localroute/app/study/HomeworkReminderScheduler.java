@@ -53,9 +53,10 @@ public final class HomeworkReminderScheduler {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
+        int leadMinutes = StudyTimetableStore.loadHomeworkReminderLeadMinutes(app);
         HomeworkReminderPlanner.Reminder next = null;
         for (HomeworkReminderPlanner.Reminder reminder : HomeworkReminderPlanner.upcoming(
-                CustomHomeworkStore.load(app), now,
+                CustomHomeworkStore.load(app), now, leadMinutes,
                 HomeworkReminderPlanner.DEFAULT_HORIZON_DAYS)) {
             if (skipRemindersBefore == null
                     || !reminder.remindAt.isBefore(skipRemindersBefore)) {
