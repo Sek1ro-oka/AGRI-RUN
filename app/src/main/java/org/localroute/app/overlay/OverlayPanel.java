@@ -177,6 +177,9 @@ public final class OverlayPanel {
     public void hide() {
         stopMoving();
         if (confirmation != null && confirmRunId != null) setConfirmation(false);
+        expanded = false;
+        if (expandedContent != null) expandedContent.setVisibility(View.GONE);
+        if (moreButton != null) moreButton.setText("更多 ▾");
         // 每次收起（回前台或点关闭）都恢复默认闭锁，下次出现时不会带着解锁状态。
         joystickUnlocked = false;
         if (joystick != null) {
