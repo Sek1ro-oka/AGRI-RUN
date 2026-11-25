@@ -6,14 +6,17 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import androidx.appcompat.app.AlertDialog;
 import android.content.Intent;
+import android.content.ActivityNotFoundException;
+import android.net.Uri;
+import android.provider.Settings;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.text.InputType;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -22,6 +25,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.LinearInterpolator;
 import android.widget.CheckBox;
+import android.widget.Button;
+import android.widget.ScrollView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -70,6 +75,7 @@ import org.localroute.app.run.RunSnapshot;
 import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.SettingsInspector;
+import org.localroute.app.settings.SetupItem;
 import org.localroute.app.settings.RunInputs;
 import org.localroute.app.settings.RunSpeedPreferences;
 import org.localroute.app.settings.SpeedPresets;
@@ -152,9 +158,10 @@ public final class CampusRunActivity extends AppCompatActivity {
     /** 旧版单路线存储的迁移 ID；新路线使用 {@link RouteRepository#newRouteId()}。 */
     private static final String ROUTE_CUSTOM_ID = "custom";
 
-    /** 权限弹窗期间 Activity 可能重建，用静态字段保存待执行动作（只含纯数据）。 */
-    @Nullable
-    private static PendingStart pendingStart;
+    @Nullable private BottomSheetDialog readinessDialog;
+    @Nullable private PendingStart readinessPlan;
+    private boolean readinessReturning;
+    private boolean readinessPermissionRequested;
 
     private ActivityCampusRunBinding binding;
     private SharedPreferences prefs;
@@ -295,6 +302,18 @@ public final class CampusRunActivity extends AppCompatActivity {
         } else {
             resultRequested = false;
             showRunScreen();
+        }
+        if (savedInstanceState != null && savedInstanceState.containsKey("readiness_route")) {
+            String savedRoute = savedInstanceState.getString("readiness_route");
+            for (CampusRoute candidate : customRoutes) {
+                if (candidate.id().equals(savedRoute)) {
+                    readinessPlan = new PendingStart(candidate,
+                            savedInstanceState.getDouble("readiness_speed"),
+                            savedInstanceState.getInt("readiness_laps"));
+                    binding.getRoot().post(this::showReadiness);
+                    break;
+                }
+            }
         }
         SimulationStateRepo.get().snapshot().observe(this, this::onSnapshot);
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -1328,18 +1347,193 @@ public final class CampusRunActivity extends AppCompatActivity {
             return;
         }
         double speedKmh = configuredSpeedKmh;
-        requestPermissionsThenStart(planRoute, speedKmh, laps);
+        beginReadiness(planRoute, speedKmh, laps);
     }
 
-    private void requestPermissionsThenStart(CampusRoute planRoute, double speedKmh, int loops) {
-        List<String> needed = neededPermissions();
-        if (needed.isEmpty()) {
+    /** Start immediately when the required checks pass; otherwise keep the plan in a sheet. */
+    private void beginReadiness(CampusRoute planRoute, double speedKmh, int loops) {
+        readinessPlan = new PendingStart(planRoute, speedKmh, loops);
+        if (readinessPassed()) {
+            readinessPlan = null;
             ensureMockReadyForRoute(planRoute, speedKmh, loops);
-            return;
+        } else {
+            showReadiness();
         }
-        pendingStart = new PendingStart(planRoute, speedKmh, loops);
-        toast(getString(R.string.campus_permission_needed));
-        permissionLauncher.launch(needed.toArray(new String[0]));
+    }
+
+    private SettingsInspector.MockProbeResult readinessProbe;
+
+    private boolean readinessPassed() {
+        List<SettingsInspector.Check> checks = SettingsInspector.inspect(this);
+        boolean locationReady = true;
+        for (SettingsInspector.Check check : checks) {
+            if ((check.item() == SetupItem.LOCATION_PERMISSION || check.item() == SetupItem.LOCATION_SWITCH)
+                    && check.status() != SettingsInspector.Status.OK) locationReady = false;
+        }
+        readinessProbe = null;
+        if (locationReady && !snapshot.isActive()) {
+            readinessProbe = SettingsInspector.probeMockProvider(this);
+        }
+        return locationReady && (!snapshot.isActive() || snapshot.singlePoint())
+                && (snapshot.isActive() && snapshot.singlePoint()
+                || readinessProbe == SettingsInspector.MockProbeResult.ALLOWED
+                || readinessProbe == SettingsInspector.MockProbeResult.ALLOWED_AFTER_CLEANUP);
+    }
+
+    private void showReadiness() {
+        if (readinessPlan == null) return;
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        readinessDialog = sheet;
+        sheet.setOnDismissListener(d -> {
+            if (readinessDialog == sheet) {
+                readinessDialog = null;
+                readinessPlan = null;
+                readinessReturning = false;
+            }
+        });
+        sheet.show();
+        renderReadiness();
+    }
+
+    private TextView readinessText(String text, float size, boolean bold) {
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextSize(size);
+        view.setTextColor(ContextCompat.getColor(this, R.color.campus_ink));
+        if (bold) view.setTypeface(null, android.graphics.Typeface.BOLD);
+        return view;
+    }
+
+    private void renderReadiness() {
+        if (readinessDialog == null || readinessPlan == null) return;
+        boolean ready = readinessPassed();
+        PendingStart plan = readinessPlan;
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        content.setPadding(pad, pad, pad, pad);
+        content.addView(readinessText("跑前准备", 22, true));
+        content.addView(readinessText(ready ? "准备就绪，可以开始" : "完成必要设置后即可开始", 14, false));
+        double meters = plan.route.lapMeters() * plan.loops;
+        TextView summary = readinessText("本次计划\n" + plan.route.name() + " · " + plan.loops
+                + " 圈\n目标 " + CampusFormat.kilometers(meters) + " km · 预计 "
+                + CampusFormat.time((long) (meters / plan.speedKmh * 3600d)), 14, false);
+        summary.setPadding(0, pad, 0, pad);
+        content.addView(summary);
+        content.addView(readinessText("必要设置", 16, true));
+        for (SettingsInspector.Check check : SettingsInspector.inspect(this)) {
+            if (!check.item().blocking()) continue;
+            boolean ok = check.status() == SettingsInspector.Status.OK;
+            String detail = check.detail();
+            if (check.item() == SetupItem.MOCK_APP) {
+                ok = snapshot.isActive() && snapshot.singlePoint()
+                        || readinessProbe == SettingsInspector.MockProbeResult.ALLOWED
+                        || readinessProbe == SettingsInspector.MockProbeResult.ALLOWED_AFTER_CLEANUP;
+                if (ok) detail = "系统允许本应用模拟位置";
+                else if (readinessProbe == null) detail = "完成定位权限和系统定位设置后自动检查";
+                else if (readinessProbe == SettingsInspector.MockProbeResult.DENIED)
+                    detail = "请在开发者选项中选择 UNLOOP";
+                else detail = "定位服务无法创建模拟位置，请检查设备定位服务";
+            }
+            addReadinessRow(content, check.title(), detail, ok,
+                    () -> openReadinessSetting(check.item()));
+        }
+        content.addView(readinessText("建议开启", 16, true));
+        for (SettingsInspector.Check check : SettingsInspector.inspect(this)) {
+            if (check.item().blocking()) continue;
+            addReadinessRow(content, check.title(), check.detail(),
+                    check.status() == SettingsInspector.Status.OK,
+                    () -> openReadinessSetting(check.item()));
+        }
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        boolean unrestricted = power != null && power.isIgnoringBatteryOptimizations(getPackageName());
+        addReadinessRow(content, "后台运行", unrestricted ? "已允许不受电池优化限制"
+                        : "调整电池优化设置有助于保持后台运行", unrestricted,
+                () -> openReadinessIntent(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+        Button start = new Button(this);
+        start.setText("开始跑圈");
+        start.setBackgroundTintList(new ColorStateList(
+                new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}},
+                new int[]{Color.LTGRAY, ContextCompat.getColor(this, R.color.campus_mint_dark)}));
+        start.setTextColor(ColorStateList.valueOf(Color.WHITE));
+        start.setEnabled(ready);
+        start.setOnClickListener(v -> {
+            if (!readinessPassed()) { renderReadiness(); return; }
+            PendingStart selected = readinessPlan;
+            readinessDialog.dismiss();
+            ensureMockReadyForRoute(selected.route, selected.speedKmh, selected.loops);
+        });
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.addView(content);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(ContextCompat.getColor(this, R.color.fm_surface));
+        int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.82f);
+        root.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height));
+        root.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        LinearLayout footer = new LinearLayout(this);
+        footer.setPadding(pad, 0, pad, pad);
+        footer.addView(start, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(footer);
+        readinessDialog.setContentView(root);
+        View bottom = readinessDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+        if (bottom != null) {
+            com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottom)
+                    .setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
+        }
+    }
+
+    private void addReadinessRow(LinearLayout parent, String title, String detail, boolean ok, Runnable action) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        int spacing = Math.round(10 * getResources().getDisplayMetrics().density);
+        row.setPadding(0, spacing, 0, spacing);
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.addView(readinessText((ok ? "✓  " : "○  ") + title, 14, true));
+        labels.addView(readinessText(detail, 12, false));
+        row.addView(labels, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        if (!ok) {
+            Button button = new Button(this);
+            button.setText("去设置");
+            button.setOnClickListener(v -> action.run());
+            row.addView(button);
+        }
+        parent.addView(row);
+    }
+
+    private void openReadinessSetting(SetupItem item) {
+        if (item == SetupItem.LOCATION_PERMISSION) {
+            if (readinessPermissionRequested && !androidx.core.app.ActivityCompat
+                    .shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                openReadinessIntent(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            } else {
+                readinessPermissionRequested = true;
+                permissionLauncher.launch(new String[]{Manifest.permission.ACCESS_FINE_LOCATION});
+            }
+        } else if (item == SetupItem.NOTIFICATIONS && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
+        } else if (item == SetupItem.OVERLAY) {
+            readinessReturning = true;
+            OverlayPanel.requestPermission(this);
+        } else if (item == SetupItem.LOCATION_SWITCH) {
+            openReadinessIntent(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+        } else if (item == SetupItem.MOCK_APP) {
+            openReadinessIntent(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
+        }
+    }
+
+    private void openReadinessIntent(Intent intent) {
+        try {
+            readinessReturning = true;
+            startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            startActivity(new Intent(Settings.ACTION_SETTINGS));
+        }
     }
 
     /**
@@ -1419,35 +1613,8 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     // ---------------------------------------------------------------- 权限 / 模拟位置检查
 
-    private List<String> neededPermissions() {
-        List<String> needed = new ArrayList<>();
-        if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            needed.add(Manifest.permission.ACCESS_FINE_LOCATION);
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && !hasPermission(Manifest.permission.POST_NOTIFICATIONS)) {
-            needed.add(Manifest.permission.POST_NOTIFICATIONS);
-        }
-        return needed;
-    }
-
     private void onPermissionResult(java.util.Map<String, Boolean> result) {
-        boolean fineGranted = hasPermission(Manifest.permission.ACCESS_FINE_LOCATION);
-        PendingStart start = pendingStart;
-        pendingStart = null;
-        if (!fineGranted) {
-            toast(getString(R.string.campus_permission_missing));
-            return;
-        }
-        if (start != null) {
-            ensureMockReadyForRoute(start.route, start.speedKmh, start.loops);
-            return;
-        }
-        toast(getString(R.string.campus_toast_pending));
-    }
-
-    private boolean hasPermission(String permission) {
-        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED;
+        if (readinessDialog != null) renderReadiness();
     }
 
     private void ensureMockReady(Runnable onReady) {
@@ -2233,6 +2400,10 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (mapHost != null) {
             mapHost.onResume();
         }
+        if (readinessReturning && readinessDialog != null) {
+            readinessReturning = false;
+            renderReadiness();
+        }
         refreshPresetRoutesIfIdle();
         if (runScreenVisible) updateRunUi();
         maybeShowPresetConflicts();
@@ -2279,6 +2450,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (readinessDialog != null) readinessDialog.dismiss();
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
         pendingOverlayProceed = null;
@@ -2301,6 +2473,11 @@ public final class CampusRunActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
+        if (readinessDialog != null && readinessPlan != null) {
+            outState.putString("readiness_route", readinessPlan.route.id());
+            outState.putDouble("readiness_speed", readinessPlan.speedKmh);
+            outState.putInt("readiness_laps", readinessPlan.loops);
+        }
         if (mapHost != null) {
             mapHost.onSaveInstanceState(outState);
         }
