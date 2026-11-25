@@ -713,4 +713,4 @@ v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位�
 
 独立审查（只读子 agent）提出三条，均已核对源码属实并修复：① `HomeAgenda` 缺少节次上限守卫——`TimetableWidgetPlan.slotsOn` 与 `ClassReminderPlanner` 都跳过 `startPeriod > totalPeriods` 并把末节钳到上限，本支补齐并加两条 JVM 用例；② 设置页缺 `onResume`，导航复用实例后提醒副标题会停在旧数据；③ 选中未来的放假日却显示「今天放假」，改为「这一天放假」。另修正时段边界 11→12 点、待接入提示文案、以及「未绑定但已手动加过课」时副标题仍谎称绑定后才有课程。
 
-不在本支范围（开放项）：`drawable-nodpi/run_card_backdrop.webp` 实为第三方漫画截图（带写死中文气泡「老实跑步 很枯燥吧？」），全仓 `docs/THIRD_PARTY_NOTICES.md` 未登记其来源与授权。本支只是把它随原首页内容搬到功能页，没有新增或替换该素材，授权问题未处理，留给用户决定是替换还是补登记。
+不在本支范围（用户已拍板不处理）：`drawable-nodpi/run_card_backdrop.webp` 实为第三方漫画截图（带写死中文气泡「老实跑步 很枯燥吧？」），全仓 `docs/THIRD_PARTY_NOTICES.md` 未登记其来源与授权。本支只是把它随原首页内容搬到功能页，没有新增或替换该素材。就此询问后用户答「别管了」，**保持现状，后续会话不再重复提出**；此处仅留档，不作为待办。
