@@ -647,3 +647,32 @@ v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位�
 验证：`:app:testDebugUnitTest` 561 例、`:route-core:test` 107 例、`:simulation-core:test` 55 例（合计 723，数字从各模块 `build/test-results/**/TEST-*.xml` 现汇总）全部通过、0 失败；`:app:lintDebug` 0 errors、283 warnings——与合入后的 main 逐条一致（按检查项 id 分布 diff 过）；`:app:assembleDebug` 通过。补一句过程：通知权限那版初稿把 `Manifest.permission.POST_NOTIFICATIONS` 直接用在 `beginReadiness()` 里，lint 立刻多出一条 `InlinedApi`（minSdk 29），改成「版本判断与申请写在同一个 `if` 里」后才回到 283，这类常量的用法以后要连着版本判断一起写。
 
 本机无法验证的部分（无 adb、无模拟器，需要真机或模拟器复验）：① 深色模式下跑前准备面板的实际观感——状态栏图标是否可见、卡片描边对比度、开始按钮在夜间的可读性；② 「系统授权框 → 跑前准备面板」这个先后次序是否比原来顺手（现在是先弹系统框，回来后才可能弹面板）；③ 摇杆在结束那一拍是否真的不再复活单点会话；④ 悬浮窗 `addView` 异常收口只能靠代码审查，构造不出真实异常。另外遗留一条不在本支范围：#93/#94 新增的写死中文文案与程序化建视图带来的 lint 增长（0.10.1 基线 263 → 合入后 283，本支没有把它压回去）尚未收进 `strings.xml`，留给下一次界面收敛。
+
+## 2026-11-25 主页设置入口移进底部导航栏（界面整改，模拟器已验证、真机未复验）
+
+需求来源：用户给出当前主页截图（右上角齿轮 + 底部「首页／校园快跑／学习」胶囊导航），要求「使用最新基线，把右上角设置按钮移动到导航栏内右下角」，并拍了三条：真·移动（不留双入口）、新项与其余三项同款、交付为新分支 + PR 先不合并。
+
+基线核对：本地停在 `feat/virtual-location-page` @ `cf76320`，它是 `upstream/main` 的祖先，所以从最新基线开分支不丢今天的虚拟定位改动。GitHub 上 main 实际已到 `5a2bcea`，而本地 remote-tracking 还停在 `7d93011`——**不先 `git fetch upstream` 就会拿旧基线开工**。`7d93011..5a2bcea` 那 11 个提交只碰 `OverlayPanel`、`CampusRunActivity`、`colors.xml`（含 night）、`themes.xml`、文档与截图，没动主页布局、`MainActivity`、`menu_main.xml` 和那条界面用例，本支行号因此在新基线上仍然成立。
+
+| 位置 | 内容 |
+| --- | --- |
+| `res/layout/activity_main.xml:14` | 删掉 `MaterialToolbar` 的 `app:menu="@menu/menu_main"`。工具栏留着——它还是 `UNLOOP` 标题的来源；56dp 高度与纵向结构一点没动 |
+| `res/layout/activity_main.xml:436-458` | 导航栏加第 4 列 `navSettings`，结构逐行照抄 `navStudy`：`0dp + layout_weight=1`、`clickable/focusable`、22dp 图标 `ic_campus_settings` 配 `app:tint="@color/fm_nav_idle"`、11sp 文案 `@string/home_app_settings_title`（值就是「设置」） |
+| `res/menu/menu_main.xml` | 整份删除，全仓只有主页那行 `app:menu` 引用它。`ic_campus_settings` 仍被跑圈页 `buttonAdvanced` 与学习页 `buttonStudySettings` 使用，不会变成未使用图标；`home_app_settings_title` 由新导航项接手——不新增字符串，也不留下未使用资源 |
+| `ui/MainActivity.java:48-49`、`59` | 导航栏绑定处加 `navSettings → startActivity(AppSettingsActivity)`，按压动画处加 `FinmoriMotion.press(binding.navSettings)` |
+| `ui/MainActivity.java:58-63` | 删掉 `toolbar.setOnMenuItemClickListener` 整段，这是 `R.id.action_settings` 在源码里唯一的引用；`R` 本身还被 93-107 行的文案用到，import 不动 |
+| `androidTest/…/CampusWorkspaceTest.java:153` | 点击目标从 `R.id.action_settings` 换成 `R.id.navSettings`，其余断言一字不改（`rowUpdate` → `cardUpdate` 显示、`pressBack` 后 `rowActivation` 仍在），证明的还是同一条链 |
+
+已知取舍：① 走直接 `Intent` 而不是 `HomeTarget`——`entry/HomeTarget` 那套枚举只为「清单里只有主页 exported，桌面长按快捷方式与快捷设置磁贴必须先落主页再转发」而存在，`res/xml/shortcuts.xml` 里没有设置类快捷方式，为导航栏单独加一个 SETTINGS 属于扩范围；② 新项用灰色待选态而不是绿色强调态——严格说它是动作而不是第四个目的地，但用户拍板「与其余三项同款」，外观一致性优先；`ic_campus_settings` 里写死的 `@color/campus_mint_dark` 会被 `app:tint` 覆盖，同栏的 `ic_study_homework` 正是同一色值、同一覆盖方式，深色下自动走 `values-night` 的 `fm_nav_idle`（#94A1B4）；③ 主页之外的页面本来就没有这条导航栏（`bg_fm_nav` 只有主页和学习页那两个页内标签在用），所以设置入口跟着导航栏一起只在主页出现，与「齿轮原来也只在主页」等价，没有拿走任何原有路径；④ 跑圈页与虚拟定位页顶部那两颗齿轮打开的是 `SettingsCheckActivity`／`StudySettingsActivity`，与中文「设置」撞名但不是同一个页面，按名字不动。
+
+验证（分口径）：
+
+- **源码**：全仓 `grep` 已无 `action_settings`／`menu_main` 引用。
+- **自动化（本机）**：`:app:assembleDebug`、`:app:lintDebug` + `:location-probe:lintDebug`、`:app:assembleDebugAndroidTest` 全部 BUILD SUCCESSFUL。lint 0 errors、284 warnings，新增的那条落在 `activity_main.xml:436`，是 `UseCompoundDrawables` 在第四列上又报一次——同一条检查原本已在 373/392/414 三列各报一次，本支没有引入新类型的告警（上一节记录的基线为 283，那个数是在另一台机器上量的，本支没有重新复测）。JVM 用例 `:route-core:test` 107 + `:simulation-core:test` 55 + `:app:testDebugUnitTest` 561 = 723，0 失败（数字从各模块 `build/test-results/**/TEST-*.xml` 现汇总）。
+- **模拟器**（AVD `agri_ui_review`，API 35 x86_64，720×1280 @ 320dpi ⇒ 宽 360dp，正是最窄的常见档位）：单跑相关用例 `advancedSettingsAndUpdaterAreReachableWithoutChangingTask` → `OK (1 test)`，即「点导航栏设置进设置页 → `rowUpdate` 打开更新页 → 返回后 `rowActivation` 仍在」这条链在设备上成立。再用 `uiautomator` 读到 `navSettings` 实际边界 `[508,1044][656,1164]` = **74×60dp**，满足 `docs/FINMORI_UI.md` 的 48dp 下限；`input tap` 中心点之后 `dumpsys activity` 的 `topResumedActivity` 是 `AppSettingsActivity`——真实手势路径也成立。浅色与深色各截图一次：工具栏只剩标题、齿轮已不在；四列「首页／校园快跑／学习／设置」标签都不截断，设置图标呈灰色待选态。
+- **同机对照（这条决定了上面那些失败算不算本支引入）**：整类 7 条用例在改动后有 3 条失败。我在 `E:/codes/agri-run-baseline-check` 另开一个 detached worktree 检出**未改动**的 `5a2bcea`，装到同一台模拟器跑同一份用例集，得到**同名同数的 3 条失败**（`runningControlsHomeShortcutAndExternalCommandsStayInSync`、`homeTimetableShortcutOpensWeekView`、`overlayPresetRemainsTheNaturalSpeedTarget`），所以这三条是本模拟器上的既有问题，不是本支引入。已看到原因的两条：服务状态等不到 `RUNNING` 超时、`cardTimetable` 在这块屏幕比例下可见度不足 90% 被 Espresso 拒绝点击；第三条的报错文本被只保留末尾 40 行的输出截断了，没有逐条深挖——既有失败不在本支范围。对照 worktree 已删除，模拟器已关闭，深浅模式已还原。
+- **真机**：未做。
+
+这台机器与上一节的记录不同：`AGENTS.md`／`docs/BUILD.md` 写的 `D:\Java\jdk-21` 与 `E:\Android\Sdk` 在此都不存在，实际用 `JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.20.8-hotspot`（JDK 17，AGP 8.9.2 够用）与 `sdk.dir=C:\Users\Xiaoyuan\AppData\Local\Android\Sdk`（platform 35 + build-tools 35.0.0）；工程路径 `E:\codes\AGRI-RUN` 是纯 ASCII，第 2 节的中文路径坑不适用。上一节「本机无 adb、无模拟器」那句对这台机器不成立，本支正是靠这里的模拟器才把导航点击跑成设备级证据。
+
+不在本支范围：`docs/11_使用手册.md:104` 与 `delivery/README_安装与使用.md:104` 写的「打开 App → 右上角菜单 → **设置检查**」本来就和当前代码不符（齿轮开的是 `AppSettingsActivity`，设置检查页在主页是从引导卡进的）。这是既有的文档漂移，本支只在 PR 里点出来，不顺手改写；改完之后那两句里的「右上角菜单」更是彻底没有对应物了，等下一次界面文案收敛一起处理。

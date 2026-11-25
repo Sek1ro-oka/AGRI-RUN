@@ -11,7 +11,6 @@
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:background="@color/fm_surface"
-        app:menu="@menu/menu_main"
         app:title="@string/app_name"
         app:titleTextColor="@color/fm_text" />
     <ScrollView
@@ -431,6 +430,28 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/fm_study_short"
+                android:textColor="@color/fm_nav_idle"
+                android:textSize="@dimen/text_caption" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/navSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_campus_settings"
+                android:contentDescription="@null"
+                app:tint="@color/fm_nav_idle" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/home_app_settings_title"
                 android:textColor="@color/fm_nav_idle"
                 android:textSize="@dimen/text_caption" />
         </LinearLayout>
