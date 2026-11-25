@@ -165,6 +165,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     @Nullable private PendingStart readinessPlan;
     private boolean readinessReturning;
     private boolean readinessPermissionRequested;
+    private boolean readinessNotificationAsked;
 
     private ActivityCampusRunBinding binding;
     private SharedPreferences prefs;
@@ -1356,9 +1357,41 @@ public final class CampusRunActivity extends AppCompatActivity {
     /** Start immediately when the required checks pass; otherwise keep the plan in a sheet. */
     private void beginReadiness(CampusRoute planRoute, double speedKmh, int loops) {
         readinessPlan = new PendingStart(planRoute, speedKmh, loops);
+        if (requestNotificationPermissionIfNeeded()) {
+            // 系统授权框要先出现，结果回来后再接着判就绪，否则两者会叠在一起。
+            return;
+        }
+        continueReadiness();
+    }
+
+    /**
+     * 跑前准备面板改版后通知权限只剩「点建议项才申请」，不点就没有跑圈通知；这里补回
+     * 0.10.1 之前的自动申请。每个 Activity 实例只判一次，被拒也不追问，避免反复打扰。
+     *
+     * @return true 表示已拉起系统授权框，调用方应等 {@link #onPermissionResult} 再继续
+     */
+    private boolean requestNotificationPermissionIfNeeded() {
+        if (readinessNotificationAsked) {
+            return false;
+        }
+        readinessNotificationAsked = true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            permissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
+            return true;
+        }
+        return false;
+    }
+
+    private void continueReadiness() {
+        PendingStart plan = readinessPlan;
+        if (plan == null || readinessDialog != null) {
+            return;
+        }
         if (readinessPassed()) {
             readinessPlan = null;
-            ensureMockReadyForRoute(planRoute, speedKmh, loops);
+            ensureMockReadyForRoute(plan.route, plan.speedKmh, plan.loops);
         } else {
             showReadiness();
         }
@@ -1385,7 +1418,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void showReadiness() {
         if (readinessPlan == null || readinessDialog != null) return;
-        Dialog dialog = new Dialog(this, android.R.style.Theme_Material_Light_NoActionBar);
+        Dialog dialog = new Dialog(this, R.style.Theme_Unloop_FullScreenDialog);
         readinessDialog = dialog;
         dialog.setOnDismissListener(d -> {
             if (readinessDialog == dialog) {
@@ -1399,10 +1432,11 @@ public final class CampusRunActivity extends AppCompatActivity {
         Window window = dialog.getWindow();
         if (window != null) {
             window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-            window.setStatusBarColor(Color.WHITE);
-            window.setNavigationBarColor(Color.WHITE);
-            WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightStatusBars(true);
-            WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightNavigationBars(true);
+            boolean lightBars = getResources().getBoolean(R.bool.fm_light_bars);
+            WindowCompat.getInsetsController(window, window.getDecorView())
+                    .setAppearanceLightStatusBars(lightBars);
+            WindowCompat.getInsetsController(window, window.getDecorView())
+                    .setAppearanceLightNavigationBars(lightBars);
         }
     }
 
@@ -1429,7 +1463,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void readinessDivider(LinearLayout parent) {
         View divider = new View(this);
-        divider.setBackgroundColor(0xffe5e7e5);
+        divider.setBackgroundColor(ContextCompat.getColor(this, R.color.fm_border));
         parent.addView(divider, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
     }
 
@@ -1450,13 +1484,14 @@ public final class CampusRunActivity extends AppCompatActivity {
         double meters = plan.route.lapMeters() * plan.loops;
         String distance = CampusFormat.kilometers(meters);
         String time = CampusFormat.time((long) (meters / plan.speedKmh * 3600d));
-        int ink = ContextCompat.getColor(this, R.color.campus_ink);
         int muted = ContextCompat.getColor(this, R.color.campus_muted);
         int border = ContextCompat.getColor(this, R.color.fm_border);
+        int surface = ContextCompat.getColor(this, R.color.readiness_surface);
+        int tile = ContextCompat.getColor(this, R.color.readiness_tile);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.WHITE);
+        root.setBackgroundColor(surface);
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
@@ -1489,7 +1524,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         LinearLayout summary = new LinearLayout(this);
         summary.setOrientation(LinearLayout.VERTICAL);
         summary.setPadding(dp(15), dp(14), dp(15), dp(14));
-        summary.setBackground(readinessBackground(Color.WHITE, border, 10));
+        summary.setBackground(readinessBackground(surface, border, 10));
         LinearLayout summaryHead = new LinearLayout(this);
         summaryHead.setGravity(Gravity.CENTER_VERTICAL);
         TextView planTitle = readinessText("本次计划", 16, true);
@@ -1521,7 +1556,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         LinearLayout required = new LinearLayout(this);
         required.setOrientation(LinearLayout.VERTICAL);
         required.setPadding(dp(14), dp(2), dp(14), dp(2));
-        required.setBackground(readinessBackground(Color.WHITE, border, 10));
+        required.setBackground(readinessBackground(surface, border, 10));
         SetupItem[] order = {SetupItem.MOCK_APP, SetupItem.LOCATION_PERMISSION, SetupItem.LOCATION_SWITCH};
         for (int i = 0; i < order.length; i++) {
             SetupItem item = order[i];
@@ -1547,7 +1582,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         LinearLayout optional = new LinearLayout(this);
         optional.setOrientation(LinearLayout.VERTICAL);
         optional.setPadding(dp(14), dp(2), dp(14), dp(2));
-        optional.setBackground(readinessBackground(0xfff7f8f7, border, 10));
+        optional.setBackground(readinessBackground(tile, border, 10));
         PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
         boolean unrestricted = power != null && power.isIgnoringBatteryOptimizations(getPackageName());
         addReadinessRow(optional, "后台运行", unrestricted ? "已允许不受电池优化限制" : "调整电池优化，减少后台暂停", unrestricted,
@@ -1578,8 +1613,10 @@ public final class CampusRunActivity extends AppCompatActivity {
         start.setText("开始跑圈");
         start.setBackgroundTintList(new ColorStateList(
                 new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}},
-                new int[]{0xffaaaaaa, ContextCompat.getColor(this, R.color.campus_mint_dark)}));
-        start.setTextColor(Color.WHITE);
+                new int[]{ContextCompat.getColor(this, R.color.readiness_disabled),
+                        ContextCompat.getColor(this, R.color.campus_mint_dark)}));
+        // 夜里 fm_link 会翻成浅薄荷，白字就糊了：用 fm_on_brand 跟着反转。
+        start.setTextColor(ContextCompat.getColor(this, R.color.fm_on_brand));
         start.setEnabled(ready);
         start.setOnClickListener(v -> {
             if (!readinessPassed()) { renderReadiness(); return; }
@@ -1598,13 +1635,17 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     private void addReadinessRow(LinearLayout parent, String title, String detail, boolean ok, Runnable action) {
+        int surface = ContextCompat.getColor(this, R.color.readiness_surface);
+        int chipOk = ContextCompat.getColor(this, R.color.readiness_chip_ok);
+        int chipStroke = ContextCompat.getColor(this, R.color.readiness_chip_ok_stroke);
+        int buttonStroke = ContextCompat.getColor(this, R.color.readiness_button_stroke);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(12), 0, dp(12));
         TextView icon = readinessText(ok ? "✓" : "!", 15, true);
         icon.setGravity(Gravity.CENTER);
-        icon.setBackground(readinessBackground(ok ? 0xffedf1ed : Color.WHITE, 0xffa8b0aa, 30));
+        icon.setBackground(readinessBackground(ok ? chipOk : surface, chipStroke, 30));
         row.addView(icon, new LinearLayout.LayoutParams(dp(27), dp(27)));
         LinearLayout labels = new LinearLayout(this);
         labels.setOrientation(LinearLayout.VERTICAL);
@@ -1618,7 +1659,7 @@ public final class CampusRunActivity extends AppCompatActivity {
             TextView button = readinessText("去设置", 13, true);
             button.setGravity(Gravity.CENTER);
             button.setPadding(dp(10), 0, dp(10), 0);
-            button.setBackground(readinessBackground(Color.WHITE, 0xff909a92, 6));
+            button.setBackground(readinessBackground(surface, buttonStroke, 6));
             button.setOnClickListener(v -> action.run());
             row.addView(button, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44)));
         }
@@ -1734,7 +1775,14 @@ public final class CampusRunActivity extends AppCompatActivity {
     // ---------------------------------------------------------------- 权限 / 模拟位置检查
 
     private void onPermissionResult(java.util.Map<String, Boolean> result) {
-        if (readinessDialog != null) renderReadiness();
+        if (readinessDialog != null) {
+            renderReadiness();
+            return;
+        }
+        // 起跑前的通知权限申请返回：计划还留着就接着往下走。
+        if (readinessPlan != null) {
+            continueReadiness();
+        }
     }
 
     private void ensureMockReady(Runnable onReady) {
@@ -2593,7 +2641,8 @@ public final class CampusRunActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        if (readinessDialog != null && readinessPlan != null) {
+        // 计划存在就要存：通知权限的申请可能正夹在「点开始」与面板之间，那时对话框还没建。
+        if (readinessPlan != null) {
             outState.putString("readiness_route", readinessPlan.route.id());
             outState.putDouble("readiness_speed", readinessPlan.speedKmh);
             outState.putInt("readiness_laps", readinessPlan.loops);

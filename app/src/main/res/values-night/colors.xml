@@ -13,4 +13,11 @@
     <color name="study_state_pending_fill">#4E321D</color>
     <color name="study_state_expired_fill">#353D46</color>
     <color name="study_state_other_fill">#263E38</color>
+
+    <!-- 跑前准备面板的深色底：readiness_surface 走 fm_surface，夜里自动换 -->
+    <color name="readiness_tile">#FF232A36</color>
+    <color name="readiness_chip_ok">#FF27352F</color>
+    <color name="readiness_chip_ok_stroke">#FF5C6B62</color>
+    <color name="readiness_button_stroke">#FF6B7580</color>
+    <color name="readiness_disabled">#FF6A7280</color>
 </resources>
