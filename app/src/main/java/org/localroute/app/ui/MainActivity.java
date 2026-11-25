@@ -45,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
         binding.cardTimetable.setOnClickListener(v -> HomeTarget.TIMETABLE.open(this));
         binding.navRun.setOnClickListener(v -> openRun());
         binding.navStudy.setOnClickListener(v -> HomeTarget.STUDY.open(this));
+        binding.navSettings.setOnClickListener(v ->
+                startActivity(new Intent(this, AppSettingsActivity.class)));
         binding.cardSetupGuide.setOnClickListener(v ->
                 startActivity(new Intent(this, SettingsCheckActivity.class)));
         FinmoriMotion.press(binding.cardCampusRun);
@@ -54,13 +56,8 @@ public class MainActivity extends AppCompatActivity {
         FinmoriMotion.press(binding.cardTimetable);
         FinmoriMotion.press(binding.navRun);
         FinmoriMotion.press(binding.navStudy);
+        FinmoriMotion.press(binding.navSettings);
         FinmoriMotion.press(binding.cardSetupGuide);
-        binding.toolbar.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == R.id.action_settings) {
-                startActivity(new Intent(this, AppSettingsActivity.class)); return true;
-            }
-            return false;
-        });
         SimulationStateRepo.get().snapshot().observe(this, this::renderRun);
         OverlayHost.get(this).restore();
         renderSetupGuide();

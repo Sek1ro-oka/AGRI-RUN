@@ -150,7 +150,7 @@ public class CampusWorkspaceTest {
         }
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             onView(withId(R.id.cardUpdate)).check(doesNotExist());
-            onView(withId(R.id.action_settings)).perform(click());
+            onView(withId(R.id.navSettings)).perform(click());
             onView(withId(R.id.rowUpdate)).perform(scrollTo(), click());
             onView(withId(R.id.cardUpdate)).check(matches(isDisplayed()));
             capture("04-settings-update");
