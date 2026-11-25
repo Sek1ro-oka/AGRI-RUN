@@ -676,3 +676,41 @@ v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位�
 这台机器与上一节的记录不同：`AGENTS.md`／`docs/BUILD.md` 写的 `D:\Java\jdk-21` 与 `E:\Android\Sdk` 在此都不存在，实际用 `JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.20.8-hotspot`（JDK 17，AGP 8.9.2 够用）与 `sdk.dir=C:\Users\Xiaoyuan\AppData\Local\Android\Sdk`（platform 35 + build-tools 35.0.0）；工程路径 `E:\codes\AGRI-RUN` 是纯 ASCII，第 2 节的中文路径坑不适用。上一节「本机无 adb、无模拟器」那句对这台机器不成立，本支正是靠这里的模拟器才把导航点击跑成设备级证据。
 
 不在本支范围：`docs/11_使用手册.md:104` 与 `delivery/README_安装与使用.md:104` 写的「打开 App → 右上角菜单 → **设置检查**」本来就和当前代码不符（齿轮开的是 `AppSettingsActivity`，设置检查页在主页是从引导卡进的）。这是既有的文档漂移，本支只在 PR 里点出来，不顺手改写；改完之后那两句里的「右上角菜单」更是彻底没有对应物了，等下一次界面文案收敛一起处理。
+
+## 2026-11-26 首页按范例重做 + 导航改四项（界面重构，模拟器已验证、真机未复验）
+
+需求来源：用户给出另一款校园 App 的首页截图作范例，要求重做本项目首页。八项逐条拍板（问答记录在会话里，此处只记结论）：① 配色沿用既有 Finmori 令牌，不照抄范例深蓝；② 校园账户四张卡保留范例四项（流量／电量／校园卡／支出），做成「未接入」空态，**不许假数字**；③ 顶部插画晨／昼／夜三张；④ 时间轴课程与作业混排，但**作业不许编时间**——有真实截止时刻的按真实时间排，没有时刻的排末尾；⑤ 底部导航四项「首页／功能／我的／设置」（这一条修正了最初「设置收进我的」的说法）；⑥ 原首页内容整份搬去「功能」页，**运行中卡与环境引导卡两张动态卡都搬过去**；⑦「我的」= 学习通账号卡 + 待接入四项；⑧ 未绑定学习通时首页给绑定引导。
+
+基线核对：`git fetch upstream` 后 `upstream/main` 已到 `17b919f`（上一节的 `feat/settings-in-bottom-nav` 已由 PR #97 合并进去），本支从该提交开出，不丢已合并改动。
+
+| 位置 | 内容 |
+| --- | --- |
+| `home/HomeAgenda.java`（新） | 纯 Java：某一天的课程 + 作业合成一条时间轴。课程走 `TimetableDay.classesOn` + `StudySchedule` 节次钟点，与小组件、课前提醒同一套算法；作业按真实 `deadlineEpochMillis` 插入，`deadline == 0` 的排在全部有时刻条目之后且只挂今天 |
+| `home/HomeGreeting.java`（新） | 时段判定：5 点起早晨、12 点起下午、18 点起晚上 |
+| `ui/MainActivity.java`（重写） | 新首页。仍是清单里唯一 exported 的启动页与 `HomeTarget` 中转站，`shortcuts.xml`／磁贴链路一字未动 |
+| `ui/FunctionsActivity.java`（新） | 原首页内容整份搬来，含 `cardActiveRun`、`cardSetupGuide` 两张动态卡与原横幅 |
+| `ui/ProfileActivity.java`（新） | 学习通账号卡 + 待接入四项。解绑／切换沿用 `StudySettingsActivity` 既有路径，不另开会清数据的入口 |
+| `ui/FinmoriNav.java`（新） | 四页共用导航：选中态、跳转、按压动画集中一处；`REORDER_TO_FRONT + SINGLE_TOP` 复用实例，转场动画关掉 |
+| `ui/AppSettingsActivity.java` | 加底部导航；去掉 Up 箭头与 `onOptionsItemSelected`（它已是同级 tab 不是二级页）；补 `onResume` 刷新提醒与外观 |
+| `ui/CampusRunActivity.java:1299` | **回归修复**：运行中按返回原本跳 `MainActivity`（那时运行卡在主页），改跳 `FunctionsActivity` |
+| `res/layout/view_bottom_nav.xml`（新） | 四列导航，四页 `include` 复用 |
+| `res/layout/activity_main.xml`（重写）、`activity_functions.xml`／`activity_profile.xml`／`item_home_agenda.xml`／`item_home_week_day.xml`（新） | 新首页、功能页、我的页与两种列表项 |
+| `drawable-nodpi/home_hero_{morning,day,night}.webp`（新） | 用户用内置 ImageGen 按本仓提示词生成，2560×1080 PNG 缩放为 1440×608 WebP（q82），三张合计 402 KB；原始 PNG 未入库 |
+| `docs/THIRD_PARTY_NOTICES.md` | 新增「插画素材」小节登记生成来源与处理过程 |
+| `docs/11_使用手册.md:104`、`delivery/README_安装与使用.md:104` | 顺手清掉上一节点名的文档漂移：「右上角菜单 → 设置检查」改为「底部导航 功能 → 引导卡 → 设置检查」，并补了就绪后从跑圈页齿轮进的备用路径 |
+
+已知取舍：① 四张账户卡本项目零数据源，永远显示 `--` + 未接入，这是用户明确选择的占位形态，不是待补的假数据；② 通知栏点击与悬浮窗「返回应用」仍落新首页，看不到运行卡——用户拍板动态卡搬功能页时已说明这条代价，故保留「打开应用」语义不改；③ `REORDER_TO_FRONT` 固有行为：轮转四个 tab 后按返回键是按访问逆序穿 tab，不是直接退出；④ 设置页多了一条导航，可视区比旧版矮 140px（60dp 导航 + 10dp 边距 @2x），长列表需要多滚一点。
+
+验证（分口径）：
+
+- **源码**：全仓 `grep` 确认没有残留指向旧首页卡片的引用；`MainActivity.class` 仅剩磁贴中转、悬浮窗「返回应用」、通知点击、导航首页项四处，均已逐条判定语义。
+- **自动化（本机）**：`:app:assembleDebug`、`:app:assembleDebugAndroidTest`、`:app:lintDebug` 全部 `BUILD SUCCESSFUL`，lint **0 errors / 292 warnings**（上一节记录的 284 未在本支重新复测；新增告警逐条看过，全部落在 `UseCompoundDrawables`／`Overdraw`／`DisableBaselineAlignment` 这些既有类型上，没有引入新类型）。JVM 用例 `:route-core:test` 107 + `:simulation-core:test` 55 + `:app:testDebugUnitTest` 577 = **739，0 失败**（从各模块 `build/test-results/**/TEST-*.xml` 现汇总），其中新增 `home` 包 16 条。
+- **模拟器**（AVD `agri_ui_review`，API 35 x86_64，720×1280 @320dpi ⇒ 宽 360dp）：整类 `CampusWorkspaceTest` 8 条，**7 通过 1 失败**。新增 `bottomNavReachesAllFourDestinations` 走通「首页 → 功能 → 我的 → 设置 → 首页」四页真实点击；`runningControlsFunctionsShortcutAndExternalCommandsStayInSync` 在修掉上面那条返回回归后通过；原 `homeTimetableShortcutOpensWeekView`（基线在本机因可见度不足 90% 失败）改名 `functionsTimetableEntryOpensWeekView` 并补 `scrollTo` 后通过。
+- **唯一失败项已做同机基线对照**：`overlayPresetRemainsTheNaturalSpeedTarget` 报 `Timed out waiting for service state: RUNNING null`；在 detached worktree 检出**未改动**的 `17b919f` 装到同一台模拟器跑同名用例，得到**完全相同的报错**，故为本模拟器既有环境问题，非本支引入。
+- **另一次基线对照（这条改变了断言）**：`advancedSettingsAndUpdaterAreReachableWithoutChangingTask` 在基线上**通过**、在本支失败。原因查明为设置页新增导航使 `ScrollView` 底边从 y=1184 降到 y=1044，从更新页返回后列表停在下沿，`rowActivation` 留在折叠线上方。页面功能正常，断言改成像用户那样先 `scrollTo` 再断言，验的仍是同一条链。两次对照 worktree 用完即删。
+- **视觉**：灌入课表与作业数据后逐页截图，`docs/screenshots/home-agenda.png`（课程 08:00 已结束 / 09:50 已结束 / 16:10 进行中，作业按真实截止时刻插在 08:00 与 09:50 之间，橙点橙字区分）、`home-agenda-dark.png`（深色下同一屏）、`functions-entries.png`（环境引导卡确实在功能页）、`profile-account.png`（账号卡 + 待接入四项）。「未标注截止」的作业行经截图确认排在全部有时刻条目之后，四张账户卡全为 `--` + 未接入。设备时钟停在 2026-11-25，种子数据按设备日期而非宿主日期灌入。
+- **真机**：未做。
+
+独立审查（只读子 agent）提出三条，均已核对源码属实并修复：① `HomeAgenda` 缺少节次上限守卫——`TimetableWidgetPlan.slotsOn` 与 `ClassReminderPlanner` 都跳过 `startPeriod > totalPeriods` 并把末节钳到上限，本支补齐并加两条 JVM 用例；② 设置页缺 `onResume`，导航复用实例后提醒副标题会停在旧数据；③ 选中未来的放假日却显示「今天放假」，改为「这一天放假」。另修正时段边界 11→12 点、待接入提示文案、以及「未绑定但已手动加过课」时副标题仍谎称绑定后才有课程。
+
+不在本支范围（开放项）：`drawable-nodpi/run_card_backdrop.webp` 实为第三方漫画截图（带写死中文气泡「老实跑步 很枯燥吧？」），全仓 `docs/THIRD_PARTY_NOTICES.md` 未登记其来源与授权。本支只是把它随原首页内容搬到功能页，没有新增或替换该素材，授权问题未处理，留给用户决定是替换还是补登记。

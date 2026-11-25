@@ -1296,7 +1296,8 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (drawMode) { exitDrawMode(); showRunScreen(); return; }
         if (!runScreenVisible) { showRunScreen(); return; }
         if (claimOwnSession && snapshot.isActive()) {
-            startActivity(new Intent(this, MainActivity.class)
+            // 运行中按返回是为了看「跑步进行中」那张卡，它现在在功能页，不在首页。
+            startActivity(new Intent(this, FunctionsActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP));
             return;
         }

@@ -94,6 +94,18 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ui.FunctionsActivity"
+            android:exported="false"
+            android:label="@string/fm_functions"
+            android:theme="@style/Theme.RouteWorkshop.Home" />
+
+        <activity
+            android:name=".ui.ProfileActivity"
+            android:exported="false"
+            android:label="@string/fm_profile"
+            android:theme="@style/Theme.RouteWorkshop.Home" />
+
+        <activity
             android:name=".ui.SettingsCheckActivity"
             android:exported="false"
             android:label="@string/settings_title"

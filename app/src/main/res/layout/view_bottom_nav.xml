@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 四个目的地共用这一份导航；选中态与点击由 FinmoriNav 按当前页设置。 -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="60dp"
+    android:layout_marginHorizontal="@dimen/space_4xl"
+    android:layout_marginBottom="@dimen/space_lg"
+    android:paddingHorizontal="@dimen/space_xl"
+    android:background="@drawable/bg_fm_nav"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+    <LinearLayout
+        android:id="@+id/navHome"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical">
+        <ImageView
+            android:id="@+id/iconNavHome"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_fm_home"
+            android:contentDescription="@null"
+            app:tint="@color/fm_nav_idle" />
+        <TextView
+            android:id="@+id/textNavHome"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/fm_home"
+            android:textColor="@color/fm_nav_idle"
+            android:textSize="@dimen/text_caption" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/navFunctions"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical">
+        <ImageView
+            android:id="@+id/iconNavFunctions"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_fm_functions"
+            android:contentDescription="@null"
+            app:tint="@color/fm_nav_idle" />
+        <TextView
+            android:id="@+id/textNavFunctions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/fm_functions"
+            android:textColor="@color/fm_nav_idle"
+            android:textSize="@dimen/text_caption" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/navProfile"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical">
+        <ImageView
+            android:id="@+id/iconNavProfile"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_fm_profile"
+            android:contentDescription="@null"
+            app:tint="@color/fm_nav_idle" />
+        <TextView
+            android:id="@+id/textNavProfile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/fm_profile"
+            android:textColor="@color/fm_nav_idle"
+            android:textSize="@dimen/text_caption" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/navSettings"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical">
+        <ImageView
+            android:id="@+id/iconNavSettings"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_campus_settings"
+            android:contentDescription="@null"
+            app:tint="@color/fm_nav_idle" />
+        <TextView
+            android:id="@+id/textNavSettings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/home_app_settings_title"
+            android:textColor="@color/fm_nav_idle"
+            android:textSize="@dimen/text_caption" />
+    </LinearLayout>
+</LinearLayout>

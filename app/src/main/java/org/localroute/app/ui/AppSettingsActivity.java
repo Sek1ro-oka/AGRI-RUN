@@ -9,7 +9,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
-import android.view.MenuItem;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.Toast;
@@ -118,9 +117,7 @@ public class AppSettingsActivity extends AppCompatActivity {
             return insets;
         });
         setSupportActionBar(binding.toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        }
+        FinmoriNav.bind(this, binding.bottomNav, FinmoriNav.Tab.SETTINGS);
         prefs = getSharedPreferences(PresetUnlock.PREFS_NAME, MODE_PRIVATE);
         PresetUnlock.migrate(prefs);
         binding.rowUpdate.setOnClickListener(v -> startActivity(new Intent(this, UpdatesActivity.class)));
@@ -329,6 +326,13 @@ public class AppSettingsActivity extends AppCompatActivity {
     // ------------------------------------------------------------- 提醒中心
 
     /** 行副标题只说结论：几项会主动通知、几项已经排到下一次；一项都没有就直说。 */
+    @Override protected void onResume() {
+        super.onResume();
+        // 导航用 REORDER_TO_FRONT 复用本页实例，别处改过提醒或外观后切回来必须重读。
+        refreshReminders();
+        refreshAppearance();
+    }
+
     private void refreshReminders() {
         ReminderCenter.State state = reminderState();
         int firing = ReminderCenter.firingCount(state);
@@ -505,15 +509,6 @@ public class AppSettingsActivity extends AppCompatActivity {
                 })
                 .setNegativeButton(R.string.app_settings_activation_cancel, null)
                 .show();
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            finish();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
     }
 
     private void showActivationDialog() {

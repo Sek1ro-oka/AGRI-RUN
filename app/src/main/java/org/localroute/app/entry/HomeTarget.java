@@ -24,7 +24,7 @@ import org.localroute.app.ui.VirtualLocationActivity;
  */
 public enum HomeTarget {
 
-    /** 跑圈地图：与主页「校园快跑」卡片同一个入口。 */
+    /** 跑圈地图：与「功能」页「校园快跑」卡片同一个入口。 */
     RUN("run"),
     /** 虚拟定位选点页，磁贴也走这里。 */
     VIRTUAL("virtual"),
