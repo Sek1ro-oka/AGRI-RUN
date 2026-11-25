@@ -97,7 +97,7 @@ keyPassword=<你的口令>
 
 因此 **v0.9.4 及更早的设备不能覆盖升级到 0.9.5+**，只能先卸载再装；卸载会删掉 `files/routes/` 与课表/自建作业等本地数据。手上只有旧证书（`.der`/`.pem`/公钥）时不要试图「换回旧签名」：APK 签名需要私钥，公钥只能用来比对指纹，Android 的签名校验也无法由打包方式绕过。同理，后续版本一律继续用 `unloop-release.jks`，换 key 等于再次逼所有用户卸载重装。
 
-离线备份要求（这条被踩过两次）：`keystore/unloop-release.jks` 与 `keystore.properties` 各存一份到仓库之外（网盘或 U 盘），口令不要写进仓库。
+离线备份要求（这条被踩过两次）：`keystore/unloop-release.jks` 与 `keystore.properties` 各存一份到仓库之外（网盘或 U 盘），口令不要写进仓库。2026-11-25 已做第一层：`D:\UNLOOP\backup\release-signing-2026-11-25\`（两文件副本 + `SHA256SUMS.txt` + 记录指纹与恢复步骤的 `README.md`，副本哈希与原件一致，证书指纹 `01547534…82f4` 即线上包所用）。**同盘副本挡不住整盘损坏，机外介质那份仍待补**。
 
 本机 JDK 路径已迁到 `D:\UNLOOP\tools\jdk-21.0.13+9\bin\keytool.exe`（上面示例中的 `D:\Java\jdk-21` 与 `agents.md` 里的 `E:\Android\Sdk` 都是旧机器路径，见第 5 节校验命令用 `$env:ANDROID_HOME`）。
 
