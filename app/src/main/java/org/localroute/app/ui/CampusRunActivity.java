@@ -1357,26 +1357,31 @@ public final class CampusRunActivity extends AppCompatActivity {
     /** Start immediately when the required checks pass; otherwise keep the plan in a sheet. */
     private void beginReadiness(CampusRoute planRoute, double speedKmh, int loops) {
         readinessPlan = new PendingStart(planRoute, speedKmh, loops);
-        if (shouldAskNotificationPermission()) {
-            // 系统授权框要先出现，结果回来后再接着判就绪，否则用户看不到通知入口也就失去了起跑反馈。
-            readinessNotificationAsked = true;
-            permissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
+        if (requestNotificationPermissionIfNeeded()) {
+            // 系统授权框要先出现，结果回来后再接着判就绪，否则两者会叠在一起。
             return;
         }
         continueReadiness();
     }
 
     /**
-     * 跑前准备面板改版后通知权限只剩「点建议项才申请」，不点就没有跑圈通知；
-     * 这里补回 0.10.1 之前的自动申请，每个 Activity 实例只问一次，避免反复打扰。
+     * 跑前准备面板改版后通知权限只剩「点建议项才申请」，不点就没有跑圈通知；这里补回
+     * 0.10.1 之前的自动申请。每个 Activity 实例只判一次，被拒也不追问，避免反复打扰。
+     *
+     * @return true 表示已拉起系统授权框，调用方应等 {@link #onPermissionResult} 再继续
      */
-    private boolean shouldAskNotificationPermission() {
-        if (readinessNotificationAsked
-                || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+    private boolean requestNotificationPermissionIfNeeded() {
+        if (readinessNotificationAsked) {
             return false;
         }
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED;
+        readinessNotificationAsked = true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            permissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
+            return true;
+        }
+        return false;
     }
 
     private void continueReadiness() {
