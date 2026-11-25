@@ -1,6 +1,9 @@
 package org.localroute.app.ui;
 
 import android.Manifest;
+import android.app.Dialog;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Window;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
@@ -158,7 +161,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     /** 旧版单路线存储的迁移 ID；新路线使用 {@link RouteRepository#newRouteId()}。 */
     private static final String ROUTE_CUSTOM_ID = "custom";
 
-    @Nullable private BottomSheetDialog readinessDialog;
+    @Nullable private Dialog readinessDialog;
     @Nullable private PendingStart readinessPlan;
     private boolean readinessReturning;
     private boolean readinessPermissionRequested;
@@ -1381,18 +1384,26 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     private void showReadiness() {
-        if (readinessPlan == null) return;
-        BottomSheetDialog sheet = new BottomSheetDialog(this);
-        readinessDialog = sheet;
-        sheet.setOnDismissListener(d -> {
-            if (readinessDialog == sheet) {
+        if (readinessPlan == null || readinessDialog != null) return;
+        Dialog dialog = new Dialog(this, android.R.style.Theme_Material_Light_NoActionBar);
+        readinessDialog = dialog;
+        dialog.setOnDismissListener(d -> {
+            if (readinessDialog == dialog) {
                 readinessDialog = null;
                 readinessPlan = null;
                 readinessReturning = false;
             }
         });
-        sheet.show();
         renderReadiness();
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            window.setStatusBarColor(Color.WHITE);
+            window.setNavigationBarColor(Color.WHITE);
+            WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightStatusBars(true);
+            WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightNavigationBars(true);
+        }
     }
 
     private TextView readinessText(String text, float size, boolean bold) {
@@ -1404,58 +1415,171 @@ public final class CampusRunActivity extends AppCompatActivity {
         return view;
     }
 
+    private GradientDrawable readinessBackground(int color, int stroke, int radius) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(color);
+        background.setCornerRadius(dp(radius));
+        if (stroke != Color.TRANSPARENT) background.setStroke(dp(1), stroke);
+        return background;
+    }
+
+    private void readinessSpace(LinearLayout parent, int height) {
+        parent.addView(new View(this), new LinearLayout.LayoutParams(1, dp(height)));
+    }
+
+    private void readinessDivider(LinearLayout parent) {
+        View divider = new View(this);
+        divider.setBackgroundColor(0xffe5e7e5);
+        parent.addView(divider, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
+    }
+
     private void renderReadiness() {
         if (readinessDialog == null || readinessPlan == null) return;
         boolean ready = readinessPassed();
         PendingStart plan = readinessPlan;
+        List<SettingsInspector.Check> checks = SettingsInspector.inspect(this);
+        boolean mockOk = snapshot.isActive() && snapshot.singlePoint()
+                || readinessProbe == SettingsInspector.MockProbeResult.ALLOWED
+                || readinessProbe == SettingsInspector.MockProbeResult.ALLOWED_AFTER_CLEANUP;
+        int completed = mockOk ? 1 : 0;
+        for (SettingsInspector.Check check : checks) {
+            if ((check.item() == SetupItem.LOCATION_PERMISSION || check.item() == SetupItem.LOCATION_SWITCH)
+                    && check.status() == SettingsInspector.Status.OK) completed++;
+        }
+        int pending = 3 - completed;
+        double meters = plan.route.lapMeters() * plan.loops;
+        String distance = CampusFormat.kilometers(meters);
+        String time = CampusFormat.time((long) (meters / plan.speedKmh * 3600d));
+        int ink = ContextCompat.getColor(this, R.color.campus_ink);
+        int muted = ContextCompat.getColor(this, R.color.campus_muted);
+        int border = ContextCompat.getColor(this, R.color.fm_border);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.WHITE);
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return insets;
+        });
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(20), 0, dp(20), 0);
+        TextView back = readinessText("‹ 返回", 14, false);
+        back.setGravity(Gravity.CENTER_VERTICAL);
+        back.setOnClickListener(v -> readinessDialog.dismiss());
+        header.addView(back, new LinearLayout.LayoutParams(0, dp(52), 1));
+        TextView section = readinessText("校园快跑", 13, false);
+        section.setTextColor(muted);
+        header.addView(section);
+        root.addView(header);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
-        content.setPadding(pad, pad, pad, pad);
-        content.addView(readinessText("跑前准备", 22, true));
-        content.addView(readinessText(ready ? "准备就绪，可以开始" : "完成必要设置后即可开始", 14, false));
-        double meters = plan.route.lapMeters() * plan.loops;
-        TextView summary = readinessText("本次计划\n" + plan.route.name() + " · " + plan.loops
-                + " 圈\n目标 " + CampusFormat.kilometers(meters) + " km · 预计 "
-                + CampusFormat.time((long) (meters / plan.speedKmh * 3600d)), 14, false);
-        summary.setPadding(0, pad, 0, pad);
+        content.setPadding(dp(20), dp(6), dp(20), dp(20));
+        content.addView(readinessText("跑前准备", 24, true));
+        TextView subtitle = readinessText(ready ? "准备就绪，可以开始" : "还有 " + pending + " 项必要设置待完成", 15, false);
+        subtitle.setTextColor(muted);
+        content.addView(subtitle);
+        readinessSpace(content, 18);
+
+        LinearLayout summary = new LinearLayout(this);
+        summary.setOrientation(LinearLayout.VERTICAL);
+        summary.setPadding(dp(15), dp(14), dp(15), dp(14));
+        summary.setBackground(readinessBackground(Color.WHITE, border, 10));
+        LinearLayout summaryHead = new LinearLayout(this);
+        summaryHead.setGravity(Gravity.CENTER_VERTICAL);
+        TextView planTitle = readinessText("本次计划", 16, true);
+        summaryHead.addView(planTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        TextView details = readinessText("查看 ›", 14, false);
+        details.setPadding(dp(8), dp(4), 0, dp(4));
+        details.setOnClickListener(v -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("本次计划")
+                .setMessage("路线：" + plan.route.name() + " · " + plan.loops + " 圈\n目标距离 "
+                        + distance + " km · 预计 " + time + "\n配速 "
+                        + CampusFormat.paceWithUnit(3600d / plan.speedKmh))
+                .setPositiveButton("完成", null).show());
+        summaryHead.addView(details);
+        summary.addView(summaryHead);
+        TextView planLine = readinessText("路线：" + plan.route.name() + "  ·  " + plan.loops + " 圈", 13, false);
+        planLine.setTextColor(muted);
+        planLine.setPadding(0, dp(4), 0, 0);
+        summary.addView(planLine);
+        TextView planTotal = readinessText("目标距离 " + distance + " km  ·  预计 " + time, 13, false);
+        planTotal.setTextColor(muted);
+        planTotal.setPadding(0, dp(4), 0, 0);
+        summary.addView(planTotal);
         content.addView(summary);
-        content.addView(readinessText("必要设置", 16, true));
-        for (SettingsInspector.Check check : SettingsInspector.inspect(this)) {
-            if (!check.item().blocking()) continue;
-            boolean ok = check.status() == SettingsInspector.Status.OK;
-            String detail = check.detail();
-            if (check.item() == SetupItem.MOCK_APP) {
-                ok = snapshot.isActive() && snapshot.singlePoint()
-                        || readinessProbe == SettingsInspector.MockProbeResult.ALLOWED
-                        || readinessProbe == SettingsInspector.MockProbeResult.ALLOWED_AFTER_CLEANUP;
-                if (ok) detail = "系统允许本应用模拟位置";
-                else if (readinessProbe == null) detail = "完成定位权限和系统定位设置后自动检查";
-                else if (readinessProbe == SettingsInspector.MockProbeResult.DENIED)
-                    detail = "请在开发者选项中选择 UNLOOP";
-                else detail = "定位服务无法创建模拟位置，请检查设备定位服务";
-            }
-            addReadinessRow(content, check.title(), detail, ok,
-                    () -> openReadinessSetting(check.item()));
+        readinessSpace(content, 22);
+        TextView requiredLabel = readinessText("必要设置 · " + completed + " / 3 已完成", 13, false);
+        requiredLabel.setTextColor(muted);
+        content.addView(requiredLabel);
+        readinessSpace(content, 10);
+        LinearLayout required = new LinearLayout(this);
+        required.setOrientation(LinearLayout.VERTICAL);
+        required.setPadding(dp(14), dp(2), dp(14), dp(2));
+        required.setBackground(readinessBackground(Color.WHITE, border, 10));
+        SetupItem[] order = {SetupItem.MOCK_APP, SetupItem.LOCATION_PERMISSION, SetupItem.LOCATION_SWITCH};
+        for (int i = 0; i < order.length; i++) {
+            SetupItem item = order[i];
+            SettingsInspector.Check found = null;
+            for (SettingsInspector.Check check : checks) if (check.item() == item) found = check;
+            if (found == null) continue;
+            boolean ok = item == SetupItem.MOCK_APP ? mockOk : found.status() == SettingsInspector.Status.OK;
+            String title = item == SetupItem.MOCK_APP ? "模拟位置应用"
+                    : item == SetupItem.LOCATION_PERMISSION ? "定位权限" : "系统定位";
+            String detail = ok ? "已完成" : item == SetupItem.MOCK_APP
+                    ? (readinessProbe == null ? "完成定位设置后自动检查" : readinessProbe == SettingsInspector.MockProbeResult.DENIED
+                    ? "在开发者选项中选择 UNLOOP" : "定位服务无法创建模拟位置")
+                    : item == SetupItem.LOCATION_PERMISSION ? "允许使用精确位置" : "打开系统定位服务";
+            addReadinessRow(required, title, detail, ok, () -> openReadinessSetting(item));
+            if (i < order.length - 1) readinessDivider(required);
         }
-        content.addView(readinessText("建议开启", 16, true));
-        for (SettingsInspector.Check check : SettingsInspector.inspect(this)) {
-            if (check.item().blocking()) continue;
-            addReadinessRow(content, check.title(), check.detail(),
-                    check.status() == SettingsInspector.Status.OK,
-                    () -> openReadinessSetting(check.item()));
-        }
+        content.addView(required);
+        readinessSpace(content, 22);
+        TextView optionalLabel = readinessText("建议开启", 13, false);
+        optionalLabel.setTextColor(muted);
+        content.addView(optionalLabel);
+        readinessSpace(content, 10);
+        LinearLayout optional = new LinearLayout(this);
+        optional.setOrientation(LinearLayout.VERTICAL);
+        optional.setPadding(dp(14), dp(2), dp(14), dp(2));
+        optional.setBackground(readinessBackground(0xfff7f8f7, border, 10));
         PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
         boolean unrestricted = power != null && power.isIgnoringBatteryOptimizations(getPackageName());
-        addReadinessRow(content, "后台运行", unrestricted ? "已允许不受电池优化限制"
-                        : "调整电池优化设置有助于保持后台运行", unrestricted,
+        addReadinessRow(optional, "后台运行", unrestricted ? "已允许不受电池优化限制" : "调整电池优化，减少后台暂停", unrestricted,
                 () -> openReadinessIntent(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+        for (SettingsInspector.Check check : checks) {
+            if (check.item().blocking()) continue;
+            readinessDivider(optional);
+            boolean ok = check.status() == SettingsInspector.Status.OK;
+            String title = check.item() == SetupItem.OVERLAY ? "悬浮窗权限" : "通知权限";
+            String detail = ok ? "已完成" : check.item() == SetupItem.OVERLAY
+                    ? "在其他应用上控制跑圈" : "在通知栏查看和控制跑圈";
+            addReadinessRow(optional, title, detail, ok, () -> openReadinessSetting(check.item()));
+        }
+        content.addView(optional);
+        readinessSpace(content, 12);
+        TextView note = readinessText("从系统设置返回后，状态会自动更新。", 12, false);
+        note.setTextColor(muted);
+        content.addView(note);
+        scroll.addView(content);
+        root.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        readinessDivider(root);
+
+        LinearLayout footer = new LinearLayout(this);
+        footer.setOrientation(LinearLayout.VERTICAL);
+        footer.setPadding(dp(20), dp(12), dp(20), dp(12));
         Button start = new Button(this);
+        start.setAllCaps(false);
         start.setText("开始跑圈");
         start.setBackgroundTintList(new ColorStateList(
                 new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}},
-                new int[]{Color.LTGRAY, ContextCompat.getColor(this, R.color.campus_mint_dark)}));
-        start.setTextColor(ColorStateList.valueOf(Color.WHITE));
+                new int[]{0xffaaaaaa, ContextCompat.getColor(this, R.color.campus_mint_dark)}));
+        start.setTextColor(Color.WHITE);
         start.setEnabled(ready);
         start.setOnClickListener(v -> {
             if (!readinessPassed()) { renderReadiness(); return; }
@@ -1463,44 +1587,40 @@ public final class CampusRunActivity extends AppCompatActivity {
             readinessDialog.dismiss();
             ensureMockReadyForRoute(selected.route, selected.speedKmh, selected.loops);
         });
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(false);
-        scroll.addView(content);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(ContextCompat.getColor(this, R.color.fm_surface));
-        int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.82f);
-        root.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height));
-        root.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-        LinearLayout footer = new LinearLayout(this);
-        footer.setPadding(pad, 0, pad, pad);
-        footer.addView(start, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
+        footer.addView(start, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+        TextView footerHint = readinessText(ready ? "路线和目标已保留" : "请先完成必要设置", 12, false);
+        footerHint.setTextColor(muted);
+        footerHint.setGravity(Gravity.CENTER);
+        footerHint.setPadding(0, dp(6), 0, 0);
+        footer.addView(footerHint);
         root.addView(footer);
         readinessDialog.setContentView(root);
-        View bottom = readinessDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-        if (bottom != null) {
-            com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottom)
-                    .setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
-        }
     }
 
     private void addReadinessRow(LinearLayout parent, String title, String detail, boolean ok, Runnable action) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        int spacing = Math.round(10 * getResources().getDisplayMetrics().density);
-        row.setPadding(0, spacing, 0, spacing);
+        row.setPadding(0, dp(12), 0, dp(12));
+        TextView icon = readinessText(ok ? "✓" : "!", 15, true);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(readinessBackground(ok ? 0xffedf1ed : Color.WHITE, 0xffa8b0aa, 30));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(27), dp(27)));
         LinearLayout labels = new LinearLayout(this);
         labels.setOrientation(LinearLayout.VERTICAL);
-        labels.addView(readinessText((ok ? "✓  " : "○  ") + title, 14, true));
-        labels.addView(readinessText(detail, 12, false));
+        labels.setPadding(dp(10), 0, dp(4), 0);
+        labels.addView(readinessText(title, 14, true));
+        TextView caption = readinessText(detail, 12, false);
+        caption.setTextColor(ContextCompat.getColor(this, R.color.campus_muted));
+        labels.addView(caption);
         row.addView(labels, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         if (!ok) {
-            Button button = new Button(this);
-            button.setText("去设置");
+            TextView button = readinessText("去设置", 13, true);
+            button.setGravity(Gravity.CENTER);
+            button.setPadding(dp(10), 0, dp(10), 0);
+            button.setBackground(readinessBackground(Color.WHITE, 0xff909a92, 6));
             button.setOnClickListener(v -> action.run());
-            row.addView(button);
+            row.addView(button, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44)));
         }
         parent.addView(row);
     }
