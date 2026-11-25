@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat;
 import org.localroute.app.R;
 import org.localroute.app.campus.CampusGeo;
 import org.localroute.app.run.RunSnapshot;
+import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.SpeedPresets;
 import org.localroute.app.settings.RunSpeedPreferences;
@@ -160,13 +161,23 @@ public final class OverlayPanel {
         }
         update(snapshot == null ? RunSnapshot.idle() : snapshot);
         if (!running) {
+            boolean attached = false;
             try {
                 windowManager.addView(scaleHost, params);
                 running = true;
+                attached = true;
                 scaleHost.post(this::clampOnScreen);
             } catch (RuntimeException e) {
                 android.util.Log.w("OverlayPanel", "addView 失败: " + e, e);
                 // 权限被撤销或窗口被系统拒绝：保持安静，不要因为悬浮窗失败影响主流程。
+                if (attached) {
+                    // 窗口已经挂上却在其后抛异常：直接丢引用会让 hide() 再也摘不掉它。
+                    try {
+                        windowManager.removeViewImmediate(scaleHost);
+                    } catch (RuntimeException ignored) {
+                        // 系统那边也已经摘掉了。
+                    }
+                }
                 root = null;
                 scaleHost = null;
                 running = false;
@@ -665,7 +676,11 @@ public final class OverlayPanel {
         if (!moving) {
             return;
         }
-        if (!running || isLocked() || snapshot.state() == RunState.PAUSED
+        // 面板里的 snapshot 可能比服务端慢一拍（LiveData 回调与 500ms 驱动节拍排在同一条主线程上）。
+        // 刚结束的那一瞬若仍按旧快照下发 drive，服务端会把已终止的运行复活成一个新的单点任务，
+        // 所以这里直接读唯一可信来源。
+        RunSnapshot live = SimulationStateRepo.get().current();
+        if (!running || !live.isActive() || isLocked() || live.state() == RunState.PAUSED
                 || Math.hypot(moveX, moveY) < 0.04f) {
             stopMoving();
             return;

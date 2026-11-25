@@ -632,3 +632,18 @@ v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位�
 | 编号 | 标题 | 处理 | 状态 |
 | --- | --- | --- | --- |
 | [#31](https://github.com/Sek1ro-oka/AGRI-RUN/issues/31) | 悬浮窗明确展示控制与常用地点传送 | 常驻工具条展示状态、暂停/继续、结束及更多；结束需确认，展开后提供摇杆、速度档位和隐藏入口。模拟器检查了暂停、继续、取消和确认结束、隐藏后继续运行及拖动。常用地点传送留待后续处理。 | 未关闭 |
+
+## #93/#94 复核发现的行为缺陷（2026-11-25，fix/overlay-readiness-behavior）
+
+0.10.1 发布后合入的 #93（跑前准备面板）与 #94（悬浮工具条重做）经逐行复核发现四条行为缺陷，本支一并处理。复核基线：合入后的 main `674ad9e`。
+
+| 项 | 根因 | 处理 | 状态 |
+| --- | --- | --- | --- |
+| 跑前准备面板强制浅色，深色模式白底深字 | 面板用 `android.R.style.Theme_Material_Light_NoActionBar`，另有 8 处 `Color.WHITE` 与 5 个 `0xff…` 写死色；而设置页确实支持跟随系统／深色（`AppearancePreferences.java:83`） | 新增 `Theme.Unloop.FullScreenDialog`（父样式 `Theme.Material3.DayNight.NoActionBar`）；面板底色／卡片／可选区／徽标／按钮描边收进 `readiness_*` 令牌并补 `values-night` 变体；状态栏与导航栏不再写死白色，按 `R.bool.fm_light_bars` 决定明暗图标；开始按钮文字改用 `fm_on_brand`（夜里 `fm_link` 翻成浅薄荷，白字会糊） | 已实现待验证 |
+| 通知权限不再自动申请 | #93 删掉了起跑前的 `neededPermissions()/requestPermissionsThenStart()`，只剩用户点面板「通知」那一行才申请；不点就没有跑圈前台通知 | `beginReadiness()` 在 Android 13+ 且未授予、本 Activity 实例未问过的前提下先拉起系统授权框，结果回来后走 `continueReadiness()` 继续原判就绪流程；每实例只问一次；顺带把 `onSaveInstanceState` 的保存条件从「对话框已显示」放宽为「计划存在」，避免授权框停留期间重建丢计划 | 已实现待验证 |
+| 悬浮窗可能留下摘不掉的孤儿窗口 | `sync()` 的 try 把 `addView` 成功之后的 `scaleHost.post(...)` 也包住，catch 里无条件 `root=null; scaleHost=null`；此后 `hide()` 因 `scaleHost == null` 直接 return，窗口却还挂在屏幕上 | catch 内先按「已挂上」判断，能摘就 `removeViewImmediate`，再清引用；`running` 只在 `addView` 成功后置位 | 已实现待验证（异常路径无法人工触发，仅代码级收口） |
+| 结束跑圈的瞬间摇杆能把运行复活成单点任务 | `moveStep()` 每 500 ms 读的是面板缓存 `snapshot`，而服务端的 `SimulationService.drive()` 见到非活跃快照会直接 `start(createSinglePoint(anchor))`；LiveData 回调与驱动节拍排在同一条主线程，结束事件落到面板之前有一次驱动机会 | `moveStep()` 改为每次直读 `SimulationStateRepo.get().current()`，非活跃或已暂停立即 `stopMoving()`（内部会 `releaseDrive` 让速度归零） | 已实现待验证 |
+
+验证：`:app:testDebugUnitTest` 561 例、`:route-core:test` 107 例、`:simulation-core:test` 55 例（合计 723，数字从各模块 `build/test-results/**/TEST-*.xml` 现汇总）全部通过、0 失败；`:app:lintDebug` 0 errors、284 warnings；`:app:assembleDebug` 通过。
+
+本机无法验证的部分（无 adb、无模拟器，需要真机或模拟器复验）：① 深色模式下跑前准备面板的实际观感——状态栏图标是否可见、卡片描边对比度、开始按钮在夜间的可读性；② 「系统授权框 → 跑前准备面板」这个先后次序是否比原来顺手（现在是先弹系统框，回来后才可能弹面板）；③ 摇杆在结束那一拍是否真的不再复活单点会话；④ 悬浮窗 `addView` 异常收口只能靠代码审查，构造不出真实异常。另外遗留一条不在本支范围：#93/#94 新增的写死中文文案（`HardcodedText` 等 lint 警告由 263 升到 284）尚未收进 `strings.xml`，留给下一次界面收敛。

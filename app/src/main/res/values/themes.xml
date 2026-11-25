@@ -21,6 +21,23 @@
     </style>
     <style name="Theme.RouteWorkshop.Home" parent="Theme.RouteWorkshop"/>
     <style name="Theme.RouteWorkshop.CampusRun" parent="Theme.RouteWorkshop"/>
+    <!--
+      全屏对话框专用：跑前准备面板要占满整屏，但平台自带的 Theme_Material_Light_* 会强行锁定浅色，
+      深色模式下白底配主题深色文字直接糊成一片。父样式跟着日/夜走，底色由 fm_background 提供。
+    -->
+    <style name="Theme.Unloop.FullScreenDialog" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/fm_brand</item><item name="colorOnPrimary">@color/fm_on_brand</item>
+        <item name="colorSurface">@color/fm_surface</item><item name="colorOnSurface">@color/fm_text</item>
+        <item name="colorOnSurfaceVariant">@color/fm_text_secondary</item>
+        <item name="colorOutline">@color/fm_border</item>
+        <item name="android:colorBackground">@color/fm_background</item>
+        <item name="colorOnBackground">@color/fm_text</item>
+        <item name="android:windowBackground">@color/fm_background</item>
+        <item name="android:statusBarColor">@color/fm_background</item>
+        <item name="android:navigationBarColor">@color/fm_background</item>
+        <item name="android:windowLightStatusBar">@bool/fm_light_bars</item>
+        <item name="android:windowLightNavigationBar">@bool/fm_light_bars</item>
+    </style>
     <style name="Widget.Legion.FinmoriButton" parent="Widget.Material3.Button"><item name="cornerRadius">16dp</item><item name="android:minHeight">48dp</item></style>
 <style name="Animation.Legion.Activity" parent="@android:style/Animation.Activity">
         <item name="android:activityOpenEnterAnimation">@anim/fm_fade_in</item>
