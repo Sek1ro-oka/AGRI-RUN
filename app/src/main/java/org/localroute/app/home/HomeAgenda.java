@@ -124,6 +124,13 @@ public final class HomeAgenda {
         @Nullable public HomeworkItem.Status taskStatus() {
             return taskStatus;
         }
+
+        /** 课上完了、作业交完或过期了，都算已结束。 */
+        public boolean finished() {
+            return kind == Kind.COURSE
+                    ? classState == ClassState.DONE
+                    : taskStatus != HomeworkItem.Status.PENDING;
+        }
     }
 
     /** 某一天的完整内容。 */
@@ -133,14 +140,16 @@ public final class HomeAgenda {
         private final boolean notImported;
         private final int courseCount;
         private final int taskCount;
+        private final int hiddenFinished;
 
         private Day(List<Item> items, boolean closed, boolean notImported,
-                    int courseCount, int taskCount) {
+                    int courseCount, int taskCount, int hiddenFinished) {
             this.items = items;
             this.closed = closed;
             this.notImported = notImported;
             this.courseCount = courseCount;
             this.taskCount = taskCount;
+            this.hiddenFinished = hiddenFinished;
         }
 
         @NonNull public List<Item> items() {
@@ -164,6 +173,11 @@ public final class HomeAgenda {
         public int taskCount() {
             return taskCount;
         }
+
+        /** 今天被隐藏掉的已结束条目数；{@link #courseCount()} 等仍是当天总数。 */
+        public int hiddenFinished() {
+            return hiddenFinished;
+        }
     }
 
     private HomeAgenda() {
@@ -183,6 +197,9 @@ public final class HomeAgenda {
         List<Item> undated = new ArrayList<>();
         int courseCount = 0;
         int taskCount = 0;
+        int hiddenFinished = 0;
+        // 只有「今天」需要收起已结束的条目；翻到过去日期时全部保留，否则历史全是空白。
+        boolean hideFinished = day.equals(today);
 
         for (TimetableCourse course : TimetableDay.classesOn(courses, day, semesterStart,
                 totalWeeks, adjustments)) {
@@ -195,10 +212,15 @@ public final class HomeAgenda {
             int end = schedule.periodEndMinutes(
                     Math.min(course.endPeriod(), schedule.totalPeriods()));
             end = Math.max(start, end);
-            timed.add(new Item(Kind.COURSE, start, StudySchedule.formatMinutes(start),
+            Item item = new Item(Kind.COURSE, start, StudySchedule.formatMinutes(start),
                     course.name(), placeAndTeacher(course),
-                    classState(day, today, nowMinutes, start, end), null));
+                    classState(day, today, nowMinutes, start, end), null);
             courseCount++;
+            if (hideFinished && item.finished()) {
+                hiddenFinished++;
+                continue;
+            }
+            timed.add(item);
         }
 
         ZoneId zone = ZoneId.systemDefault();
@@ -217,9 +239,14 @@ public final class HomeAgenda {
                 continue;
             }
             int minutes = instant.atZone(zone).getHour() * 60 + instant.atZone(zone).getMinute();
-            timed.add(new Item(Kind.HOMEWORK, minutes, StudySchedule.formatMinutes(minutes),
-                    task.title(), task.subtitle(), null, task.status()));
+            Item item = new Item(Kind.HOMEWORK, minutes, StudySchedule.formatMinutes(minutes),
+                    task.title(), task.subtitle(), null, task.status());
             taskCount++;
+            if (hideFinished && item.finished()) {
+                hiddenFinished++;
+                continue;
+            }
+            timed.add(item);
         }
 
         timed.sort(Comparator.comparingInt((Item item) -> item.minutes)
@@ -227,7 +254,7 @@ public final class HomeAgenda {
         List<Item> items = new ArrayList<>(timed);
         items.addAll(undated);
         return new Day(items, TimetableDay.isClosed(day, adjustments), courses.isEmpty(),
-                courseCount, taskCount);
+                courseCount, taskCount, hiddenFinished);
     }
 
     @NonNull

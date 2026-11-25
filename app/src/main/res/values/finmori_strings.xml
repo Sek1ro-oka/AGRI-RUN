@@ -25,6 +25,7 @@
     <string name="home_greet_guest">同学</string>
     <string name="home_greet_summary">%1$d 节课 · %2$d 份作业</string>
     <string name="home_greet_unbound">绑定学习通后显示今天的课程</string>
+    <string name="home_greet_no_timetable">导入课表后显示当天课程</string>
     <string name="home_hero_description">校园插画</string>
     <string name="home_date_format">%1$d月%2$d日 星期%3$s</string>
     <string-array name="home_weekday_labels">
@@ -39,6 +40,9 @@
     <string name="home_agenda_closed">这一天放假</string>
     <string name="home_agenda_empty">这一天没有课程，也没有作业</string>
     <string name="home_agenda_count">%1$d 节课 · %2$d 份作业</string>
+    <string name="home_agenda_expand">展开还有 %1$d 项</string>
+    <string name="home_agenda_collapse">收起</string>
+    <string name="home_agenda_all_done">今天的安排都结束了</string>
     <string name="home_class_done">已结束</string>
     <string name="home_class_live">进行中</string>
     <string name="home_class_upcoming">未开始</string>
@@ -50,10 +54,8 @@
     <string name="home_task_other">查看</string>
     <string name="home_task_custom">自建作业</string>
     <string name="home_agenda_no_timetable">还没有课表</string>
-    <string name="home_agenda_no_timetable_detail">从教务导入或手动添加课程后，这里显示当天课程</string>
     <string name="home_agenda_import_action">去导入</string>
     <string name="home_bind_title">还没绑定学习通</string>
-    <string name="home_bind_detail">绑定后这里显示当天课程与作业截止，课表也可以从教务导入</string>
     <string name="home_bind_action">去绑定</string>
     <string name="home_account_section">校园账户</string>
     <string name="home_account_placeholder">占位 · 无数据源</string>

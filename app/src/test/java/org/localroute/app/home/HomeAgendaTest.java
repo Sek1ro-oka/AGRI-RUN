@@ -206,13 +206,44 @@ public class HomeAgendaTest {
         assertEquals(0, result.courseCount());
     }
 
-    /** 末节超出作息时钳到最后一节：21:45 下课，21:50 就该是已结束而不是进行中。 */
+    /** 末节超出作息时钳到最后一节：21:45 下课，21:50 就该判已结束（不钳的话会算成进行中）。 */
     @Test public void endPeriodIsClampedToScheduleTotal() {
         HomeAgenda.Day result = day(courses(course("a", 3, 11, 15)), WEDNESDAY, WEDNESDAY,
                 21 * 60 + 50, Collections.emptyList(), Collections.emptyList());
 
-        assertEquals(1, result.items().size());
-        assertEquals("20:10", result.items().get(0).timeLabel());
-        assertEquals(HomeAgenda.ClassState.DONE, result.items().get(0).classState());
+        assertEquals(1, result.courseCount());
+        assertEquals(1, result.hiddenFinished());
+        assertTrue(result.items().isEmpty());
+    }
+
+    /** 今天已结束的课与已交的作业收起来，但当天总数不变。 */
+    @Test public void finishedItemsAreHiddenOnToday() {
+        List<TimetableCourse> list = courses(course("a", 3, 1, 2), course("b", 3, 5, 6));
+        List<HomeAgenda.Task> tasks = Arrays.asList(
+                task("已交的", millisAt(WEDNESDAY, 9, 0), HomeworkItem.Status.SUBMITTED),
+                task("待交的", millisAt(WEDNESDAY, 15, 0), HomeworkItem.Status.PENDING));
+
+        HomeAgenda.Day result = day(list, WEDNESDAY, WEDNESDAY, 10 * 60, tasks,
+                Collections.emptyList());
+
+        assertEquals(2, result.items().size());
+        assertEquals("13:30", result.items().get(0).timeLabel());
+        assertEquals("15:00", result.items().get(1).timeLabel());
+        assertEquals(2, result.hiddenFinished());
+        assertEquals(2, result.courseCount());
+        assertEquals(2, result.taskCount());
+    }
+
+    /** 翻到过去日期时不隐藏，否则历史全是空白。 */
+    @Test public void pastDayKeepsFinishedItems() {
+        List<TimetableCourse> list = courses(course("a", 3, 1, 2));
+        List<HomeAgenda.Task> tasks = Collections.singletonList(
+                task("已交的", millisAt(WEDNESDAY, 9, 0), HomeworkItem.Status.SUBMITTED));
+
+        HomeAgenda.Day result = day(list, WEDNESDAY, THURSDAY, 10 * 60, tasks,
+                Collections.emptyList());
+
+        assertEquals(2, result.items().size());
+        assertEquals(0, result.hiddenFinished());
     }
 }

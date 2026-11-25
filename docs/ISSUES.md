@@ -714,3 +714,28 @@ v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位�
 独立审查（只读子 agent）提出三条，均已核对源码属实并修复：① `HomeAgenda` 缺少节次上限守卫——`TimetableWidgetPlan.slotsOn` 与 `ClassReminderPlanner` 都跳过 `startPeriod > totalPeriods` 并把末节钳到上限，本支补齐并加两条 JVM 用例；② 设置页缺 `onResume`，导航复用实例后提醒副标题会停在旧数据；③ 选中未来的放假日却显示「今天放假」，改为「这一天放假」。另修正时段边界 11→12 点、待接入提示文案、以及「未绑定但已手动加过课」时副标题仍谎称绑定后才有课程。
 
 不在本支范围（用户已拍板不处理）：`drawable-nodpi/run_card_backdrop.webp` 实为第三方漫画截图（带写死中文气泡「老实跑步 很枯燥吧？」），全仓 `docs/THIRD_PARTY_NOTICES.md` 未登记其来源与授权。本支只是把它随原首页内容搬到功能页，没有新增或替换该素材。就此询问后用户答「别管了」，**保持现状，后续会话不再重复提出**；此处仅留档，不作为待办。
+
+### 2026-11-26 追加：时间轴自适应折叠 + 隐藏已结束（同一分支，PR #98）
+
+用户看过 PR 后追加两条：折叠时间轴让账户卡也进首屏；已结束的课和作业不展示。拍板「自适应折叠」（按剩余高度算条数，放不下的收进「展开还有 N 项」）。
+
+**先量后改，纠正了一次自己的估算**：我最初判断「不压缩布局也能靠折叠一屏」，实测推翻——在用户机型档 360×792dp 上，可视区 629dp、固定部分 595dp（插画 160 + 日程卡骨架 157 + 账户区 245 + 间距 33），只剩 33dp，而一条时间轴行 53dp，**算下来 0 条**，首页一条日程都看不到。把这个数字回报后用户改选「轻度瘦身」。
+
+| 位置 | 内容 |
+| --- | --- |
+| `home/HomeAgenda.java` | 新增 `Item.finished()` 与 `Day.hiddenFinished()`；**只在 `day == today` 时**收起已结束条目，翻到过去日期全部保留（否则历史全空白）。`courseCount/taskCount` 仍是当天总数，不受隐藏影响 |
+| `ui/MainActivity.java` | `applyCollapse()`：全量渲染后 `post` 一次，用 `homeScroll`/`homeContent` 的**真实测量高度**算能放几条，从末尾收起并换成「展开还有 N 项」；点开后整页可滚，再点「收起」还原。切换日期重置展开态 |
+| `ui/MainActivity.java` | 空态从「标题 + 两行说明 + 大按钮」居中堆叠改成一行「标题 + 按钮」，说明文案移到插画副标题；新增「今天的安排都结束了」空态 |
+| `res/layout/activity_main.xml` | 插画 160→130dp；账户卡内边距 12→8dp、数值 24→20sp；日程卡内边距 14→8dp；去掉统计行上方的分隔线；多处间距收紧。**周条 48dp 触达下限未动** |
+| `androidTest/…/CampusWorkspaceTest.java` | 新增一屏断言：`homeContent.getHeight() <= homeScroll.getHeight()`；两处 `cardCampusRun` 点击补 `scrollTo`（与 `cardTimetable` 同类，功能页本来就要滚） |
+
+**那条一屏断言当场抓到两个我漏掉的情况**，值得记下来：① 折叠只管时间轴行，**未绑定时的空态比折叠后的列表还高**，640dp 下超屏 90dp；② 改紧凑后仍超 30dp，再收一轮间距后只差 **1 像素**（971 vs 970），再收 2dp 才过。没有这条断言，这三步都会被「看起来差不多」放过去。
+
+验证（分口径）：
+
+- **自动化**：lint **0 errors / 292 warnings**；JVM `route-core` 107 + `simulation-core` 55 + `app` 579 = **741，0 失败**（`home` 包 18 条，含隐藏已结束的 3 条新用例）。
+- **模拟器**：`CampusWorkspaceTest` 8 条 **7 通过**，唯一失败仍是上一节已做同机基线对照的 `overlayPresetRemainsTheNaturalSpeedTarget`。
+- **视觉（两档屏幕分别量过）**：360×792dp（`wm size 1440x3168` + `density 640` 模拟用户机型）显示 **2 条日程 + 「展开还有 1 项」**，3 节已结束的课被隐藏，四张账户卡完整可见，整页不滚；展开→3 条→收起→2 条往返正常。360×640dp（审查 AVD 原配置）整页也一屏，时间轴收成「展开还有 3 项」。截图：`docs/screenshots/home-agenda.png`、`home-agenda-dark.png`、`home-agenda-narrow.png`。
+- **真机**：未做。
+
+环境备注：`wm size reset` 会连同上一轮会话设的 720×1280 覆盖一起清掉，露出 AVD 原生 1080×2340@440（392×851dp）——量窄屏前必须重新 `wm size 720x1280` + `wm density 320`，否则量到的不是同一档屏幕。本次量完已还原该覆盖并清空种子数据。

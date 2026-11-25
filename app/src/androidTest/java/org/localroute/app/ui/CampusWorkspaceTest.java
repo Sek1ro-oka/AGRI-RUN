@@ -43,6 +43,13 @@ public class CampusWorkspaceTest {
         onView(withId(R.id.imageHomeHero)).check(matches(isDisplayed()));
         onView(withId(R.id.cardHomeAgenda)).check(matches(isDisplayed()));
         onView(withId(R.id.cardHomeTraffic)).check(matches(isDisplayed()));
+        // 自适应折叠的承诺：首屏不用滚动就能看完，账户卡也在内。
+        onView(withId(R.id.homeScroll)).check((view, error) -> {
+            android.widget.ScrollView scroll = (android.widget.ScrollView) view;
+            assertTrue("首页内容超出首屏，折叠没生效：content="
+                            + scroll.getChildAt(0).getHeight() + " viewport=" + scroll.getHeight(),
+                    scroll.getChildAt(0).getHeight() <= scroll.getHeight());
+        });
         // 运行中与环境引导两张动态卡搬去了功能页，首页不该再有。
         onView(withId(R.id.cardActiveRun)).check(doesNotExist());
         onView(withId(R.id.cardSetupGuide)).check(doesNotExist());
@@ -215,7 +222,7 @@ public class CampusWorkspaceTest {
     @Test public void runningControlsFunctionsShortcutAndExternalCommandsStayInSync() throws Exception {
         try (ActivityScenario<FunctionsActivity> functions =
                      ActivityScenario.launch(FunctionsActivity.class)) {
-            onView(withId(R.id.cardCampusRun)).perform(click());
+            onView(withId(R.id.cardCampusRun)).perform(scrollTo(), click());
             onView(withId(R.id.buttonRunMain)).perform(click());
             await(() -> SimulationStateRepo.get().current().state() == RunState.RUNNING);
             String runId = SimulationStateRepo.get().current().runId();
@@ -262,7 +269,7 @@ public class CampusWorkspaceTest {
     @Test public void overlayPresetRemainsTheNaturalSpeedTarget() throws Exception {
         try (ActivityScenario<FunctionsActivity> scenario =
                      ActivityScenario.launch(FunctionsActivity.class)) {
-            onView(withId(R.id.cardCampusRun)).perform(click());
+            onView(withId(R.id.cardCampusRun)).perform(scrollTo(), click());
             onView(withId(R.id.buttonRunMain)).perform(click());
             await(() -> SimulationStateRepo.get().current().state() == RunState.RUNNING);
             InstrumentationRegistry.getInstrumentation().runOnMainSync(() ->

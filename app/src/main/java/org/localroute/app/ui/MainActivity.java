@@ -54,6 +54,10 @@ public class MainActivity extends AppCompatActivity {
     private LocalDate selectedDay;
     private List<LocalDate> weekDays = new ArrayList<>();
     private String[] weekdayLabels;
+    /** 时间轴默认折叠到「一屏放得下」的条数，点开后才允许整页滚动。 */
+    private boolean agendaExpanded;
+    private boolean collapseActionable;
+    private final Runnable collapsePass = this::applyCollapse;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -69,6 +73,11 @@ public class MainActivity extends AppCompatActivity {
         weekdayLabels = getResources().getStringArray(R.array.home_weekday_labels);
         binding.buttonHomeCalendar.setOnClickListener(v -> HomeTarget.TIMETABLE.open(this));
         binding.buttonHomeBind.setOnClickListener(v -> onEmptyAction());
+        binding.textHomeAgendaCount.setOnClickListener(v -> {
+            if (!collapseActionable) return;
+            agendaExpanded = !agendaExpanded;
+            render();
+        });
         binding.cardHomeTraffic.setOnClickListener(v -> openProfile());
         binding.cardHomePower.setOnClickListener(v -> openProfile());
         binding.cardHomeCard.setOnClickListener(v -> openProfile());
@@ -203,10 +212,17 @@ public class MainActivity extends AppCompatActivity {
         binding.textHomeGreeting.setText(getString(greetRes, name));
         // 没绑定但已经手动加过课／作业时，不能再谎称「绑定后才有课程」。
         boolean nothingToday = todayAgenda.courseCount() == 0 && todayAgenda.taskCount() == 0;
-        binding.textHomeGreetingSub.setText(session == null && nothingToday
-                ? getString(R.string.home_greet_unbound)
-                : getString(R.string.home_greet_summary, todayAgenda.courseCount(),
-                todayAgenda.taskCount()));
+        int subRes;
+        if (session == null && nothingToday) {
+            subRes = R.string.home_greet_unbound;
+        } else if (todayAgenda.notImported()) {
+            subRes = R.string.home_greet_no_timetable;
+        } else {
+            binding.textHomeGreetingSub.setText(getString(R.string.home_greet_summary,
+                    todayAgenda.courseCount(), todayAgenda.taskCount()));
+            return;
+        }
+        binding.textHomeGreetingSub.setText(subRes);
     }
 
     private void renderDate() {
@@ -235,6 +251,7 @@ public class MainActivity extends AppCompatActivity {
             cell.getRoot().setContentDescription(dateLabel(day));
             cell.getRoot().setOnClickListener(v -> {
                 selectedDay = day;
+                agendaExpanded = false;
                 render();
             });
             binding.weekStrip.addView(cell.getRoot());
@@ -242,11 +259,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void renderAgenda(HomeAgenda.Day shown, StudySession session) {
+        binding.homeScroll.removeCallbacks(collapsePass);
+        collapseActionable = false;
         binding.agendaList.removeAllViews();
         boolean empty = shown.items().isEmpty();
         binding.agendaList.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.agendaEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-        binding.dividerAgendaCount.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.textHomeAgendaCount.setVisibility(empty ? View.GONE : View.VISIBLE);
         if (empty) {
             renderEmpty(shown, session);
@@ -263,6 +281,43 @@ public class MainActivity extends AppCompatActivity {
             bindRow(row, item, i == items.size() - 1);
             binding.agendaList.addView(row.getRoot());
         }
+        // 先按全量渲染量一次真实高度，再决定收起几条：不写死条数，任何屏高都能一屏。
+        binding.homeScroll.post(collapsePass);
+    }
+
+    /**
+     * 自适应折叠：整页放得下就全展开；放不下就从末尾收起若干条，换成「展开还有 N 项」。
+     *
+     * <p>用的是真实测量高度而不是估算，所以插画、账户卡、字号任何一处改动都不用回来调常数。
+     */
+    private void applyCollapse() {
+        int total = binding.agendaList.getChildCount();
+        int viewport = binding.homeScroll.getHeight();
+        if (total == 0 || viewport <= 0) return;
+        int content = binding.homeContent.getHeight();
+        if (content <= viewport) return;
+        if (agendaExpanded) {
+            collapseActionable = true;
+            binding.textHomeAgendaCount.setText(R.string.home_agenda_collapse);
+            return;
+        }
+        int rowsHeight = 0;
+        for (int i = 0; i < total; i++) {
+            rowsHeight += binding.agendaList.getChildAt(i).getHeight();
+        }
+        int rowHeight = binding.agendaList.getChildAt(0).getHeight();
+        if (rowHeight <= 0) return;
+        int fit = Math.max(0, (viewport - (content - rowsHeight)) / rowHeight);
+        if (fit >= total) return;
+        for (int i = total - 1; i >= fit; i--) {
+            binding.agendaList.removeViewAt(i);
+        }
+        if (fit > 0) {
+            binding.agendaList.getChildAt(fit - 1).findViewById(R.id.viewItemLine)
+                    .setVisibility(View.INVISIBLE);
+        }
+        collapseActionable = true;
+        binding.textHomeAgendaCount.setText(getString(R.string.home_agenda_expand, total - fit));
     }
 
     private void bindRow(ItemHomeAgendaBinding row, HomeAgenda.Item item, boolean last) {
@@ -330,23 +385,24 @@ public class MainActivity extends AppCompatActivity {
         FinmoriMotion.press(row.cardItem);
     }
 
-    /** 空态分三种：没绑定、绑了但没课表、这天真的没安排。 */
+    /** 空态分四种：今天都结束了、没绑定、绑了但没课表、这天真的没安排。 */
     private void renderEmpty(HomeAgenda.Day shown, StudySession session) {
+        if (shown.hiddenFinished() > 0) {
+            binding.textHomeEmptyTitle.setText(R.string.home_agenda_all_done);
+            binding.buttonHomeBind.setVisibility(View.GONE);
+            return;
+        }
         if (shown.notImported()) {
             boolean unbound = session == null;
             binding.textHomeEmptyTitle.setText(unbound
                     ? R.string.home_bind_title : R.string.home_agenda_no_timetable);
-            binding.textHomeEmptyDetail.setText(unbound
-                    ? R.string.home_bind_detail : R.string.home_agenda_no_timetable_detail);
             binding.buttonHomeBind.setText(unbound
                     ? R.string.home_bind_action : R.string.home_agenda_import_action);
-            binding.textHomeEmptyDetail.setVisibility(View.VISIBLE);
             binding.buttonHomeBind.setVisibility(View.VISIBLE);
             return;
         }
         binding.textHomeEmptyTitle.setText(shown.closed()
                 ? R.string.home_agenda_closed : R.string.home_agenda_empty);
-        binding.textHomeEmptyDetail.setVisibility(View.GONE);
         binding.buttonHomeBind.setVisibility(View.GONE);
     }
 

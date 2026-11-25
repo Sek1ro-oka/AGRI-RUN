@@ -7,19 +7,21 @@
     android:orientation="vertical"
     android:background="@color/fm_surface">
     <ScrollView
+        android:id="@+id/homeScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true"
         android:clipToPadding="false">
         <LinearLayout
+            android:id="@+id/homeContent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
             <!-- 插画通栏，问候语压在下缘；scrim 保证文字对比度，随时段换图与换字色。 -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="160dp">
+                android:layout_height="130dp">
                 <ImageView
                     android:id="@+id/imageHomeHero"
                     android:layout_width="match_parent"
@@ -64,12 +66,12 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:paddingHorizontal="@dimen/space_4xl"
-                android:paddingBottom="@dimen/space_3xl">
+                android:paddingBottom="@dimen/space_md">
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardHomeAgenda"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_xl"
+                    android:layout_marginTop="@dimen/space_md"
                     app:cardBackgroundColor="@color/fm_surface_alt"
                     app:cardCornerRadius="@dimen/radius_sheet"
                     app:cardElevation="0dp"
@@ -78,7 +80,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="@dimen/space_2xl">
+                        android:padding="@dimen/space_md">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -108,64 +110,51 @@
                             android:id="@+id/weekStrip"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_md"
+                            android:layout_marginTop="@dimen/space_xs"
                             android:orientation="horizontal" />
                         <LinearLayout
                             android:id="@+id/agendaList"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_lg"
+                            android:layout_marginTop="@dimen/space_md"
                             android:orientation="vertical" />
                         <LinearLayout
                             android:id="@+id/agendaEmpty"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_lg"
-                            android:gravity="center_horizontal"
-                            android:orientation="vertical"
+                            android:layout_marginTop="@dimen/space_sm"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
                             android:visibility="gone">
                             <TextView
                                 android:id="@+id/textHomeEmptyTitle"
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:gravity="center"
+                                android:layout_weight="1"
                                 android:textColor="@color/fm_text"
-                                android:textSize="@dimen/text_lead"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:id="@+id/textHomeEmptyDetail"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_xs"
-                                android:gravity="center"
-                                android:textColor="@color/fm_muted"
-                                android:textSize="@dimen/text_caption" />
+                                android:textSize="@dimen/text_meta"
+                                android:maxLines="1"
+                                android:ellipsize="end" />
                             <TextView
                                 android:id="@+id/buttonHomeBind"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_lg"
+                                android:layout_marginStart="@dimen/space_md"
                                 android:background="@drawable/bg_home_pill"
                                 android:clickable="true"
                                 android:focusable="true"
-                                android:paddingHorizontal="@dimen/space_5xl"
-                                android:paddingVertical="@dimen/space_md"
+                                android:paddingHorizontal="@dimen/space_xl"
+                                android:paddingVertical="@dimen/space_sm"
                                 android:text="@string/home_bind_action"
                                 android:textColor="@color/fm_surface"
-                                android:textSize="@dimen/text_label"
+                                android:textSize="@dimen/text_caption"
                                 android:textStyle="bold" />
                         </LinearLayout>
-                        <View
-                            android:id="@+id/dividerAgendaCount"
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:layout_marginTop="@dimen/space_md"
-                            android:background="@color/fm_border" />
                         <TextView
                             android:id="@+id/textHomeAgendaCount"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_sm"
+                            android:layout_marginTop="@dimen/space_xs"
                             android:textColor="@color/fm_text_secondary"
                             android:textSize="@dimen/text_caption" />
                     </LinearLayout>
@@ -173,8 +162,8 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_3xl"
-                    android:layout_marginBottom="@dimen/space_md"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:layout_marginBottom="@dimen/space_sm"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
                     <TextView
@@ -205,7 +194,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:orientation="vertical"
-                        android:padding="@dimen/space_xl">
+                        android:padding="@dimen/space_md">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -231,7 +220,7 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_md"
+                            android:layout_marginTop="@dimen/space_xs"
                             android:gravity="bottom"
                             android:orientation="horizontal">
                             <TextView
@@ -239,7 +228,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="@string/home_account_value_unknown"
                                 android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_metric"
+                                android:textSize="@dimen/text_page_title"
                                 android:textStyle="bold" />
                             <TextView
                                 android:layout_width="wrap_content"
@@ -253,7 +242,6 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_hair"
                             android:text="@string/home_account_missing"
                             android:textColor="@color/fm_muted"
                             android:textSize="@dimen/text_caption" />
@@ -268,7 +256,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:orientation="vertical"
-                        android:padding="@dimen/space_xl">
+                        android:padding="@dimen/space_md">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -294,7 +282,7 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_md"
+                            android:layout_marginTop="@dimen/space_xs"
                             android:gravity="bottom"
                             android:orientation="horizontal">
                             <TextView
@@ -302,7 +290,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="@string/home_account_value_unknown"
                                 android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_metric"
+                                android:textSize="@dimen/text_page_title"
                                 android:textStyle="bold" />
                             <TextView
                                 android:layout_width="wrap_content"
@@ -316,7 +304,6 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_hair"
                             android:text="@string/home_account_missing"
                             android:textColor="@color/fm_muted"
                             android:textSize="@dimen/text_caption" />
@@ -336,7 +323,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:orientation="vertical"
-                        android:padding="@dimen/space_xl">
+                        android:padding="@dimen/space_md">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -362,7 +349,7 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_md"
+                            android:layout_marginTop="@dimen/space_xs"
                             android:gravity="bottom"
                             android:orientation="horizontal">
                             <TextView
@@ -370,7 +357,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="@string/home_account_value_unknown"
                                 android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_metric"
+                                android:textSize="@dimen/text_page_title"
                                 android:textStyle="bold" />
                             <TextView
                                 android:layout_width="wrap_content"
@@ -384,7 +371,6 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_hair"
                             android:text="@string/home_account_missing"
                             android:textColor="@color/fm_muted"
                             android:textSize="@dimen/text_caption" />
@@ -399,7 +385,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:orientation="vertical"
-                        android:padding="@dimen/space_xl">
+                        android:padding="@dimen/space_md">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -425,7 +411,7 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_md"
+                            android:layout_marginTop="@dimen/space_xs"
                             android:gravity="bottom"
                             android:orientation="horizontal">
                             <TextView
@@ -433,7 +419,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="@string/home_account_value_unknown"
                                 android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_metric"
+                                android:textSize="@dimen/text_page_title"
                                 android:textStyle="bold" />
                             <TextView
                                 android:layout_width="wrap_content"
@@ -447,7 +433,6 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_hair"
                             android:text="@string/home_account_missing"
                             android:textColor="@color/fm_muted"
                             android:textSize="@dimen/text_caption" />
