@@ -18,12 +18,13 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
+import android.widget.TextView;
+import org.localroute.app.campus.CampusFormat;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.StringRes;
@@ -40,28 +41,7 @@ import org.localroute.app.ui.MainActivity;
 import org.localroute.core.GeoPoint;
 import org.localroute.core.RunState;
 
-/**
- * 跨应用悬浮「摇杆控制台」。
- *
- * <p>整体是一块紧凑的小面板：顶部功能行左「返回主界面」、中「暂停/继续跑圈」、
- * 右上角「⌊ ⌉」缩放键；中间一行左侧是「移动」按钮、中央是摇杆、右侧是「关闭悬浮屏」按钮；
- * 下方并排行走 / 跑步 / 骑行三个档位按钮。暂停按钮左右两格等宽，所以始终居中；缩放键沿
- * 对角线拖动即可让整个控制台等比放大缩小（往左下缩小、往右上放大，0.7—1.4 倍，持久化）。
- *
- * <p>摇杆默认锁定，点一下切到开口锁图样并解锁，再点一下回到闭锁；只有没有跑圈任务
- * （空闲或悬浮单点保持）时才允许解锁，路线跑圈期间由快照强制锁定。解锁后按住摇杆，
- * 每 500 毫秒向
- * {@link SimulationService#drive(Context, GeoPoint, double, double, double)} 下发方向与速度，
- * 由服务端在定位节拍里推进坐标并发布带速度/航向的定位，松手立即停止。
- *
- * <p>面板只在虚拟定位任务运行中、且用户已经离开跑圈地图时显示：跑圈地图上不遮挡地图，
- * 切到设置页、主页、作业/课表或系统后台时出现；任务结束立即收起。面板可拖动、位置与
- * 缩放持久化；没有「显示在其他应用上层」权限时整体不显示，由设置页引导授权。
- *
- * <p>面板右下角能折叠成一个小球：小球同样可拖动、点一下展开控制台，折叠与否也持久化。
- * 两种内容是同一个悬浮窗的两种尺寸，换过去时按中心不动换算位置（见 {@link OverlayFold}），
- * 不会跳到面板原来的左上角。
- */
+/** Cross-app run controls and manual-location joystick. */
 public final class OverlayPanel {
 
     /** 用户在设置页打开「悬浮控制台」后写这个键。 */
@@ -72,23 +52,9 @@ public final class OverlayPanel {
     private static final String KEY_Y = "overlay_y";
     private static final String KEY_GEAR = "overlay_gear";
     private static final String KEY_SCALE = "overlay_scale";
-    private static final String KEY_FOLDED = "overlay_folded";
 
     /** 摇杆命令间隔：与服务端 500 ms 的定位节拍一致，方向变化即时生效。 */
     private static final long DRIVE_INTERVAL_MS = 500L;
-
-    /** 面板里圆形按钮的基准直径。 */
-    private static final int BUTTON_DP = 36;
-    /** 摇杆直径：与上下按钮排的宽度接近，居中摆放。 */
-    private static final int JOYSTICK_DP = 108;
-    /** 折叠成小球的基准直径：够一根拇指按住，又不至于挡住半个屏幕。 */
-    private static final int BALL_DP = 56;
-    /** 按钮之间的水平间距。 */
-    private static final int GAP_DP = 6;
-    /** 三枚按钮加两处间距并排放下的宽度，上下两行以它为基准宽度。 */
-    private static final int CONTENT_DP = 120;
-    /** 摇杆两侧各有「移动」「关闭」按钮，中间行比上下按钮排更宽。 */
-    private static final int MIDDLE_DP = BUTTON_DP * 2 + JOYSTICK_DP + GAP_DP * 2;
 
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -127,10 +93,18 @@ public final class OverlayPanel {
 
     private OverlayScaleHost scaleHost;
     private LinearLayout root;
-    private ImageView ball;
     private JoystickView joystick;
     private ScaleControlView scaleControl;
-    private ImageView pauseButton;
+    private TextView pauseButton;
+    private TextView statusText;
+    private TextView stopButton;
+    private TextView moreButton;
+    private TextView progressText;
+    private TextView speedText;
+    private LinearLayout expandedContent;
+    private LinearLayout confirmation;
+    private boolean expanded;
+    private String confirmRunId;
     private WindowManager.LayoutParams params;
 
     private RunSnapshot snapshot = RunSnapshot.idle();
@@ -138,7 +112,6 @@ public final class OverlayPanel {
     private boolean moving;
     private boolean gestureAnnounced;
     private boolean joystickUnlocked;
-    private boolean folded;
     private float overlayScale = 1f;
     private int gear;
     private float moveX;
@@ -165,7 +138,6 @@ public final class OverlayPanel {
         });
         this.gear = normalizeGear(prefs.getInt(KEY_GEAR, 1));
         this.overlayScale = ScaleControlView.clamp(prefs.getFloat(KEY_SCALE, 1f));
-        this.folded = prefs.getBoolean(KEY_FOLDED, false);
     }
 
     public boolean isShowing() {
@@ -196,7 +168,6 @@ public final class OverlayPanel {
                 android.util.Log.w("OverlayPanel", "addView 失败: " + e, e);
                 // 权限被撤销或窗口被系统拒绝：保持安静，不要因为悬浮窗失败影响主流程。
                 root = null;
-                ball = null;
                 scaleHost = null;
                 running = false;
             }
@@ -205,6 +176,10 @@ public final class OverlayPanel {
 
     public void hide() {
         stopMoving();
+        if (confirmation != null && confirmRunId != null) setConfirmation(false);
+        expanded = false;
+        if (expandedContent != null) expandedContent.setVisibility(View.GONE);
+        if (moreButton != null) moreButton.setText("更多 ▾");
         // 每次收起（回前台或点关闭）都恢复默认闭锁，下次出现时不会带着解锁状态。
         joystickUnlocked = false;
         if (joystick != null) {
@@ -226,32 +201,28 @@ public final class OverlayPanel {
     // ---------------------------------------------------------------- 界面
 
     private void inflate() {
+        overlayScale = allowedScale(overlayScale);
         root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(dp(6), dp(4), dp(6), dp(6));
-        root.setClipChildren(false);
-        root.setClipToPadding(false);
-
-        // 中间行最宽：左「移动」、中摇杆、右「关闭」；上下两行仍按 120dp 居中。
+        root.setPadding(dp(8), dp(6), dp(8), dp(6));
+        root.setBackground(panelBackground());
         root.addView(buildTopRow());
-        root.addView(buildControlCluster());
+        expandedContent = buildControlCluster();
+        expandedContent.setVisibility(View.GONE);
+        root.addView(expandedContent);
+        confirmation = buildConfirmation();
+        confirmation.setVisibility(View.GONE);
+        root.addView(confirmation);
         updateGearStyles();
-
-        ball = buildBall();
         scaleHost = new OverlayScaleHost(context);
-        attachContent();
+        scaleHost.addView(root);
         scaleHost.setScale(overlayScale);
-
         params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                         ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                         : WindowManager.LayoutParams.TYPE_PHONE,
-                // 不抢焦点：底下的 App 仍能正常输入；同时触屏外区域透传。
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT);
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = prefs(context).getInt(KEY_X, dp(10));
         params.y = prefs(context).getInt(KEY_Y, dp(88));
@@ -259,201 +230,190 @@ public final class OverlayPanel {
         clampToScreen();
     }
 
-    /** 顶部功能行：左返回、中暂停、右上角缩放键；左右两格等宽让暂停严格居中。 */
+    private Drawable panelBackground() {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xf2242a33);
+        background.setCornerRadius(dp(14));
+        background.setStroke(dp(1), ContextCompat.getColor(context, R.color.overlay_ring));
+        return background;
+    }
+
+    private TextView label(String text, int size) {
+        TextView view = new TextView(context);
+        view.setText(text);
+        view.setTextSize(size);
+        view.setTextColor(Color.WHITE);
+        view.setGravity(Gravity.CENTER);
+        view.setIncludeFontPadding(false);
+        return view;
+    }
+
+    private TextView action(String text, Runnable action) {
+        TextView view = label(text, 13);
+        view.setContentDescription(text);
+        view.setClickable(true);
+        view.setFocusable(true);
+        view.setOnClickListener(v -> action.run());
+        return view;
+    }
+
     private LinearLayout buildTopRow() {
         LinearLayout top = new LinearLayout(context);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
-
-        FrameLayout leftCell = new FrameLayout(context);
-        ImageView home = circleIcon(R.drawable.ic_overlay_home, BUTTON_DP, 9,
-                R.color.overlay_icon, R.string.overlay_home);
-        home.setOnClickListener(v -> openMainScreen());
-        leftCell.addView(home,
-                new FrameLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP), Gravity.CENTER));
-
-        pauseButton = circleIcon(R.drawable.ic_overlay_pause, BUTTON_DP, 9,
-                R.color.overlay_mint, R.string.overlay_pause_run);
-        pauseButton.setOnClickListener(v -> togglePause());
-        // 长按结束本次运动并直接回到跑圈地图，不再弹「再来一次 / 返回」确认。
-        pauseButton.setOnLongClickListener(v -> {
-            endRunFromOverlay();
-            return true;
-        });
-
-        FrameLayout rightCell = new FrameLayout(context);
-        scaleControl = new ScaleControlView(context);
-        scaleControl.setScale(overlayScale);
-        scaleControl.setListener(new ScaleControlView.Listener() {
-            @Override
-            public void onScaleChanged(float scale) {
-                applyScale(scale, false);
-            }
-
-            @Override
-            public void onScaleCommitted(float scale) {
-                applyScale(scale, true);
-            }
-        });
-        rightCell.addView(scaleControl,
-                new FrameLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP), Gravity.CENTER));
-
-        top.addView(leftCell, new LinearLayout.LayoutParams(0, dp(BUTTON_DP), 1f));
-        top.addView(pauseButton, new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)));
-        top.addView(rightCell, new LinearLayout.LayoutParams(0, dp(BUTTON_DP), 1f));
-
-        top.setLayoutParams(new LinearLayout.LayoutParams(dp(CONTENT_DP), dp(BUTTON_DP)));
+        top.setLayoutParams(new LinearLayout.LayoutParams(dp(304), dp(48)));
+        TextView drag = label("⠿", 22);
+        drag.setContentDescription("拖动悬浮窗");
+        drag.setOnTouchListener(new DragListener());
+        top.addView(drag, new LinearLayout.LayoutParams(dp(36), dp(48)));
+        statusText = label("未运行", 13);
+        top.addView(statusText, new LinearLayout.LayoutParams(dp(66), dp(48)));
+        pauseButton = action("暂停", this::togglePause);
+        top.addView(pauseButton, new LinearLayout.LayoutParams(dp(56), dp(48)));
+        stopButton = action("结束", this::requestEndConfirmation);
+        top.addView(stopButton, new LinearLayout.LayoutParams(dp(56), dp(48)));
+        moreButton = action("更多 ▾", this::toggleDetails);
+        top.addView(moreButton, new LinearLayout.LayoutParams(0, dp(48), 1));
         return top;
     }
 
-    /** 控制区：左「移动」、中摇杆、右「关闭」，下方并排行走 / 跑步 / 骑行三个档位按钮。 */
     private LinearLayout buildControlCluster() {
         LinearLayout cluster = new LinearLayout(context);
         cluster.setOrientation(LinearLayout.VERTICAL);
-        cluster.setGravity(Gravity.CENTER_HORIZONTAL);
-
+        cluster.setPadding(dp(8), dp(4), dp(8), dp(4));
+        cluster.setLayoutParams(new LinearLayout.LayoutParams(dp(304), LinearLayout.LayoutParams.WRAP_CONTENT));
+        progressText = label("本次进度   —", 13);
+        progressText.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        cluster.addView(progressText, new LinearLayout.LayoutParams(-1, dp(38)));
+        TextView controlTitle = label("手动控制 · 跑圈时摇杆锁定", 12);
+        controlTitle.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        controlTitle.setTextColor(0xffc9d2da);
+        cluster.addView(controlTitle, new LinearLayout.LayoutParams(-1, dp(28)));
+        LinearLayout controls = new LinearLayout(context);
+        controls.setGravity(Gravity.CENTER_VERTICAL);
         joystick = new JoystickView(context);
         joystick.setContentDescription(context.getString(R.string.overlay_joystick_locked));
         joystick.setLocked(!joystickUnlocked);
         joystick.setListener(new JoystickView.Listener() {
-            @Override
-            public void onMove(float x, float y) {
-                moveX = x;
-                moveY = y;
+            @Override public void onMove(float x, float y) {
+                moveX = x; moveY = y;
                 if (Math.hypot(x, y) >= 0.04f) {
                     if (!gestureAnnounced) {
                         gestureAnnounced = true;
                         RunState state = snapshot.state();
-                        if (state == RunState.IDLE || state == RunState.READY) {
+                        if (state == RunState.IDLE || state == RunState.READY)
                             toast(context.getString(R.string.overlay_idle_toast));
-                        }
                     }
                     startMoving();
                 }
             }
-
-            @Override
-            public void onRelease() {
-                gestureAnnounced = false;
-                moveX = 0f;
-                moveY = 0f;
-                stopMoving();
+            @Override public void onRelease() {
+                gestureAnnounced = false; moveX = 0f; moveY = 0f; stopMoving();
             }
-
-            @Override
-            public void onTap() {
-                toggleJoystickLock();
-            }
+            @Override public void onTap() { toggleJoystickLock(); }
         });
-
-        LinearLayout middle = new LinearLayout(context);
-        middle.setOrientation(LinearLayout.HORIZONTAL);
-        middle.setGravity(Gravity.CENTER);
-
-        // 左：移动悬浮窗；按住拖动，与摇杆、关闭键互不抢触摸。
-        ImageView moveButton = circleIcon(R.drawable.ic_overlay_move, BUTTON_DP, 7,
-                R.color.overlay_icon, R.string.overlay_grip);
-        moveButton.setOnTouchListener(new DragListener());
-        middle.addView(moveButton,
-                new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)));
-
-        LinearLayout.LayoutParams joystickParams =
-                new LinearLayout.LayoutParams(dp(JOYSTICK_DP), dp(JOYSTICK_DP));
-        joystickParams.leftMargin = dp(GAP_DP);
-        joystickParams.rightMargin = dp(GAP_DP);
-        middle.addView(joystick, joystickParams);
-
-        // 右：关闭悬浮屏并记住开关；下次在设置页手动开启，切到后台才再出现。
-        ImageView closeButton = circleIcon(R.drawable.ic_overlay_close, BUTTON_DP, 9,
-                R.color.overlay_close, R.string.overlay_close);
-        closeButton.setOnClickListener(v -> {
-            toast(context.getString(R.string.overlay_closed_toast));
-            if (closeAction != null) {
-                closeAction.run();
-            } else {
-                hide();
-            }
-        });
-        middle.addView(closeButton,
-                new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)));
-
-        LinearLayout.LayoutParams middleParams =
-                new LinearLayout.LayoutParams(dp(MIDDLE_DP), dp(JOYSTICK_DP));
-        middleParams.topMargin = dp(GAP_DP);
-        cluster.addView(middle, middleParams);
-
+        controls.addView(joystick, new LinearLayout.LayoutParams(dp(96), dp(96)));
+        LinearLayout gearsColumn = new LinearLayout(context);
+        gearsColumn.setOrientation(LinearLayout.VERTICAL);
+        gearsColumn.setGravity(Gravity.CENTER);
         LinearLayout gears = new LinearLayout(context);
-        gears.setOrientation(LinearLayout.HORIZONTAL);
         gears.setGravity(Gravity.CENTER);
-
-        int[] icons = {R.drawable.ic_overlay_walk, R.drawable.ic_overlay_run,
-                R.drawable.ic_overlay_bike};
-        int[] labels = {R.string.overlay_gear_walk, R.string.overlay_gear_run,
-                R.string.overlay_gear_ride};
+        int[] icons = {R.drawable.ic_overlay_walk, R.drawable.ic_overlay_run, R.drawable.ic_overlay_bike};
+        int[] labels = {R.string.overlay_gear_walk, R.string.overlay_gear_run, R.string.overlay_gear_ride};
         for (int i = 0; i < gearButtons.length; i++) {
             final int index = i;
-            ImageView button = circleIcon(icons[i], BUTTON_DP, 9,
-                    R.color.overlay_icon, labels[i]);
+            LinearLayout gearItem = new LinearLayout(context);
+            gearItem.setOrientation(LinearLayout.VERTICAL);
+            gearItem.setGravity(Gravity.CENTER);
+            ImageView button = circleIcon(icons[i], 40, 9, R.color.overlay_icon, labels[i]);
             button.setOnClickListener(v -> selectGear(index, true));
             gearButtons[i] = button;
-            LinearLayout.LayoutParams params =
-                    new LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP));
-            if (i > 0) {
-                params.leftMargin = dp(GAP_DP);
-            }
-            gears.addView(button, params);
+            gearItem.addView(button, new LinearLayout.LayoutParams(dp(40), dp(40)));
+            gearItem.addView(label(context.getString(labels[i]), 11));
+            gears.addView(gearItem, new LinearLayout.LayoutParams(dp(53), LinearLayout.LayoutParams.WRAP_CONTENT));
         }
-        // 下排右侧再挤进一格「折叠成小球」：三档仍按 120dp 居中，右侧空出的正好是一枚按钮。
-        FrameLayout bottomRow = new FrameLayout(context);
-        bottomRow.addView(gears,
-                new FrameLayout.LayoutParams(dp(CONTENT_DP), dp(BUTTON_DP), Gravity.CENTER));
-        ImageView foldButton = circleIcon(R.drawable.ic_overlay_fold, BUTTON_DP, 9,
-                R.color.overlay_icon, R.string.overlay_fold);
-        foldButton.setOnClickListener(v -> toggleFold());
-        bottomRow.addView(foldButton, new FrameLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP),
-                Gravity.END | Gravity.CENTER_VERTICAL));
-
-        LinearLayout.LayoutParams bottomParams =
-                new LinearLayout.LayoutParams(dp(MIDDLE_DP), dp(BUTTON_DP));
-        bottomParams.topMargin = dp(GAP_DP);
-        cluster.addView(bottomRow, bottomParams);
-
-        cluster.setLayoutParams(new LinearLayout.LayoutParams(dp(MIDDLE_DP),
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+        gearsColumn.addView(gears);
+        speedText = label("", 11);
+        speedText.setPadding(0, dp(4), 0, 0);
+        gearsColumn.addView(speedText);
+        controls.addView(gearsColumn, new LinearLayout.LayoutParams(0, -2, 1));
+        cluster.addView(controls);
+        LinearLayout utilities = new LinearLayout(context);
+        utilities.setGravity(Gravity.CENTER_VERTICAL);
+        TextView home = action("返回应用", this::openMainScreen);
+        utilities.addView(home, new LinearLayout.LayoutParams(0, dp(48), 1));
+        TextView close = action("隐藏悬浮窗", () -> {
+            toast(context.getString(R.string.overlay_closed_toast));
+            if (closeAction != null) closeAction.run(); else hide();
+        });
+        utilities.addView(close, new LinearLayout.LayoutParams(0, dp(48), 1));
+        scaleControl = new ScaleControlView(context);
+        scaleControl.setContentDescription(context.getString(R.string.overlay_scale));
+        scaleControl.setScale(overlayScale);
+        scaleControl.setListener(new ScaleControlView.Listener() {
+            @Override public void onScaleChanged(float value) { applyScale(value, false); }
+            @Override public void onScaleCommitted(float value) { applyScale(value, true); }
+        });
+        utilities.addView(scaleControl, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        cluster.addView(utilities);
         return cluster;
     }
 
-    /**
-     * 折叠后的悬浮小球：一枚圆形摇杆图样，点一下展开控制台，按住可挪位置。
-     *
-     * <p>展开走点击监听，触摸监听只负责拖动；两者用位移阈值分开（见 {@link BallListener}），
-     * 这样 TalkBack 的双击也能展开。配色沿用面板的选中态（薄荷绿描边），在深色底上更容易看见。
-     */
-    private ImageView buildBall() {
-        ImageView view = new ImageView(context);
-        view.setImageResource(R.drawable.ic_overlay_joystick);
-        view.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        int padding = dp(16);
-        view.setPadding(padding, padding, padding, padding);
-        view.setImageTintList(ColorStateList.valueOf(
-                ContextCompat.getColor(context, R.color.overlay_mint)));
-        view.setBackground(circleBackground(true));
-        view.setContentDescription(context.getString(R.string.overlay_ball));
-        view.setClickable(true);
-        view.setOnClickListener(v -> toggleFold());
-        view.setOnTouchListener(new BallListener());
-        return view;
+    private LinearLayout buildConfirmation() {
+        LinearLayout panel = new LinearLayout(context);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(8), dp(8), dp(8), dp(6));
+        panel.addView(label("结束本次运动？", 15));
+        TextView hint = label("结束后显示本次运动结果。", 12);
+        hint.setTextColor(0xffc9d2da);
+        hint.setPadding(0, dp(6), 0, dp(6));
+        panel.addView(hint);
+        LinearLayout actions = new LinearLayout(context);
+        actions.addView(action("取消", () -> setConfirmation(false)),
+                new LinearLayout.LayoutParams(0, dp(48), 1));
+        actions.addView(action("确认结束", () -> {
+            if (snapshot.isActive() && snapshot.runId().equals(confirmRunId)) {
+                setConfirmation(false);
+                endRunFromOverlay();
+            } else {
+                setConfirmation(false);
+                toast("当前任务已发生变化，请重新操作");
+            }
+        }), new LinearLayout.LayoutParams(0, dp(48), 1));
+        panel.addView(actions);
+        return panel;
     }
 
-    /** 缩放容器里现在放面板还是小球；基准尺寸在这里给，缩放比例由容器统一乘。 */
-    private void attachContent() {
-        FrameLayout.LayoutParams content = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        if (folded) {
-            content.width = dp(BALL_DP);
-            content.height = dp(BALL_DP);
-        }
-        scaleHost.addView(folded ? ball : root, content);
+    private void requestEndConfirmation() {
+        if (!snapshot.isActive()) return;
+        confirmRunId = snapshot.runId();
+        setConfirmation(true);
+    }
+
+    private void setConfirmation(boolean visible) {
+        if (!visible) confirmRunId = null;
+        confirmation.setVisibility(visible ? View.VISIBLE : View.GONE);
+        expandedContent.setVisibility(!visible && expanded ? View.VISIBLE : View.GONE);
+        moreButton.setEnabled(!visible);
+        resizeAfterChange();
+    }
+
+    private void toggleDetails() {
+        expanded = !expanded;
+        if (!expanded) stopMoving();
+        expandedContent.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        moreButton.setText(expanded ? "收起 ▴" : "更多 ▾");
+        resizeAfterChange();
+    }
+
+    private void resizeAfterChange() {
+        if (scaleHost != null && running) scaleHost.post(this::clampOnScreen);
+    }
+
+    private float allowedScale(float scale) {
+        float widthDp = context.getResources().getDisplayMetrics().widthPixels
+                / context.getResources().getDisplayMetrics().density;
+        return Math.min(ScaleControlView.clamp(scale), Math.max(0.7f, (widthDp - 8f) / 320f));
     }
 
     /** 圆形深色按钮：薄荷绿描边 + 轻触涟漪。 */
@@ -511,17 +471,27 @@ public final class OverlayPanel {
         if (pauseButton == null) {
             return;
         }
-        if (ball != null) {
-            // 小球上没有文字和数值，用摇杆图样的颜色区分「有没有在跑」。
-            ball.setImageTintList(ColorStateList.valueOf(ContextCompat.getColor(context,
-                    snapshot.isActive() ? R.color.overlay_mint : R.color.overlay_icon)));
-        }
         OverlayViewState state = OverlayViewState.from(snapshot);
         boolean resume = state.actionIsResume();
-        pauseButton.setImageResource(resume ? R.drawable.ic_overlay_play : R.drawable.ic_overlay_pause);
-        pauseButton.setContentDescription(context.getString(resume
-                ? R.string.overlay_resume_run
-                : R.string.overlay_pause_run));
+        pauseButton.setText(resume ? "继续" : "暂停");
+        pauseButton.setContentDescription(resume ? "继续跑圈" : "暂停跑圈");
+        String status;
+        switch (state.mode()) {
+            case RUNNING_ROUTE: status = "运行中"; break;
+            case RUNNING_SINGLE_POINT: status = "单点定位"; break;
+            case PAUSED: status = "已暂停"; break;
+            case STARTING: status = "准备中"; break;
+            case TERMINAL: status = "已结束"; break;
+            default: status = "未运行"; break;
+        }
+        statusText.setText(status);
+        stopButton.setEnabled(state.stopEnabled());
+        stopButton.setAlpha(state.stopEnabled() ? 1f : 0.45f);
+        progressText.setText("本次进度  " + snapshot.distanceText() + "   " + snapshot.elapsedText());
+        speedText.setText(context.getString(gearLabelRes(gear)) + " · " + SpeedPresets.format(presets.get(gear)) + " km/h");
+        if (confirmRunId != null && (!snapshot.isActive() || !confirmRunId.equals(snapshot.runId()))) {
+            setConfirmation(false);
+        }
         pauseButton.setEnabled(state.actionEnabled());
         pauseButton.setAlpha(state.actionEnabled() ? 1f : 0.45f);
 
@@ -570,7 +540,7 @@ public final class OverlayPanel {
     }
 
     /**
-     * 长按顶部中间的暂停键：结束当前运动，并把跑圈地图调到前台显示本次结果。
+     * 确认结束当前运动，并把跑圈地图调到前台显示本次结果。
      *
      * <p>停止命令和页面跳转都是异步的：页面先显示运行中的画面，服务发布终止快照后
      * 由 {@link CampusRunActivity} 切到「结果」模式，不弹完成确认框。
@@ -634,6 +604,7 @@ public final class OverlayPanel {
         gear = normalizeGear(index);
         prefs(context).edit().putInt(KEY_GEAR, gear).apply();
         updateGearStyles();
+        if (speedText != null) speedText.setText(context.getString(gearLabelRes(gear)) + " · " + SpeedPresets.format(presets.get(gear)) + " km/h");
         if (!announce) {
             return;
         }
@@ -645,47 +616,11 @@ public final class OverlayPanel {
                 context.getString(gearLabelRes(gear)), SpeedPresets.format(kmh)));
     }
 
-    // ---------------------------------------------------------------- 折叠
-
-    /**
-     * 折叠成小球，或点小球展开面板。
-     *
-     * <p>折叠时先停掉摇杆驱动：面板收起来之后不该还往服务端发方向。位置换算要等新内容的尺寸
-     * 量出来才知道差多少，所以放到 {@code post} 里；万一量到 0 就按原位收下，顶多小球落在
-     * 面板原来的左上角，下次拖动自动正。
-     */
-    private void toggleFold() {
-        folded = !folded;
-        prefs(context).edit().putBoolean(KEY_FOLDED, folded).apply();
-        stopMoving();
-        if (folded) {
-            // 折叠这一步变化最大，说明怎么回来；展开本身看得见，不再啰嗦。
-            toast(context.getString(R.string.overlay_fold_toast));
-        }
-        if (!running || scaleHost == null) {
-            return;
-        }
-        int oldWidth = scaleHost.getMeasuredWidth();
-        int oldHeight = scaleHost.getMeasuredHeight();
-        scaleHost.removeAllViews();
-        attachContent();
-        scaleHost.post(() -> reanchorAfterFold(oldWidth, oldHeight));
-    }
-
-    private void reanchorAfterFold(int oldWidth, int oldHeight) {
-        if (params == null || scaleHost == null) {
-            return;
-        }
-        params.x = OverlayFold.keepCenter(params.x, oldWidth, scaleHost.getMeasuredWidth());
-        params.y = OverlayFold.keepCenter(params.y, oldHeight, scaleHost.getMeasuredHeight());
-        clampOnScreen();
-        persistPosition();
-    }
-
     // ---------------------------------------------------------------- 缩放
 
     private void applyScale(float scale, boolean persist) {
-        overlayScale = ScaleControlView.clamp(scale);
+        overlayScale = allowedScale(scale);
+        if (scaleControl != null) scaleControl.setScale(overlayScale);
         if (scaleHost != null) {
             scaleHost.setScale(overlayScale);
         }
@@ -776,7 +711,7 @@ public final class OverlayPanel {
         }
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         int width = scaleHost != null && scaleHost.getMeasuredWidth() > 0
-                ? scaleHost.getMeasuredWidth() : dp(MIDDLE_DP + 12);
+                ? scaleHost.getMeasuredWidth() : dp(320);
         int height = scaleHost != null && scaleHost.getMeasuredHeight() > 0
                 ? scaleHost.getMeasuredHeight() : dp(320);
         params.x = OverlayFold.clamp(params.x, width, metrics.widthPixels);
@@ -824,55 +759,6 @@ public final class OverlayPanel {
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
                     persistPosition();
-                    return true;
-                default:
-                    return false;
-            }
-        }
-    }
-
-    /**
-     * 只挂在小球上负责拖动：位移没超过阈值就算点一下，转给 {@code performClick} 展开控制台。
-     *
-     * <p>不能让框架自己判点击——拖动过程也会走 UP，每次挪完位置都会误展开一次。取消手势
-     * （系统抢走触摸）只收按压态，不算点。
-     */
-    private final class BallListener implements View.OnTouchListener {
-        private final int slop = ViewConfiguration.get(context).getScaledTouchSlop();
-        private int startX;
-        private int startY;
-        private float touchX;
-        private float touchY;
-
-        @Override
-        public boolean onTouch(View v, MotionEvent event) {
-            if (params == null) {
-                return false;
-            }
-            switch (event.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                    startX = params.x;
-                    startY = params.y;
-                    touchX = event.getRawX();
-                    touchY = event.getRawY();
-                    v.setPressed(true);
-                    return true;
-                case MotionEvent.ACTION_MOVE:
-                    params.x = startX + Math.round(event.getRawX() - touchX);
-                    params.y = startY + Math.round(event.getRawY() - touchY);
-                    clampOnScreen();
-                    return true;
-                case MotionEvent.ACTION_UP:
-                    v.setPressed(false);
-                    if (OverlayFold.isTap(event.getRawX() - touchX,
-                            event.getRawY() - touchY, slop)) {
-                        v.performClick();
-                    } else {
-                        persistPosition();
-                    }
-                    return true;
-                case MotionEvent.ACTION_CANCEL:
-                    v.setPressed(false);
                     return true;
                 default:
                     return false;
