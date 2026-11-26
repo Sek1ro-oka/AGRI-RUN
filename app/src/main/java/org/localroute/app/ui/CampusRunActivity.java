@@ -28,7 +28,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.LinearInterpolator;
 import android.widget.CheckBox;
-import android.widget.Button;
 import android.widget.ScrollView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -53,6 +52,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.button.MaterialButton;
 
 import org.localroute.app.BuildConfig;
 import org.localroute.app.R;
@@ -1468,10 +1468,10 @@ public final class CampusRunActivity extends AppCompatActivity {
         return view;
     }
 
-    private GradientDrawable readinessBackground(int color, int stroke, int radius) {
+    private GradientDrawable readinessBackground(int color, int stroke, float radiusPx) {
         GradientDrawable background = new GradientDrawable();
         background.setColor(color);
-        background.setCornerRadius(dp(radius));
+        background.setCornerRadius(radiusPx);
         if (stroke != Color.TRANSPARENT) background.setStroke(dp(1), stroke);
         return background;
     }
@@ -1509,13 +1509,14 @@ public final class CampusRunActivity extends AppCompatActivity {
                 ? getString(R.string.run_plan_unlimited)
                 : getString(R.string.run_readiness_total, distance, time);
         int muted = ContextCompat.getColor(this, R.color.campus_muted);
+        int link = ContextCompat.getColor(this, R.color.fm_link);
         int border = ContextCompat.getColor(this, R.color.fm_border);
-        int surface = ContextCompat.getColor(this, R.color.readiness_surface);
-        int tile = ContextCompat.getColor(this, R.color.readiness_tile);
+        int surface = ContextCompat.getColor(this, R.color.fm_surface);
+        float cardRadius = getResources().getDimension(R.dimen.radius_sheet);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(surface);
+        root.setBackgroundColor(ContextCompat.getColor(this, R.color.fm_background));
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
@@ -1548,12 +1549,13 @@ public final class CampusRunActivity extends AppCompatActivity {
         LinearLayout summary = new LinearLayout(this);
         summary.setOrientation(LinearLayout.VERTICAL);
         summary.setPadding(dp(15), dp(14), dp(15), dp(14));
-        summary.setBackground(readinessBackground(surface, border, 10));
+        summary.setBackground(readinessBackground(surface, border, cardRadius));
         LinearLayout summaryHead = new LinearLayout(this);
         summaryHead.setGravity(Gravity.CENTER_VERTICAL);
         TextView planTitle = readinessText("本次计划", 16, true);
         summaryHead.addView(planTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         TextView details = readinessText("查看 ›", 14, false);
+        details.setTextColor(link);
         details.setPadding(dp(8), dp(4), 0, dp(4));
         details.setOnClickListener(v -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("本次计划")
@@ -1573,13 +1575,13 @@ public final class CampusRunActivity extends AppCompatActivity {
         content.addView(summary);
         readinessSpace(content, 22);
         TextView requiredLabel = readinessText("必要设置 · " + completed + " / 3 已完成", 13, false);
-        requiredLabel.setTextColor(muted);
+        requiredLabel.setTextColor(link);
         content.addView(requiredLabel);
         readinessSpace(content, 10);
         LinearLayout required = new LinearLayout(this);
         required.setOrientation(LinearLayout.VERTICAL);
         required.setPadding(dp(14), dp(2), dp(14), dp(2));
-        required.setBackground(readinessBackground(surface, border, 10));
+        required.setBackground(readinessBackground(surface, border, cardRadius));
         SetupItem[] order = {SetupItem.MOCK_APP, SetupItem.LOCATION_PERMISSION, SetupItem.LOCATION_SWITCH};
         for (int i = 0; i < order.length; i++) {
             SetupItem item = order[i];
@@ -1605,7 +1607,7 @@ public final class CampusRunActivity extends AppCompatActivity {
         LinearLayout optional = new LinearLayout(this);
         optional.setOrientation(LinearLayout.VERTICAL);
         optional.setPadding(dp(14), dp(2), dp(14), dp(2));
-        optional.setBackground(readinessBackground(tile, border, 10));
+        optional.setBackground(readinessBackground(surface, border, cardRadius));
         PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
         boolean unrestricted = power != null && power.isIgnoringBatteryOptimizations(getPackageName());
         addReadinessRow(optional, "后台运行", unrestricted ? "已允许不受电池优化限制" : "调整电池优化，减少后台暂停", unrestricted,
@@ -1631,13 +1633,15 @@ public final class CampusRunActivity extends AppCompatActivity {
         LinearLayout footer = new LinearLayout(this);
         footer.setOrientation(LinearLayout.VERTICAL);
         footer.setPadding(dp(20), dp(12), dp(20), dp(12));
-        Button start = new Button(this);
+        MaterialButton start = new MaterialButton(this);
         start.setAllCaps(false);
         start.setText("开始跑圈");
+        start.setCornerRadius((int) getResources().getDimension(R.dimen.radius_card));
+        start.setInsetTop(0);
+        start.setInsetBottom(0);
         start.setBackgroundTintList(new ColorStateList(
                 new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}},
-                new int[]{ContextCompat.getColor(this, R.color.readiness_disabled),
-                        ContextCompat.getColor(this, R.color.campus_mint_dark)}));
+                new int[]{ContextCompat.getColor(this, R.color.readiness_disabled), link}));
         // 夜里 fm_link 会翻成浅薄荷，白字就糊了：用 fm_on_brand 跟着反转。
         start.setTextColor(ContextCompat.getColor(this, R.color.fm_on_brand));
         start.setEnabled(ready);
@@ -1658,17 +1662,20 @@ public final class CampusRunActivity extends AppCompatActivity {
     }
 
     private void addReadinessRow(LinearLayout parent, String title, String detail, boolean ok, Runnable action) {
-        int surface = ContextCompat.getColor(this, R.color.readiness_surface);
-        int chipOk = ContextCompat.getColor(this, R.color.readiness_chip_ok);
-        int chipStroke = ContextCompat.getColor(this, R.color.readiness_chip_ok_stroke);
-        int buttonStroke = ContextCompat.getColor(this, R.color.readiness_button_stroke);
+        int surface = ContextCompat.getColor(this, R.color.fm_surface);
+        int chipPending = ContextCompat.getColor(this, R.color.study_state_pending_fill);
+        int chipDone = ContextCompat.getColor(this, R.color.campus_mint_pale);
+        int link = ContextCompat.getColor(this, R.color.fm_link);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(12), 0, dp(12));
         TextView icon = readinessText(ok ? "✓" : "!", 15, true);
         icon.setGravity(Gravity.CENTER);
-        icon.setBackground(readinessBackground(ok ? chipOk : surface, chipStroke, 30));
+        icon.setTextColor(ContextCompat.getColor(this,
+                ok ? R.color.fm_success : R.color.fm_warning));
+        icon.setBackground(readinessBackground(ok ? chipDone : chipPending,
+                Color.TRANSPARENT, dp(30)));
         row.addView(icon, new LinearLayout.LayoutParams(dp(27), dp(27)));
         LinearLayout labels = new LinearLayout(this);
         labels.setOrientation(LinearLayout.VERTICAL);
@@ -1681,8 +1688,10 @@ public final class CampusRunActivity extends AppCompatActivity {
         if (!ok) {
             TextView button = readinessText("去设置", 13, true);
             button.setGravity(Gravity.CENTER);
+            button.setTextColor(link);
             button.setPadding(dp(10), 0, dp(10), 0);
-            button.setBackground(readinessBackground(surface, buttonStroke, 6));
+            button.setBackground(readinessBackground(surface, link,
+                    getResources().getDimension(R.dimen.radius_card)));
             button.setOnClickListener(v -> action.run());
             row.addView(button, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44)));
         }
