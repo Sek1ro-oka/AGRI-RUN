@@ -55,7 +55,8 @@ public final class StudyDialogs {
      * @param unparsed 节次没能识别、因而被跳过的课程名；必须在预览里报出来，
      *                 否则用户拿到的是一张看起来完整、实际少了几节课的课表
      * @param semester 教务课表自带的本周周次与校历日期；导入确认时据此自动定位本周。
-     *                 读不到锚点时，确认导入后会再问一次开学日期；推算结果会写在预览里
+     *                 教务完全没给锚点时，确认导入后会再问一次开学日期；课表属于其他学期时
+     *                 保持本机日期不动。推算结果会写在预览里
      */
     public static void showImportPreview(@NonNull Activity activity,
                                          @NonNull List<TimetableCourse> imported,
@@ -116,7 +117,7 @@ public final class StudyDialogs {
                                     : activity.getString(R.string.study_import_result, added),
                             Toast.LENGTH_LONG).show();
                     dialog.dismiss();
-                    if (plan.semesterStart == null) {
+                    if (plan.anchor == JwSemesterInfo.Plan.Anchor.MISSING) {
                         promptMissingSemesterStart(activity, onImported);
                     } else if (onImported != null) {
                         onImported.run();
@@ -171,13 +172,17 @@ public final class StudyDialogs {
     /**
      * 教务自带的周次与校历日期推算出的定位结果。
      *
-     * <p>取不到锚点时要提前说明导入后会补选开学日期，不能静默跳过；手设的开学日期
-     * 被替换时也必须说清楚，否则用户会发现自己调好的日期无声无息变了。
+     * <p>教务完全没给锚点时要提前说明导入后会补选开学日期，不能静默跳过；课表属于
+     * 其他学期时说明本机日期不会被改动；手设的开学日期被替换时也必须说清楚，
+     * 否则用户会发现自己调好的日期无声无息变了。
      */
     private static String semesterLine(@NonNull Activity activity,
                                        @NonNull JwSemesterInfo.Plan plan,
                                        @Nullable LocalDate previousStart) {
         if (plan.semesterStart == null) {
+            if (plan.anchor == JwSemesterInfo.Plan.Anchor.OTHER_TERM) {
+                return activity.getString(R.string.study_import_semester_other_term);
+            }
             return previousStart == null
                     ? activity.getString(R.string.study_import_semester_missing)
                     : activity.getString(R.string.study_import_semester_missing_old,
@@ -198,7 +203,7 @@ public final class StudyDialogs {
     }
 
     /**
-     * 教务没给学期日期时，导入完成后再问一次。
+     * 教务完全没给学期日期时，导入完成后再问一次；课表属于其他学期时不会走到这里。
      *
      * <p>不阻断导入：可以现在选，也可以稍后去「学习 · 设置」补。选「稍后」会清掉旧日期——
      * 旧值多半属于上学期，静默沿用比空着更容易误导。日期选择器从今天开始、不预填旧值，

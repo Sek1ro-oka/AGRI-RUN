@@ -46,19 +46,32 @@ public final class JwSemesterInfo {
     private final int termYear;
     /** 学期序号 1/2/3，0 表示没读到。 */
     private final int termIndex;
+    /** 教务原始学期码：正方 3/12/16，旧式 1/2/3；0 表示没读到。 */
+    private final int termCode;
 
     private JwSemesterInfo(int declaredWeek, @Nullable LocalDate calendarStart,
-                           int calendarWeeks, int termYear, int termIndex) {
+                           int calendarWeeks, int termYear, int termCode) {
         this.declaredWeek = declaredWeek;
         this.calendarStart = calendarStart;
         this.calendarWeeks = calendarWeeks;
         this.termYear = termYear;
-        this.termIndex = termIndex;
+        this.termCode = termCode;
+        this.termIndex = mapTermIndex(termCode);
     }
 
     /** 推算结果：导入确认时要写进本机偏好文件的开学日期、本周周次与总周数。 */
     public static final class Plan {
-        /** 第 1 周内的任意一天；为 null 表示教务信息不够，保持本机原值。 */
+        /** 推算状态：UI 据此决定要不要引导补填，不能只看 semesterStart 是否为空。 */
+        public enum Anchor {
+            /** 教务给出了可用锚点（校历日期或本周周次）。 */
+            FOUND,
+            /** 教务没有给出周次和校历日期，需要用户补填开学日期。 */
+            MISSING,
+            /** 教务给了周次，但课表属于其他学期，学期守护拦下了推算。 */
+            OTHER_TERM
+        }
+
+        /** 第 1 周内的任意一天；为 null 表示没有可用锚点，是否改动本机值由 anchor 决定。 */
         @Nullable
         public final LocalDate semesterStart;
         /** 本周周次；为 0 表示不知道，保持本机原来查看的周。 */
@@ -67,15 +80,19 @@ public final class JwSemesterInfo {
         public final int totalWeeks;
         /** 开学日期是否直接来自教务校历（否则是按本周倒推出来的周一）。 */
         public final boolean fromCalendar;
+        /** 为什么有或没有锚点；MISSING 才需要补填，OTHER_TERM 不能动本机日期。 */
+        public final Anchor anchor;
 
-        Plan(@Nullable LocalDate semesterStart, int week, int totalWeeks, boolean fromCalendar) {
+        Plan(@Nullable LocalDate semesterStart, int week, int totalWeeks,
+             boolean fromCalendar, Anchor anchor) {
             this.semesterStart = semesterStart;
             this.week = week;
             this.totalWeeks = totalWeeks;
             this.fromCalendar = fromCalendar;
+            this.anchor = anchor;
         }
 
-        static final Plan NONE = new Plan(null, 0, 0, false);
+        static final Plan NONE = new Plan(null, 0, 0, false, Anchor.MISSING);
     }
 
     public static JwSemesterInfo read(@Nullable JSONObject root) {
@@ -119,7 +136,7 @@ public final class JwSemesterInfo {
             count = parseWeek(root.opt("weekCount"));
         }
         return new JwSemesterInfo(week, start, count,
-                parseTermYear(root.opt("xnm")), parseTermIndex(root.opt("xqm")));
+                parseTermYear(root.opt("xnm")), parseTermCode(root.opt("xqm")));
     }
 
     /**
@@ -138,19 +155,20 @@ public final class JwSemesterInfo {
             boolean agrees = calendarStart != null
                     && SemesterCalendar.teachingWeek(calendarStart, today, total) == declaredWeek;
             if (agrees) {
-                return new Plan(calendarStart, declaredWeek, total, true);
+                return new Plan(calendarStart, declaredWeek, total, true, Plan.Anchor.FOUND);
             }
             // 只能靠「本周第 N 周」倒推时，先确认这份课表就是今天在读的学期。
-            return termCoversToday(today)
-                    ? new Plan(SemesterCalendar.mondayOf(today).minusWeeks(declaredWeek - 1L),
-                    declaredWeek, total, false)
-                    : Plan.NONE;
+            if (!termCoversToday(today)) {
+                return new Plan(null, 0, 0, false, Plan.Anchor.OTHER_TERM);
+            }
+            return new Plan(SemesterCalendar.mondayOf(today).minusWeeks(declaredWeek - 1L),
+                    declaredWeek, total, false, Plan.Anchor.FOUND);
         }
         if (calendarStart == null) {
             return Plan.NONE;
         }
         return new Plan(calendarStart, SemesterCalendar.teachingWeek(calendarStart, today, total),
-                total, true);
+                total, true, Plan.Anchor.FOUND);
     }
 
     /**
@@ -168,9 +186,14 @@ public final class JwSemesterInfo {
         LocalDate to;
         switch (termIndex) {
             case 1:
-                from = LocalDate.of(termYear, 8, 20);
-                to = LocalDate.of(termYear + 1, 2, 10);
-                break;
+                if (covers(today, LocalDate.of(termYear, 8, 20),
+                        LocalDate.of(termYear + 1, 2, 10))) {
+                    return true;
+                }
+                // 代码 3 在旧式 1/2/3 部署里是短学期，与正方第一学期共用，两个窗口任一覆盖都放行。
+                // 短学期窗口保守收到 8 月 31 日：9 月已可能是下一学年秋季，别让旧课表趁机改锚点。
+                return termCode == 3 && covers(today,
+                        LocalDate.of(termYear + 1, 6, 15), LocalDate.of(termYear + 1, 8, 31));
             case 2:
                 from = LocalDate.of(termYear + 1, 2, 1);
                 to = LocalDate.of(termYear + 1, 7, 31);
@@ -182,6 +205,10 @@ public final class JwSemesterInfo {
             default:
                 return true;
         }
+        return covers(today, from, to);
+    }
+
+    private static boolean covers(LocalDate today, LocalDate from, LocalDate to) {
         return !today.isBefore(from) && !today.isAfter(to);
     }
 
@@ -217,19 +244,16 @@ public final class JwSemesterInfo {
     /**
      * 学期序号：正方常用 3/12/16 表示秋/春/短学期，部分部署直接写 1/2/3。
      *
-     * <p>3 在两套写法里含义不同：正方把「第一学期」写成 3，
-     * {@link JwTimetableParser#termLabel} 也按这个口径展示，这里跟随它，
-     * 否则第一学期的导入会被当成短学期、被学期守护拦掉。
+     * <p>3 在两套写法里含义不同：正方把「第一学期」写成 3，旧式部署把短学期写成 3。
+     * {@link JwTimetableParser#termLabel} 按正方口径展示，这里跟随它；
+     * 旧式短学期由 {@link #termCoversToday} 对代码 3 同时认可秋季与短学期两个窗口兜底。
      */
     static int parseTermIndex(@Nullable Object value) {
-        if (!scalar(value)) {
-            return 0;
-        }
-        Matcher matcher = WEEK_NUMBER.matcher(String.valueOf(value));
-        if (!matcher.find()) {
-            return 0;
-        }
-        switch (Integer.parseInt(matcher.group())) {
+        return mapTermIndex(parseTermCode(value));
+    }
+
+    private static int mapTermIndex(int code) {
+        switch (code) {
             case 1:
             case 3:
                 return 1;
@@ -241,6 +265,15 @@ public final class JwSemesterInfo {
             default:
                 return 0;
         }
+    }
+
+    /** 原始学期码：正方 3/12/16，旧式 1/2/3；0 表示没读到。 */
+    static int parseTermCode(@Nullable Object value) {
+        if (!scalar(value)) {
+            return 0;
+        }
+        Matcher matcher = WEEK_NUMBER.matcher(String.valueOf(value));
+        return matcher.find() ? Integer.parseInt(matcher.group()) : 0;
     }
 
     /** 「9」「第9周」都读成 9；没有数字、超过两位或超出周数上限时返回 0。 */

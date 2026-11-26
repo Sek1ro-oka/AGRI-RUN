@@ -213,10 +213,15 @@ public final class JwTimetableJavascript {
 
                 function readCalendar(term) {
                   var out = pageCalendar();
-                  // 有些入口把周次放在 URL 上，页面里没有 #xq 时可退到这里。
-                  if (!out.weeks) out.weeks = weekDigits(params['xq'] || params['week']);
+                  function urlWeeks() {
+                    // 有些课表入口把周次写在 URL 的 xq/week 上；只信课表页，避免其他页面同名参数
+                    if (!out.weeks && path.indexOf('/kbcx/') >= 0) {
+                      out.weeks = weekDigits(params['xq'] || params['week']);
+                    }
+                    return out;
+                  }
                   return loadIndex(term).then(function (html) {
-                    if (!html || isLoginPage(html)) return out;
+                    if (!html || isLoginPage(html)) return urlWeeks();
                     if (!out.weeks) {
                       var declared = /xnWeeks\\s*=\\s*['"]?([0-9]{1,2})/.exec(html);
                       if (declared) out.weeks = declared[1];
@@ -226,16 +231,16 @@ public final class JwTimetableJavascript {
                     try {
                       doc = new DOMParser().parseFromString(html, 'text/html');
                     } catch (ignored) {
-                      return out;
+                      return urlWeeks();
                     }
-                    if (!doc) return out;
+                    if (!doc) return urlWeeks();
                     if (!out.count) {
                       out.count = nonEmptyOptions(findSelect(doc, 'xq')).length;
                     }
                     if (!out.weeks) out.weeks = weekDigits(selectedOption(doc, 'xq'));
-                    return out;
+                    return urlWeeks();
                   }).catch(function () {
-                    return out;
+                    return urlWeeks();
                   });
                 }
 

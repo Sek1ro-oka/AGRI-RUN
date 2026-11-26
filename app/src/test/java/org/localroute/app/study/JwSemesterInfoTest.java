@@ -43,6 +43,7 @@ public class JwSemesterInfoTest {
         JwSemesterInfo.Plan plan = info.plan(TODAY, 20);
         assertNull(plan.semesterStart);
         assertEquals(0, plan.week);
+        assertEquals(JwSemesterInfo.Plan.Anchor.MISSING, plan.anchor);
     }
 
     @Test
@@ -190,6 +191,8 @@ public class JwSemesterInfoTest {
                 "{\"xnm\":\"2025-2026\",\"xqm\":\"2\",\"xnWeeks\":\"9\"}")).plan(TODAY, 20);
         assertNull(past.semesterStart);
         assertEquals(0, past.week);
+        // 空锚点有两种成因，UI 只应对 MISSING 弹补填，不能碰 OTHER_TERM 的本机日期
+        assertEquals(JwSemesterInfo.Plan.Anchor.OTHER_TERM, past.anchor);
         assertFalse(JwSemesterInfo.read(json("{\"xnm\":\"2025-2026\",\"xqm\":\"2\"}"))
                 .termCoversToday(TODAY));
         assertTrue(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"2\"}"))
@@ -217,6 +220,7 @@ public class JwSemesterInfoTest {
         assertEquals(WEEK_ONE_MONDAY, plan.semesterStart);
         assertEquals(9, plan.week);
         assertFalse(plan.fromCalendar);
+        assertEquals(JwSemesterInfo.Plan.Anchor.FOUND, plan.anchor);
     }
 
     @Test
@@ -226,6 +230,21 @@ public class JwSemesterInfoTest {
         assertTrue(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"12\"}"))
                 .termCoversToday(LocalDate.of(2027, 3, 15)));
         assertTrue(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"16\"}"))
+                .termCoversToday(LocalDate.of(2027, 7, 1)));
+    }
+
+    /** 代码 3 在旧式 1/2/3 部署里是短学期：正方秋季窗口之外，短学期窗口也要放行。 */
+    @Test
+    public void legacyShortTermCodeStillCovered() throws Exception {
+        assertTrue(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"3\"}"))
+                .termCoversToday(LocalDate.of(2027, 7, 1)));
+        assertTrue(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"3\"}"))
+                .termCoversToday(LocalDate.of(2027, 8, 25)));
+        // 短学期窗口保守收到 8/31：9 月已可能是下一学年秋季，不能放旧课表进来
+        assertFalse(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"3\"}"))
+                .termCoversToday(LocalDate.of(2027, 9, 10)));
+        // 旧式的 1 仍是秋季，不因此放行到暑期
+        assertFalse(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"1\"}"))
                 .termCoversToday(LocalDate.of(2027, 7, 1)));
     }
 
@@ -242,5 +261,8 @@ public class JwSemesterInfoTest {
         assertEquals(2, JwSemesterInfo.parseTermIndex("12"));
         assertEquals(3, JwSemesterInfo.parseTermIndex("16"));
         assertEquals(0, JwSemesterInfo.parseTermIndex("4"));
+        assertEquals(3, JwSemesterInfo.parseTermCode("3"));
+        assertEquals(16, JwSemesterInfo.parseTermCode(16));
+        assertEquals(0, JwSemesterInfo.parseTermCode(null));
     }
 }

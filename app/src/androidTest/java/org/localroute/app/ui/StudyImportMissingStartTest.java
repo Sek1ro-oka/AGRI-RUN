@@ -28,12 +28,14 @@ import java.util.Map;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertNotNull;
@@ -42,11 +44,12 @@ import static org.junit.Assert.assertNotNull;
  * 教务导入没读到学期日期时的补填流程。
  *
  * <p>预览先说明「导入完成后要选日期」；确认后课程照常写入，再弹一次补填。
- * 点「稍后设置」必须清掉旧学期的日期，避免新学期静默沿用旧值。
+ * 点「稍后设置」必须清掉旧学期的日期，避免新学期静默沿用旧值；选日期则写入所选锚点。
  */
 @RunWith(AndroidJUnit4.class)
 public class StudyImportMissingStartTest {
 
+    /** StudyTimetableStore 的偏好键（三个包内常量 + 一个私有常量），改名时这里要同步。 */
     private static final String[] TOUCHED = {
             "courses", "semester_start", "total_weeks", "current_week"
     };
@@ -128,6 +131,53 @@ public class StudyImportMissingStartTest {
             onView(withText(R.string.study_import_start_later)).inRoot(isDialog()).perform(click());
 
             assertNull(StudyTimetableStore.loadSemesterStart(context));
+            assertFalse(StudyTimetableStore.loadCourses(context).isEmpty());
+        }
+    }
+
+    @Test
+    public void missingStartPickedDateIsSaved() throws Exception {
+        List<TimetableCourse> courses = Collections.singletonList(TimetableCourse.create(
+                "大学英语", "李老师", "B202", 3, 3, 4, "1-16"));
+        JwSemesterInfo noAnchor = JwSemesterInfo.read(
+                new JSONObject("{\"xnm\":\"2026-2027\",\"xqm\":\"3\"}"));
+        try (ActivityScenario<StudySettingsActivity> scenario =
+                     ActivityScenario.launch(StudySettingsActivity.class)) {
+            scenario.onActivity(activity -> StudyDialogs.showImportPreview(activity, courses,
+                    "测试来源", Collections.emptyList(), noAnchor, null));
+            onView(withText(R.string.study_import_confirm)).inRoot(isDialog()).perform(click());
+            onView(withText(R.string.study_import_start_choose)).inRoot(isDialog()).perform(click());
+            // 日期选择器默认停在今天，直接确认即可写入锚点
+            onView(withText(android.R.string.ok)).inRoot(isDialog()).perform(click());
+
+            assertEquals(LocalDate.now(), StudyTimetableStore.loadSemesterStart(context));
+            assertFalse(StudyTimetableStore.loadCourses(context).isEmpty());
+        }
+    }
+
+    /** 往学期课表：预览说明不动本机日期，导入后也不能弹补填框。 */
+    @Test
+    public void otherTermImportKeepsSemesterStartWithoutPrompt() throws Exception {
+        List<TimetableCourse> courses = Collections.singletonList(TimetableCourse.create(
+                "线性代数", "王老师", "C303", 2, 5, 6, "1-16"));
+        JwSemesterInfo pastTerm = JwSemesterInfo.read(
+                new JSONObject("{\"xnm\":\"2019-2020\",\"xqm\":\"2\",\"xnWeeks\":\"9\"}"));
+        LocalDate existing = LocalDate.of(2026, 9, 1);
+        try (ActivityScenario<StudySettingsActivity> scenario =
+                     ActivityScenario.launch(StudySettingsActivity.class)) {
+            scenario.onActivity(activity -> {
+                StudyTimetableStore.saveSemesterStart(activity, existing);
+                StudyDialogs.showImportPreview(activity, courses, "测试来源",
+                        Collections.emptyList(), pastTerm, null);
+            });
+            onView(withId(R.id.textImportSummary)).inRoot(isDialog())
+                    .check(matches(withText(containsString("属于其他学期"))));
+
+            onView(withText(R.string.study_import_confirm)).inRoot(isDialog()).perform(click());
+
+            onView(withText(R.string.study_import_start_later)).inRoot(isDialog())
+                    .check(doesNotExist());
+            assertEquals(existing, StudyTimetableStore.loadSemesterStart(context));
             assertFalse(StudyTimetableStore.loadCourses(context).isEmpty());
         }
     }
