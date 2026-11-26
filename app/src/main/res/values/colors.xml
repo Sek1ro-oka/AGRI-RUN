@@ -37,15 +37,7 @@
     <color name="overlay_chevron">#66C3D0CA</color>
     <color name="overlay_close">#FF9A93</color>
 
-    <!--
-      跑前准备面板：这组色值原本以 Color.WHITE／0xff… 写死在 CampusRunActivity 里，
-      深色模式下会变成白底深字。改走资源后 values-night 可以整体换色，代码只查令牌。
-    -->
-    <color name="readiness_surface">@color/fm_surface</color>
-    <color name="readiness_tile">#FFF7F8F7</color>
-    <color name="readiness_chip_ok">#FFEDF1ED</color>
-    <color name="readiness_chip_ok_stroke">#FFA8B0AA</color>
-    <color name="readiness_button_stroke">#FF909A92</color>
+    <!-- 跑前准备面板：页面、卡片与状态色一律复用 fm_* 角色，只有禁用态单独定义。 -->
     <color name="readiness_disabled">#FFAAAAAA</color>
 
     <!-- 作业查询：课表色块与状态底色，延续薄荷绿主色 -->
