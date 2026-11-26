@@ -159,285 +159,43 @@
                             android:textSize="@dimen/text_caption" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
-                <LinearLayout
+<com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardHomework"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_md"
-                    android:layout_marginBottom="@dimen/space_sm"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/home_account_section"
-                        android:textColor="@color/fm_text_secondary"
-                        android:textSize="@dimen/text_body"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/home_account_placeholder"
-                        android:textColor="@color/fm_muted"
-                        android:textSize="@dimen/text_caption" />
-                </LinearLayout>
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="@dimen/space_xl"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/fm_surface_alt"
+                    app:cardCornerRadius="@dimen/radius_sheet"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="0dp">
                     <LinearLayout
-                        android:id="@+id/cardHomeTraffic"
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_home_account_card"
-                        android:clickable="true"
-                        android:focusable="true"
                         android:orientation="vertical"
                         android:padding="@dimen/space_md">
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-                            <ImageView
-                                android:layout_width="14dp"
-                                android:layout_height="14dp"
-                                android:src="@drawable/ic_home_traffic"
-                                android:contentDescription="@null"
-                                app:tint="@color/fm_link" />
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/space_sm"
-                                android:layout_weight="1"
-                                android:text="@string/home_account_traffic"
-                                android:textColor="@color/fm_text_secondary"
-                                android:textSize="@dimen/text_caption"
-                                android:maxLines="1"
-                                android:ellipsize="end" />
-                        </LinearLayout>
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_xs"
-                            android:gravity="bottom"
-                            android:orientation="horizontal">
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/home_account_value_unknown"
-                                android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_page_title"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/space_xs"
-                                android:layout_marginBottom="@dimen/space_xs"
-                                android:text="@string/home_account_unit_gb"
-                                android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_caption" />
-                        </LinearLayout>
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="@string/home_account_missing"
-                            android:textColor="@color/fm_muted"
-                            android:textSize="@dimen/text_caption" />
-                    </LinearLayout>
-                    <LinearLayout
-                        android:id="@+id/cardHomePower"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_md"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_home_account_card"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:orientation="vertical"
-                        android:padding="@dimen/space_md">
+                            android:text="@string/home_homework_section"
+                            android:textColor="@color/fm_text"
+                            android:textSize="@dimen/text_body"
+                            android:textStyle="bold" />
                         <LinearLayout
+                            android:id="@+id/homeworkList"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-                            <ImageView
-                                android:layout_width="14dp"
-                                android:layout_height="14dp"
-                                android:src="@drawable/ic_home_power"
-                                android:contentDescription="@null"
-                                app:tint="@color/fm_link" />
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/space_sm"
-                                android:layout_weight="1"
-                                android:text="@string/home_account_power"
-                                android:textColor="@color/fm_text_secondary"
-                                android:textSize="@dimen/text_caption"
-                                android:maxLines="1"
-                                android:ellipsize="end" />
-                        </LinearLayout>
-                        <LinearLayout
+                            android:layout_marginTop="@dimen/space_sm"
+                            android:orientation="vertical" />
+                        <TextView
+                            android:id="@+id/textHomeworkFoot"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_xs"
-                            android:gravity="bottom"
-                            android:orientation="horizontal">
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/home_account_value_unknown"
-                                android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_page_title"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/space_xs"
-                                android:layout_marginBottom="@dimen/space_xs"
-                                android:text="@string/home_account_unit_kwh"
-                                android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_caption" />
-                        </LinearLayout>
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="@string/home_account_missing"
-                            android:textColor="@color/fm_muted"
+                            android:textColor="@color/fm_text_secondary"
                             android:textSize="@dimen/text_caption" />
                     </LinearLayout>
-                </LinearLayout>
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_md"
-                    android:orientation="horizontal">
-                    <LinearLayout
-                        android:id="@+id/cardHomeCard"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_home_account_card"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:orientation="vertical"
-                        android:padding="@dimen/space_md">
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-                            <ImageView
-                                android:layout_width="14dp"
-                                android:layout_height="14dp"
-                                android:src="@drawable/ic_home_card"
-                                android:contentDescription="@null"
-                                app:tint="@color/fm_link" />
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/space_sm"
-                                android:layout_weight="1"
-                                android:text="@string/home_account_card"
-                                android:textColor="@color/fm_text_secondary"
-                                android:textSize="@dimen/text_caption"
-                                android:maxLines="1"
-                                android:ellipsize="end" />
-                        </LinearLayout>
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_xs"
-                            android:gravity="bottom"
-                            android:orientation="horizontal">
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/home_account_value_unknown"
-                                android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_page_title"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/space_xs"
-                                android:layout_marginBottom="@dimen/space_xs"
-                                android:text="@string/home_account_unit_yuan"
-                                android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_caption" />
-                        </LinearLayout>
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="@string/home_account_missing"
-                            android:textColor="@color/fm_muted"
-                            android:textSize="@dimen/text_caption" />
-                    </LinearLayout>
-                    <LinearLayout
-                        android:id="@+id/cardHomeSpend"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_md"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_home_account_card"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:orientation="vertical"
-                        android:padding="@dimen/space_md">
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-                            <ImageView
-                                android:layout_width="14dp"
-                                android:layout_height="14dp"
-                                android:src="@drawable/ic_home_spend"
-                                android:contentDescription="@null"
-                                app:tint="@color/fm_link" />
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/space_sm"
-                                android:layout_weight="1"
-                                android:text="@string/home_account_spend"
-                                android:textColor="@color/fm_text_secondary"
-                                android:textSize="@dimen/text_caption"
-                                android:maxLines="1"
-                                android:ellipsize="end" />
-                        </LinearLayout>
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_xs"
-                            android:gravity="bottom"
-                            android:orientation="horizontal">
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/home_account_value_unknown"
-                                android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_page_title"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="@dimen/space_xs"
-                                android:layout_marginBottom="@dimen/space_xs"
-                                android:text="@string/home_account_unit_yuan"
-                                android:textColor="@color/fm_nav_idle"
-                                android:textSize="@dimen/text_caption" />
-                        </LinearLayout>
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="@string/home_account_missing"
-                            android:textColor="@color/fm_muted"
-                            android:textSize="@dimen/text_caption" />
-                    </LinearLayout>
-                </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
         </LinearLayout>
     </ScrollView>

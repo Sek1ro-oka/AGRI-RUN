@@ -38,11 +38,15 @@
         <item>日</item>
     </string-array>
     <string name="home_agenda_closed">这一天放假</string>
-    <string name="home_agenda_empty">这一天没有课程，也没有作业</string>
-    <string name="home_agenda_count">%1$d 节课 · %2$d 份作业</string>
+    <string name="home_agenda_empty">这一天没有课程</string>
+    <string name="home_agenda_count">%1$d 节课</string>
+    <string name="home_homework_section">待交作业</string>
+    <string name="home_homework_count">共 %1$d 份</string>
+    <string name="home_day_today">今天</string>
+    <string name="home_day_tomorrow">明天</string>
     <string name="home_agenda_expand">展开还有 %1$d 项</string>
     <string name="home_agenda_collapse">收起</string>
-    <string name="home_agenda_all_done">今天的安排都结束了</string>
+    <string name="home_agenda_all_done">今天的课都结束了</string>
     <string name="home_class_done">已结束</string>
     <string name="home_class_live">进行中</string>
     <string name="home_class_upcoming">未开始</string>
@@ -57,17 +61,6 @@
     <string name="home_agenda_import_action">去导入</string>
     <string name="home_bind_title">还没绑定学习通</string>
     <string name="home_bind_action">去绑定</string>
-    <string name="home_account_section">校园账户</string>
-    <string name="home_account_placeholder">占位 · 无数据源</string>
-    <string name="home_account_missing">未接入　›</string>
-    <string name="home_account_value_unknown">--</string>
-    <string name="home_account_traffic">校园网剩余流量</string>
-    <string name="home_account_power">宿舍剩余电量</string>
-    <string name="home_account_card">校园卡余额</string>
-    <string name="home_account_spend">本月支出</string>
-    <string name="home_account_unit_gb">GB</string>
-    <string name="home_account_unit_kwh">度</string>
-    <string name="home_account_unit_yuan">元</string>
 
     <!-- 我的：账号与待接入。账号文案复用 study_account_* / study_settings_account_meta。 -->
     <string name="profile_manage_action">管理账号</string>
