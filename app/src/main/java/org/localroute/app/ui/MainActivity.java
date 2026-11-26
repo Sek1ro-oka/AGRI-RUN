@@ -295,6 +295,7 @@ public class MainActivity extends AppCompatActivity {
     /** 待交作业：跨天清单，没有内容就整块不出现。 */
     private void renderHomework(List<HomeworkDue.Item> due) {
         binding.homeScroll.removeCallbacks(collapsePass);
+        collapseRetries = 0;
         homeworkFootActionable = false;
         homeworkTotal = due.size();
         binding.homeworkList.removeAllViews();
@@ -349,9 +350,14 @@ public class MainActivity extends AppCompatActivity {
         int hFit = homeworkExpanded ? hRows
                 : (hH > 0 ? Math.max(0, Math.min(hRows, rest / hH)) : 0);
         // 作业有内容却一条都分不到时，从课程匀一条给它：只剩一个标题的作业块看起来像坏了。
+        // 先算换得来几条再动课程，换不到就别白丢一条课。
         if (!homeworkExpanded && !courseExpanded && hRows > 0 && hFit == 0 && cFit > 1) {
-            cFit--;
-            hFit = Math.min(hRows, (available - cFit * cH) / Math.max(1, hH));
+            int shifted = Math.min(hRows,
+                    Math.max(0, available - (cFit - 1) * cH) / Math.max(1, hH));
+            if (shifted > 0) {
+                cFit--;
+                hFit = shifted;
+            }
         }
 
         int cHidden = cRows - cFit;
