@@ -175,8 +175,8 @@ public class StudyImportMissingStartTest {
 
             onView(withText(R.string.study_import_confirm)).inRoot(isDialog()).perform(click());
 
-            onView(withText(R.string.study_import_start_later)).inRoot(isDialog())
-                    .check(doesNotExist());
+            // 「稍后设置」只在补填弹窗里出现；不在对话框根里查找，避免没有根时抛无匹配异常
+            onView(withText(R.string.study_import_start_later)).check(doesNotExist());
             assertEquals(existing, StudyTimetableStore.loadSemesterStart(context));
             assertFalse(StudyTimetableStore.loadCourses(context).isEmpty());
         }
