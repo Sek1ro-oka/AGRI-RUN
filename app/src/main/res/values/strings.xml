@@ -322,6 +322,7 @@
     <string name="campus_stat_time">运动时间</string>
     <string name="campus_stat_pace">当前配速</string>
     <string name="campus_lap_info">第 %1$d / %2$d 圈</string>
+    <string name="campus_lap_info_unlimited">第 %1$d 圈</string>
     <string name="campus_lap_info_completed">已完成 %1$d 圈</string>
     <string name="campus_lap_hold">单点保持</string>
     <string name="campus_single_route_info">%1$s · 单点保持</string>
@@ -861,6 +862,12 @@
     <string name="run_speed_mode">速度（km/h）</string>
     <string name="run_laps_edit">设置圈数</string>
     <string name="run_laps_value">%1$d 圈</string>
+    <string name="run_laps_unset">不设圈数</string>
+    <string name="run_laps_clear">不设圈数</string>
+    <string name="run_plan_unlimited">不设圈数 · 手动结束</string>
+    <string name="run_readiness_total">目标距离 %1$s km · 预计 %2$s</string>
+    <string name="run_notification_loops_unlimited">已完成 %1$d 圈</string>
+    <string name="run_notification_loops_target">圈 %1$d/%2$d</string>
     <string name="run_plan_summary">目标 %1$d 圈 · %2$s km · 预计 %3$s</string>
     <string name="run_pace_hint">直接输入，或拖动滑条快速调整。保存为当前运动类型的预设。</string>
     <string name="run_apply_now">保存并立即调整</string>

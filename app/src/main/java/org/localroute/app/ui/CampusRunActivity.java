@@ -117,7 +117,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     private static final String PREFS = "campus_run";
     private static final String KEY_SPORT = "sport";
     private static final String KEY_PACE = "pace_seconds";
-    private static final String KEY_LAPS = "laps";
+    private static final String STATE_DRAFT_LAPS = "draft_laps";
     private static final String KEY_NATURAL = "natural_speed";
     /** 新键：0..1 的扰动程度；旧版的是布尔 {@code vary_path}，首次读取时迁移。 */
     private static final String KEY_VARY_STRENGTH = "vary_strength";
@@ -197,7 +197,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     private int paceSeconds = DEFAULT_PACE_RUN;
     private double configuredSpeedKmh = 9d;
     private SpeedPresets speedPresets;
-    private int laps = 5;
+    private int laps = RunConfig.NO_LOOP_TARGET;
     private boolean naturalEnabled = true;
     /** 路线扰动程度 0..1，0 表示关闭。 */
     private double varyStrength = 0.5d;
@@ -271,6 +271,9 @@ public final class CampusRunActivity extends AppCompatActivity {
         MapLibre.getInstance(this);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         loadSettings();
+        if (savedInstanceState != null) {
+            laps = savedInstanceState.getInt(STATE_DRAFT_LAPS, RunConfig.NO_LOOP_TARGET);
+        }
 
         binding = ActivityCampusRunBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -359,6 +362,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     /** 把刚结束的本次结果留在跑圈地图上，释放会话所有权但保留数字显示。 */
     private void applyResultSnapshot(RunSnapshot result) {
+        laps = RunConfig.NO_LOOP_TARGET;
         claimOwnSession = false;
         activeRunId = "";
         showResult = true;
@@ -386,8 +390,6 @@ public final class CampusRunActivity extends AppCompatActivity {
         }
         configuredSpeedKmh = speedPresets.get(sportIndex());
         paceSeconds = (int) Math.round(3600d / configuredSpeedKmh);
-        laps = clamp(prefs.getInt(KEY_LAPS, RunConfig.DEFAULT_LOOPS),
-                RunConfig.MIN_LOOPS, RunConfig.MAX_LOOPS);
         naturalEnabled = prefs.getBoolean(KEY_NATURAL, true);
         loadVaryStrength();
         loadRoutes();
@@ -1064,11 +1066,14 @@ public final class CampusRunActivity extends AppCompatActivity {
         } else {
             binding.textPlanSummary.setVisibility(View.VISIBLE);
             int target = snapshot.isActive() && claimOwnSession ? snapshot.targetLoops() : laps;
-            if (target <= 0) target = laps;
-            double meters = route.lapMeters() * target;
-            long millis = (long) (meters / configuredSpeedKmh * 3600d);
-            binding.textPlanSummary.setText(getString(R.string.run_plan_summary, target,
-                    CampusFormat.kilometers(meters), CampusFormat.time(millis)));
+            if (target == RunConfig.NO_LOOP_TARGET) {
+                binding.textPlanSummary.setText(R.string.run_plan_unlimited);
+            } else {
+                double meters = route.lapMeters() * target;
+                long millis = (long) (meters / configuredSpeedKmh * 3600d);
+                binding.textPlanSummary.setText(getString(R.string.run_plan_summary, target,
+                        CampusFormat.kilometers(meters), CampusFormat.time(millis)));
+            }
         }
         if (!snapshot.isActive() && !showResult) binding.textLapInfo.setText(R.string.run_choose_route);
     }
@@ -1086,7 +1091,9 @@ public final class CampusRunActivity extends AppCompatActivity {
         EditText input = new EditText(this);
         input.setId(R.id.inputRunValue);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setSingleLine(true); input.setText(String.valueOf(laps)); input.selectAll();
+        input.setSingleLine(true);
+        input.setText(String.valueOf(laps == RunConfig.NO_LOOP_TARGET ? RunConfig.DEFAULT_LOOPS : laps));
+        input.selectAll();
         input.setContentDescription(getString(R.string.run_laps_edit));
         LinearLayout stepper = new LinearLayout(this);
         stepper.setGravity(Gravity.CENTER_VERTICAL);
@@ -1104,12 +1111,16 @@ public final class CampusRunActivity extends AppCompatActivity {
         box.addView(stepper);
         AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(R.string.run_laps_edit)
                 .setView(box).setNegativeButton(R.string.campus_cancel, null)
+                .setNeutralButton(R.string.run_laps_clear, (d, which) -> {
+                    if (snapshot.isActive()) return;
+                    laps = RunConfig.NO_LOOP_TARGET;
+                    renderSetupValues(); updateRunUi();
+                })
                 .setPositiveButton(R.string.campus_save, null).create();
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             if (snapshot.isActive()) { dialog.dismiss(); return; }
             try {
                 laps = RunInputs.laps(input.getText().toString());
-                prefs.edit().putInt(KEY_LAPS, laps).apply();
                 renderSetupValues(); updateRunUi(); dialog.dismiss();
             } catch (IllegalArgumentException error) { input.setError(error.getMessage()); }
         }));
@@ -1195,7 +1206,7 @@ public final class CampusRunActivity extends AppCompatActivity {
 
     private void renderSetupValues() {
         renderPaceValue();
-        binding.textLaps.setText(getString(R.string.run_laps_value, laps));
+        renderLapsValue();
         if (runScreenVisible) renderPlanSummary();
         binding.switchNatural.setChecked(naturalEnabled);
         varySeekGuard = true;
@@ -1203,6 +1214,13 @@ public final class CampusRunActivity extends AppCompatActivity {
         varySeekGuard = false;
         renderVaryValue();
         updateBackDescriptions();
+    }
+
+    private void renderLapsValue() {
+        int target = snapshot.isActive() && claimOwnSession && !snapshot.singlePoint()
+                ? snapshot.targetLoops() : laps;
+        binding.textLaps.setText(target == RunConfig.NO_LOOP_TARGET
+                ? getString(R.string.run_laps_unset) : getString(R.string.run_laps_value, target));
     }
 
     /** 地图返回上级，运行设置返回地图。 */
@@ -1485,6 +1503,11 @@ public final class CampusRunActivity extends AppCompatActivity {
         double meters = plan.route.lapMeters() * plan.loops;
         String distance = CampusFormat.kilometers(meters);
         String time = CampusFormat.time((long) (meters / plan.speedKmh * 3600d));
+        String lapLabel = plan.loops == RunConfig.NO_LOOP_TARGET
+                ? getString(R.string.run_laps_unset) : getString(R.string.run_laps_value, plan.loops);
+        String totalLabel = plan.loops == RunConfig.NO_LOOP_TARGET
+                ? getString(R.string.run_plan_unlimited)
+                : getString(R.string.run_readiness_total, distance, time);
         int muted = ContextCompat.getColor(this, R.color.campus_muted);
         int border = ContextCompat.getColor(this, R.color.fm_border);
         int surface = ContextCompat.getColor(this, R.color.readiness_surface);
@@ -1534,17 +1557,16 @@ public final class CampusRunActivity extends AppCompatActivity {
         details.setPadding(dp(8), dp(4), 0, dp(4));
         details.setOnClickListener(v -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle("本次计划")
-                .setMessage("路线：" + plan.route.name() + " · " + plan.loops + " 圈\n目标距离 "
-                        + distance + " km · 预计 " + time + "\n配速 "
+                .setMessage("路线：" + plan.route.name() + " · " + lapLabel + "\n" + totalLabel + "\n配速 "
                         + CampusFormat.paceWithUnit(3600d / plan.speedKmh))
                 .setPositiveButton("完成", null).show());
         summaryHead.addView(details);
         summary.addView(summaryHead);
-        TextView planLine = readinessText("路线：" + plan.route.name() + "  ·  " + plan.loops + " 圈", 13, false);
+        TextView planLine = readinessText("路线：" + plan.route.name() + "  ·  " + lapLabel, 13, false);
         planLine.setTextColor(muted);
         planLine.setPadding(0, dp(4), 0, 0);
         summary.addView(planLine);
-        TextView planTotal = readinessText("目标距离 " + distance + " km  ·  预计 " + time, 13, false);
+        TextView planTotal = readinessText(totalLabel, 13, false);
         planTotal.setTextColor(muted);
         planTotal.setPadding(0, dp(4), 0, 0);
         summary.addView(planTotal);
@@ -1879,6 +1901,9 @@ public final class CampusRunActivity extends AppCompatActivity {
         naturalRunning = false;
         handler.removeCallbacks(naturalTicker);
         boolean wasSinglePoint = next.singlePoint() || previous.singlePoint();
+        if (!wasSinglePoint) {
+            laps = RunConfig.NO_LOOP_TARGET;
+        }
         showResult = !wasSinglePoint;
         boolean showResultNow = resultRequested;
         claimOwnSession = false;
@@ -1887,6 +1912,7 @@ public final class CampusRunActivity extends AppCompatActivity {
                 .putBoolean(KEY_OWNED, false)
                 .remove(KEY_ACTIVE_RUN_ID)
                 .apply();
+        renderLapsValue();
 
         if (pendingRouteSwitch != null) {
             CampusRoute target = pendingRouteSwitch;
@@ -1944,6 +1970,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     // ---------------------------------------------------------------- 跑圈页 UI
 
     private void updateRunUi() {
+        renderLapsValue();
         boolean ours = claimOwnSession || showResult;
         boolean active = ours && snapshot.isActive();
         boolean single = active && snapshot.singlePoint();
@@ -1975,12 +2002,16 @@ public final class CampusRunActivity extends AppCompatActivity {
             } else {
                 binding.textRouteInfo.setText(getString(R.string.campus_route_info,
                         route.name(), CampusFormat.lapMeters(lapMeters)));
-                int target = snapshot.targetLoops() > 0 ? snapshot.targetLoops() : laps;
+                int target = ours && (snapshot.isActive() || isTerminal(snapshot.state()))
+                        ? snapshot.targetLoops() : laps;
                 if (ours && snapshot.state() == RunState.COMPLETED) {
                     binding.textLapInfo.setText(
                             getString(R.string.campus_lap_info_completed, snapshot.completedLoops()));
                 } else if (ours && snapshot.state() == RunState.STARTING) {
                     binding.textLapInfo.setText(getString(R.string.campus_starting));
+                } else if (target == RunConfig.NO_LOOP_TARGET) {
+                    binding.textLapInfo.setText(getString(R.string.campus_lap_info_unlimited,
+                            snapshot.isActive() ? snapshot.completedLoops() + 1 : 1));
                 } else {
                     int current = Math.min(snapshot.completedLoops() + 1, target);
                     binding.textLapInfo.setText(getString(R.string.campus_lap_info, current, target));
@@ -2642,6 +2673,7 @@ public final class CampusRunActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
+        outState.putInt(STATE_DRAFT_LAPS, laps);
         // 计划存在就要存：通知权限的申请可能正夹在「点开始」与面板之间，那时对话框还没建。
         if (readinessPlan != null) {
             outState.putString("readiness_route", readinessPlan.route.id());

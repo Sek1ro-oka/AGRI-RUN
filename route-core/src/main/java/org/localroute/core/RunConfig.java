@@ -11,6 +11,8 @@ public final class RunConfig {
     public static final double MAX_SPEED_KMH = 60d;
     public static final double DEFAULT_SPEED_KMH = 9d;
     public static final int MIN_LOOPS = 1;
+    /** 未设置目标圈数，循环路线持续运行，直到用户结束。 */
+    public static final int NO_LOOP_TARGET = 0;
     public static final int MAX_LOOPS = 1000;
     public static final int DEFAULT_LOOPS = 5;
     public static final int DEFAULT_TICK_INTERVAL_MS = 500;
@@ -30,8 +32,8 @@ public final class RunConfig {
             throw new IllegalArgumentException(String.format(java.util.Locale.US,
                     "速度必须在 %.1f—%.0f km/h 之间：%.2f", MIN_SPEED_KMH, MAX_SPEED_KMH, speedKmh));
         }
-        if (loopCount < MIN_LOOPS || loopCount > MAX_LOOPS) {
-            throw new IllegalArgumentException("圈数必须在 " + MIN_LOOPS + "—" + MAX_LOOPS + " 之间：" + loopCount);
+        if (loopCount < NO_LOOP_TARGET || loopCount > MAX_LOOPS) {
+            throw new IllegalArgumentException("圈数须为未设置或 " + MIN_LOOPS + "—" + MAX_LOOPS + "：" + loopCount);
         }
         if (tickIntervalMs < MIN_TICK_INTERVAL_MS || tickIntervalMs > MAX_TICK_INTERVAL_MS) {
             throw new IllegalArgumentException("调度间隔必须在 " + MIN_TICK_INTERVAL_MS + "—" + MAX_TICK_INTERVAL_MS

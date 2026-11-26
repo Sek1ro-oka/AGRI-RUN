@@ -81,6 +81,35 @@ public class RouteEngineTest {
     }
 
     @Test
+    public void noLoopTarget_continuesAcrossManyLaps_andKeepsPositionContinuous() throws Exception {
+        CompiledRoute route = squareRoute();
+        RunConfig config = new RunConfig(9d, RunConfig.NO_LOOP_TARGET);
+        double distance = route.lapLengthMeters() * 1001.25d;
+        RouteEngine.Progress progress = RouteEngine.progressForDistance(route,
+                config.withSpeedKmh(12d).loopCount(), distance, 12d / 3.6d);
+        GeoPoint expected = route.pointAt(distance);
+        assertFalse(progress.finished());
+        assertEquals(1001, progress.completedLoops());
+        assertEquals(RunConfig.NO_LOOP_TARGET, progress.targetLoops());
+        assertEquals(distance, progress.distanceMeters(), 1e-6d);
+        assertEquals(expected.latitude(), progress.latitude(), 1e-12d);
+        assertEquals(expected.longitude(), progress.longitude(), 1e-12d);
+        assertTrue(Double.isInfinite(RouteEngine.targetDistanceMeters(route, config)));
+        assertEquals(RunConfig.NO_LOOP_TARGET, config.withTickIntervalMs(1000).loopCount());
+    }
+
+    @Test
+    public void noLoopTarget_doesNotChangeSingleRunEndBehavior() throws Exception {
+        CompiledRoute route = RouteCompiler.compile(squareRoute().closedRing().subList(0, 4),
+                EndBehavior.STOP_AT_END);
+        RouteEngine.Progress progress = RouteEngine.progressForDistance(route,
+                RunConfig.NO_LOOP_TARGET, route.lapLengthMeters() * 2d, 2.5d);
+        assertTrue(progress.finished());
+        assertEquals(1, progress.targetLoops());
+        assertEquals(route.lapLengthMeters(), progress.distanceMeters(), 1e-6d);
+    }
+
+    @Test
     public void loopCounting_isFloorOfDistanceOverLap() throws Exception {
         CompiledRoute route = squareRoute();
         RunConfig config = new RunConfig(20d, 10);
@@ -206,7 +235,7 @@ public class RouteEngineTest {
     public void runConfig_validatesBounds() {
         assertThrows(IllegalArgumentException.class, () -> new RunConfig(0.4d, 5));
         assertThrows(IllegalArgumentException.class, () -> new RunConfig(61d, 5));
-        assertThrows(IllegalArgumentException.class, () -> new RunConfig(9d, 0));
+        assertThrows(IllegalArgumentException.class, () -> new RunConfig(9d, -1));
         assertThrows(IllegalArgumentException.class, () -> new RunConfig(9d, 1001));
         assertThrows(IllegalArgumentException.class, () -> new RunConfig(9d, 5, 50));
         assertThrows(IllegalArgumentException.class, () -> new RunConfig(Double.NaN, 5));

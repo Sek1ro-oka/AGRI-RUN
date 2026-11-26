@@ -1374,8 +1374,11 @@ public class SimulationService extends Service {
         } else if (progress == null) {
             text = state == RunState.PAUSED ? "已暂停" : "正在准备模拟位置…";
         } else {
-            text = String.format(Locale.US, "%s · 圈 %d/%d · %s · %s",
-                    stateText(state), progress.completedLoops(), progress.targetLoops(),
+            String loops = progress.targetLoops() == RunConfig.NO_LOOP_TARGET
+                    ? getString(R.string.run_notification_loops_unlimited, progress.completedLoops())
+                    : getString(R.string.run_notification_loops_target, progress.completedLoops(), progress.targetLoops());
+            text = String.format(Locale.US, "%s · %s · %s · %s",
+                    stateText(state), loops,
                     RunSnapshot.formatMeters(progress.distanceMeters()),
                     org.localroute.core.ActiveElapsedClock.formatDuration(lastElapsedMs * 1_000_000L));
         }
