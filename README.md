@@ -40,15 +40,25 @@
 
 需要 JDK 17+（本项目用 JDK 21 实测）与 Android SDK（platform 35、build-tools 35.0.0）。工程路径建议使用纯 ASCII。
 
-```powershell
-$env:JAVA_HOME='D:\Java\jdk-21'
-$env:ANDROID_HOME='C:\Users\<user>\AppData\Local\Android\Sdk'
-Set-Location E:\agri-run\route-workshop
-.\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest
-.\gradlew.bat :app:assembleRelease :app:lintDebug
+先让 Gradle 找到 JDK 与 SDK：JDK 用 `JAVA_HOME` 指定；Android SDK 写在工程根目录的 `local.properties`（该文件不入库）：
+
+```properties
+sdk.dir=<Android SDK 路径>
 ```
 
-高德 Key 通过 `local.properties` 的 `amapKey=` 注入，不提交到仓库。
+```bash
+# macOS / Linux
+export JAVA_HOME=/path/to/jdk
+./gradlew :route-core:test :simulation-core:test :app:testDebugUnitTest
+./gradlew :app:assembleRelease :app:lintDebug
+
+# Windows PowerShell
+# $env:JAVA_HOME='<JDK 路径>'
+# .\gradlew.bat :route-core:test :simulation-core:test :app:testDebugUnitTest
+# .\gradlew.bat :app:assembleRelease :app:lintDebug
+```
+
+高德 Key 通过 `local.properties` 的 `amapKey=` 注入，不提交到仓库。完整命令、产物与签名说明见 [docs/BUILD.md](docs/BUILD.md)。
 
 ## 目录
 

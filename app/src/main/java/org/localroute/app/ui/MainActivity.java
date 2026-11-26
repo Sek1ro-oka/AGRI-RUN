@@ -79,7 +79,8 @@ public class MainActivity extends AppCompatActivity {
         });
         weekdayLabels = getResources().getStringArray(R.array.home_weekday_labels);
         binding.buttonHomeCalendar.setOnClickListener(v -> HomeTarget.TIMETABLE.open(this));
-        binding.buttonHomeBind.setOnClickListener(v -> onEmptyAction());
+        binding.buttonHomeImport.setOnClickListener(v -> openJwImport());
+        binding.buttonHomeworkEmpty.setOnClickListener(v -> onHomeworkEmptyAction());
         binding.textHomeAgendaCount.setOnClickListener(v -> {
             if (!courseFootActionable) return;
             courseExpanded = !courseExpanded;
@@ -91,7 +92,8 @@ public class MainActivity extends AppCompatActivity {
             render();
         });
         FinmoriMotion.press(binding.buttonHomeCalendar);
-        FinmoriMotion.press(binding.buttonHomeBind);
+        FinmoriMotion.press(binding.buttonHomeImport);
+        FinmoriMotion.press(binding.buttonHomeworkEmpty);
         FinmoriNav.bind(this, binding.bottomNav, FinmoriNav.Tab.HOME);
         OverlayHost.get(this).restore();
         // 只认冷启动那一次：进程被杀后恢复时不该把用户又甩进别的页面。
@@ -114,11 +116,6 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         pendingTarget = HomeTarget.from(intent.getStringExtra(HomeTarget.EXTRA_TARGET));
-    }
-
-    private void openProfile() {
-        startActivity(new Intent(this, ProfileActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP));
     }
 
     private void render() {
@@ -156,8 +153,8 @@ public class MainActivity extends AppCompatActivity {
         renderHero(session, todayAgenda.courseCount(), due.size(), todayAgenda.notImported());
         renderDate();
         renderWeekStrip();
-        renderAgenda(shown, session);
-        renderHomework(due);
+        renderAgenda(shown);
+        renderHomework(due, session);
     }
 
     /** 学习通缓存与自建作业合成同一份待办；截止时刻为 0 的由 HomeworkDue 排到末尾。 */
@@ -217,13 +214,14 @@ public class MainActivity extends AppCompatActivity {
         String name = session != null && !session.name().isEmpty()
                 ? session.name() : getString(R.string.home_greet_guest);
         binding.textHomeGreeting.setText(getString(greetRes, name));
-        // 没绑定但已经手动加过课／作业时，不能再谎称「绑定后才有课程」。
-        boolean nothingToday = courseCount == 0 && homeworkCount == 0;
+        // 课程看教务导入、作业看学习通绑定，两个数据源缺哪个就说哪个。
         int subRes;
-        if (session == null && nothingToday) {
-            subRes = R.string.home_greet_unbound;
+        if (notImported && session == null && homeworkCount == 0) {
+            subRes = R.string.home_greet_unbound_all;
         } else if (notImported) {
             subRes = R.string.home_greet_no_timetable;
+        } else if (session == null && homeworkCount == 0) {
+            subRes = R.string.home_greet_unbound;
         } else {
             binding.textHomeGreetingSub.setText(getString(R.string.home_greet_summary,
                     courseCount, homeworkCount));
@@ -266,7 +264,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void renderAgenda(HomeAgenda.Day shown, StudySession session) {
+    private void renderAgenda(HomeAgenda.Day shown) {
         binding.homeScroll.removeCallbacks(collapsePass);
         courseFootActionable = false;
         courseTotal = shown.courseCount();
@@ -274,9 +272,12 @@ public class MainActivity extends AppCompatActivity {
         boolean empty = shown.items().isEmpty();
         binding.agendaList.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.agendaEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+        binding.agendaSkeleton.setVisibility(
+                empty && shown.notImported() ? View.VISIBLE : View.GONE);
         binding.textHomeAgendaCount.setVisibility(empty ? View.GONE : View.VISIBLE);
         if (empty) {
-            renderEmpty(shown, session);
+            courseExpanded = false;
+            renderEmpty(shown);
             return;
         }
         LayoutInflater inflater = LayoutInflater.from(this);
@@ -292,16 +293,28 @@ public class MainActivity extends AppCompatActivity {
                 courseTotal));
     }
 
-    /** 待交作业：跨天清单，没有内容就整块不出现。 */
-    private void renderHomework(List<HomeworkDue.Item> due) {
+    /** 待交作业：跨天清单；没有内容时保留一张空态卡，不整块消失。 */
+    private void renderHomework(List<HomeworkDue.Item> due, StudySession session) {
         binding.homeScroll.removeCallbacks(collapsePass);
         collapseRetries = 0;
         homeworkFootActionable = false;
         homeworkTotal = due.size();
         binding.homeworkList.removeAllViews();
-        binding.cardHomework.setVisibility(due.isEmpty() ? View.GONE : View.VISIBLE);
-        if (due.isEmpty()) {
-            // 课程也没有内容时，整页只剩空态卡，不需要再留一行脚注。
+        binding.cardHomework.setVisibility(View.VISIBLE);
+        boolean empty = due.isEmpty();
+        binding.homeworkList.setVisibility(empty ? View.GONE : View.VISIBLE);
+        binding.homeworkEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+        binding.homeworkSkeleton.setVisibility(
+                empty && session == null ? View.VISIBLE : View.GONE);
+        binding.textHomeworkFoot.setVisibility(empty ? View.GONE : View.VISIBLE);
+        if (empty) {
+            homeworkExpanded = false;
+            boolean unbound = session == null;
+            binding.textHomeworkEmpty.setText(unbound
+                    ? R.string.home_bind_title : R.string.home_homework_empty_title);
+            binding.buttonHomeworkEmpty.setText(unbound
+                    ? R.string.home_bind_action : R.string.home_homework_view_action);
+            binding.textHomeworkFoot.setText("");
             binding.homeScroll.post(collapsePass);
             return;
         }
@@ -457,32 +470,34 @@ public class MainActivity extends AppCompatActivity {
         return day.getMonthValue() + "-" + day.getDayOfMonth();
     }
 
-    /** 空态分四种：今天都结束了、没绑定、绑了但没课表、这天真的没安排。 */
-    private void renderEmpty(HomeAgenda.Day shown, StudySession session) {
+    /** 课程空态：今天都结束了、没导入课表、放假、这天真的没安排。作业不在这张卡里管。 */
+    private void renderEmpty(HomeAgenda.Day shown) {
         if (shown.hiddenFinished() > 0) {
             binding.textHomeEmptyTitle.setText(R.string.home_agenda_all_done);
-            binding.buttonHomeBind.setVisibility(View.GONE);
+            binding.buttonHomeImport.setVisibility(View.GONE);
             return;
         }
         if (shown.notImported()) {
-            boolean unbound = session == null;
-            binding.textHomeEmptyTitle.setText(unbound
-                    ? R.string.home_bind_title : R.string.home_agenda_no_timetable);
-            binding.buttonHomeBind.setText(unbound
-                    ? R.string.home_bind_action : R.string.home_agenda_import_action);
-            binding.buttonHomeBind.setVisibility(View.VISIBLE);
+            binding.textHomeEmptyTitle.setText(R.string.home_agenda_no_timetable);
+            binding.buttonHomeImport.setText(R.string.home_agenda_import_action);
+            binding.buttonHomeImport.setVisibility(View.VISIBLE);
             return;
         }
         binding.textHomeEmptyTitle.setText(shown.closed()
                 ? R.string.home_agenda_closed : R.string.home_agenda_empty);
-        binding.buttonHomeBind.setVisibility(View.GONE);
+        binding.buttonHomeImport.setVisibility(View.GONE);
     }
 
-    private void onEmptyAction() {
+    /** 课表统一走教务导入这条既有链路，不在首页另造一套绑定。 */
+    private void openJwImport() {
+        startActivity(new Intent(this, JwImportActivity.class));
+    }
+
+    private void onHomeworkEmptyAction() {
         if (StudySessionStore.load(this) == null) {
-            openProfile();
+            startActivity(new Intent(this, StudyLoginActivity.class));
         } else {
-            HomeTarget.TIMETABLE.open(this);
+            HomeTarget.STUDY.open(this);
         }
     }
 }

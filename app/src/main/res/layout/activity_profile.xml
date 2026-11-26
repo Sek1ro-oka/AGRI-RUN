@@ -80,164 +80,64 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_3xl"
-                android:text="@string/profile_pending_section"
+                android:layout_marginBottom="@dimen/space_md"
+                android:text="@string/fm_timetable"
                 android:textColor="@color/fm_text_secondary"
                 android:textSize="@dimen/text_body"
                 android:textStyle="bold" />
-            <TextView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:layout_marginBottom="@dimen/space_md"
-                android:text="@string/profile_pending_hint"
-                android:textColor="@color/fm_muted"
-                android:textSize="@dimen/text_caption" />
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_home_account_card"
-                android:orientation="vertical"
-                android:paddingHorizontal="@dimen/space_xl">
+                app:cardBackgroundColor="@color/fm_surface_alt"
+                app:cardCornerRadius="@dimen/radius_sheet"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp">
                 <LinearLayout
+                    android:id="@+id/rowProfileJwImport"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/touch_min"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:padding="@dimen/space_3xl">
                     <ImageView
                         android:layout_width="@dimen/icon_home"
                         android:layout_height="@dimen/icon_home"
                         android:background="@drawable/bg_campus_entry_icon"
-                        android:padding="@dimen/space_sm"
-                        android:src="@drawable/ic_home_traffic"
                         android:contentDescription="@null"
+                        android:padding="@dimen/space_sm"
+                        android:src="@drawable/ic_study_import"
                         app:tint="@color/fm_link" />
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_xl"
                         android:layout_weight="1"
-                        android:text="@string/profile_pending_traffic"
-                        android:textColor="@color/fm_text"
-                        android:textSize="@dimen/text_meta" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_home_tag_outline"
-                        android:paddingHorizontal="@dimen/space_sm"
-                        android:paddingVertical="1dp"
-                        android:text="@string/profile_pending_status"
-                        android:textColor="@color/fm_muted"
-                        android:textSize="@dimen/text_caption" />
-                </LinearLayout>
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="@dimen/inset_nav"
-                    android:background="@color/fm_border" />
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/touch_min"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/profile_jw_import_title"
+                            android:textColor="@color/fm_text"
+                            android:textSize="@dimen/text_meta"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/textProfileJwMeta"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_hair"
+                            android:textColor="@color/fm_text_secondary"
+                            android:textSize="@dimen/text_caption" />
+                    </LinearLayout>
                     <ImageView
-                        android:layout_width="@dimen/icon_home"
-                        android:layout_height="@dimen/icon_home"
-                        android:background="@drawable/bg_campus_entry_icon"
-                        android:padding="@dimen/space_sm"
-                        android:src="@drawable/ic_home_power"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
                         android:contentDescription="@null"
-                        app:tint="@color/fm_link" />
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_xl"
-                        android:layout_weight="1"
-                        android:text="@string/profile_pending_power"
-                        android:textColor="@color/fm_text"
-                        android:textSize="@dimen/text_meta" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_home_tag_outline"
-                        android:paddingHorizontal="@dimen/space_sm"
-                        android:paddingVertical="1dp"
-                        android:text="@string/profile_pending_status"
-                        android:textColor="@color/fm_muted"
-                        android:textSize="@dimen/text_caption" />
+                        android:src="@drawable/ic_campus_chevron_right" />
                 </LinearLayout>
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="@dimen/inset_nav"
-                    android:background="@color/fm_border" />
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/touch_min"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <ImageView
-                        android:layout_width="@dimen/icon_home"
-                        android:layout_height="@dimen/icon_home"
-                        android:background="@drawable/bg_campus_entry_icon"
-                        android:padding="@dimen/space_sm"
-                        android:src="@drawable/ic_home_card"
-                        android:contentDescription="@null"
-                        app:tint="@color/fm_link" />
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_xl"
-                        android:layout_weight="1"
-                        android:text="@string/profile_pending_card"
-                        android:textColor="@color/fm_text"
-                        android:textSize="@dimen/text_meta" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_home_tag_outline"
-                        android:paddingHorizontal="@dimen/space_sm"
-                        android:paddingVertical="1dp"
-                        android:text="@string/profile_pending_status"
-                        android:textColor="@color/fm_muted"
-                        android:textSize="@dimen/text_caption" />
-                </LinearLayout>
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="@dimen/inset_nav"
-                    android:background="@color/fm_border" />
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/touch_min"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <ImageView
-                        android:layout_width="@dimen/icon_home"
-                        android:layout_height="@dimen/icon_home"
-                        android:background="@drawable/bg_campus_entry_icon"
-                        android:padding="@dimen/space_sm"
-                        android:src="@drawable/ic_campus_bookmark"
-                        android:contentDescription="@null"
-                        app:tint="@color/fm_link" />
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_xl"
-                        android:layout_weight="1"
-                        android:text="@string/profile_pending_library"
-                        android:textColor="@color/fm_text"
-                        android:textSize="@dimen/text_meta" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_home_tag_outline"
-                        android:paddingHorizontal="@dimen/space_sm"
-                        android:paddingVertical="1dp"
-                        android:text="@string/profile_pending_status"
-                        android:textColor="@color/fm_muted"
-                        android:textSize="@dimen/text_caption" />
-                </LinearLayout>
-            </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </ScrollView>
     <include

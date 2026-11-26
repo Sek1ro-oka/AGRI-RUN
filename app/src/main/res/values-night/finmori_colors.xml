@@ -22,4 +22,5 @@
     <color name="fm_go_end">#8CDBAE</color>
     <color name="fm_tab_selected">#273E34</color>
     <color name="fm_dark_map_chip">#E612151C</color>
+    <color name="fm_skeleton">#33E6EDF1</color>
 </resources>
