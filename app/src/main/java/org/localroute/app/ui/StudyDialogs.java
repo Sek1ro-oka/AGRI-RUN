@@ -23,6 +23,7 @@ import org.localroute.app.databinding.DialogStudyImportBinding;
 import org.localroute.app.study.CustomHomework;
 import org.localroute.app.study.HomeworkReminderPlanner;
 import org.localroute.app.study.JwSemesterInfo;
+import org.localroute.app.study.SemesterCalendar;
 import org.localroute.app.study.StudySchedule;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
@@ -53,8 +54,9 @@ public final class StudyDialogs {
      *
      * @param unparsed 节次没能识别、因而被跳过的课程名；必须在预览里报出来，
      *                 否则用户拿到的是一张看起来完整、实际少了几节课的课表
-     * @param semester 教务课表自带的本周周次与校历日期；导入确认时据此自动定位本周，
-     *                 用户不必再去设置页手填开学日期。推算结果会写在预览里，替换手设值也不藏着
+     * @param semester 教务课表自带的本周周次与校历日期；导入确认时据此自动定位本周。
+     *                 教务完全没给锚点时，确认导入后会再问一次开学日期；课表属于其他学期时
+     *                 保持本机日期不动。推算结果会写在预览里
      */
     public static void showImportPreview(@NonNull Activity activity,
                                          @NonNull List<TimetableCourse> imported,
@@ -115,7 +117,9 @@ public final class StudyDialogs {
                                     : activity.getString(R.string.study_import_result, added),
                             Toast.LENGTH_LONG).show();
                     dialog.dismiss();
-                    if (onImported != null) {
+                    if (plan.anchor == JwSemesterInfo.Plan.Anchor.MISSING) {
+                        promptMissingSemesterStart(activity, onImported);
+                    } else if (onImported != null) {
                         onImported.run();
                     }
                 }));
@@ -168,15 +172,21 @@ public final class StudyDialogs {
     /**
      * 教务自带的周次与校历日期推算出的定位结果。
      *
-     * <p>取不到锚点时这一行整段消失，不做「没定位上」的碎碎念——课表页顶部本来就有
-     * 设置开学日期的引导入口。手设的开学日期被替换时必须说清楚，否则用户会发现
-     * 自己调好的日期无声无息变了。
+     * <p>教务完全没给锚点时要提前说明导入后会补选开学日期，不能静默跳过；课表属于
+     * 其他学期时说明本机日期不会被改动；手设的开学日期被替换时也必须说清楚，
+     * 否则用户会发现自己调好的日期无声无息变了。
      */
     private static String semesterLine(@NonNull Activity activity,
                                        @NonNull JwSemesterInfo.Plan plan,
                                        @Nullable LocalDate previousStart) {
         if (plan.semesterStart == null) {
-            return "";
+            if (plan.anchor == JwSemesterInfo.Plan.Anchor.OTHER_TERM) {
+                return activity.getString(R.string.study_import_semester_other_term);
+            }
+            return previousStart == null
+                    ? activity.getString(R.string.study_import_semester_missing)
+                    : activity.getString(R.string.study_import_semester_missing_old,
+                            previousStart.toString());
         }
         String line = plan.week > 0
                 ? activity.getString(plan.fromCalendar
@@ -190,6 +200,63 @@ public final class StudyDialogs {
                     previousStart.toString());
         }
         return line;
+    }
+
+    /**
+     * 教务完全没给学期日期时，导入完成后再问一次；课表属于其他学期时不会走到这里。
+     *
+     * <p>不阻断导入：可以现在选，也可以稍后去「学习 · 设置」补。选「稍后」会清掉旧日期——
+     * 旧值多半属于上学期，静默沿用比空着更容易误导。日期选择器从今天开始、不预填旧值，
+     * 同一学期重导也要重新确认。
+     */
+    private static void promptMissingSemesterStart(@NonNull Activity activity,
+                                                   @Nullable Runnable onDone) {
+        LocalDate existing = StudyTimetableStore.loadSemesterStart(activity);
+        String message = existing == null
+                ? activity.getString(R.string.study_import_start_missing_message)
+                : activity.getString(R.string.study_import_start_missing_message_old,
+                        existing.toString());
+        AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+                .setTitle(R.string.study_semester_start_title)
+                .setMessage(message)
+                .setNegativeButton(R.string.study_import_start_later, null)
+                .setPositiveButton(R.string.study_import_start_choose, null)
+                .create();
+        dialog.setCancelable(false);
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(view -> {
+                if (StudyTimetableStore.loadSemesterStart(activity) != null) {
+                    StudyTimetableStore.clearSemesterStart(activity);
+                    Toast.makeText(activity, R.string.study_import_start_cleared,
+                            Toast.LENGTH_LONG).show();
+                }
+                dialog.dismiss();
+            });
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                LocalDate initial = LocalDate.now();
+                DatePickerDialog picker = new DatePickerDialog(activity,
+                        (picked, year, month, day) -> {
+                            LocalDate date = LocalDate.of(year, month + 1, day);
+                            int totalWeeks = StudyTimetableStore.loadTotalWeeks(activity);
+                            int week = SemesterCalendar.teachingWeek(date, LocalDate.now(),
+                                    totalWeeks);
+                            StudyTimetableStore.applySemesterAnchor(activity, date, 0, week);
+                            Toast.makeText(activity, activity.getString(
+                                            R.string.study_import_start_saved, date.toString()),
+                                    Toast.LENGTH_LONG).show();
+                            dialog.dismiss();
+                        },
+                        initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
+                picker.setTitle(R.string.study_semester_start_pick_title);
+                picker.show();
+            });
+        });
+        dialog.setOnDismissListener(ignored -> {
+            if (onDone != null) {
+                onDone.run();
+            }
+        });
+        dialog.show();
     }
 
     private static void updateImportHint(Activity activity, DialogStudyImportBinding binding,

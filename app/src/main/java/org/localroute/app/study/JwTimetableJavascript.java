@@ -54,8 +54,14 @@ public final class JwTimetableJavascript {
                   });
                 }
 
+                function findSelect(doc, id) {
+                  if (!doc) return null;
+                  return doc.getElementById(id) ||
+                      doc.querySelector('select[name="' + id + '"]');
+                }
+
                 function selectedOption(doc, id) {
-                  var select = doc.getElementById(id);
+                  var select = findSelect(doc, id);
                   if (!select) return '';
                   var options = nonEmptyOptions(select);
                   if (!options.length) return '';
@@ -154,7 +160,7 @@ public final class JwTimetableJavascript {
                 function pageCalendar() {
                   var out = {weeks: '', dates: [], count: 0};
                   try {
-                    var options = nonEmptyOptions(document.getElementById('xq'));
+                    var options = nonEmptyOptions(findSelect(document, 'xq'));
                     if (options.length) {
                       out.count = options.length;
                       var chosen = options.filter(function (option) {
@@ -207,8 +213,15 @@ public final class JwTimetableJavascript {
 
                 function readCalendar(term) {
                   var out = pageCalendar();
+                  function urlWeeks() {
+                    // 有些课表入口把周次写在 URL 的 xq/week 上；只信课表页，避免其他页面同名参数
+                    if (!out.weeks && path.indexOf('/kbcx/') >= 0) {
+                      out.weeks = weekDigits(params['xq'] || params['week']);
+                    }
+                    return out;
+                  }
                   return loadIndex(term).then(function (html) {
-                    if (!html || isLoginPage(html)) return out;
+                    if (!html || isLoginPage(html)) return urlWeeks();
                     if (!out.weeks) {
                       var declared = /xnWeeks\\s*=\\s*['"]?([0-9]{1,2})/.exec(html);
                       if (declared) out.weeks = declared[1];
@@ -218,16 +231,16 @@ public final class JwTimetableJavascript {
                     try {
                       doc = new DOMParser().parseFromString(html, 'text/html');
                     } catch (ignored) {
-                      return out;
+                      return urlWeeks();
                     }
-                    if (!doc) return out;
+                    if (!doc) return urlWeeks();
                     if (!out.count) {
-                      out.count = nonEmptyOptions(doc.getElementById('xq')).length;
+                      out.count = nonEmptyOptions(findSelect(doc, 'xq')).length;
                     }
                     if (!out.weeks) out.weeks = weekDigits(selectedOption(doc, 'xq'));
-                    return out;
+                    return urlWeeks();
                   }).catch(function () {
-                    return out;
+                    return urlWeeks();
                   });
                 }
 
