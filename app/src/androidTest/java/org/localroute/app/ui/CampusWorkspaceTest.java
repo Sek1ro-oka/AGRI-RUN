@@ -17,6 +17,7 @@ import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.run.RunRequest;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.RunSpeedPreferences;
+import org.localroute.app.settings.OnboardingState;
 import org.localroute.core.CompiledRoute;
 import org.localroute.core.EndBehavior;
 import org.localroute.core.GeoPoint;
@@ -95,6 +96,8 @@ public class CampusWorkspaceTest {
     }
     @Before public void prepare() throws Exception {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        context.getSharedPreferences(OnboardingState.PREFS, 0).edit()
+                .putBoolean("initialized", true).putBoolean("complete", true).commit();
         android.app.UiAutomation automation = InstrumentationRegistry.getInstrumentation().getUiAutomation();
         automation.grantRuntimePermission(context.getPackageName(), android.Manifest.permission.ACCESS_COARSE_LOCATION);
         automation.grantRuntimePermission(context.getPackageName(), android.Manifest.permission.ACCESS_FINE_LOCATION);

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_step">准备 · %1$d / 3</string>
+    <string name="onboarding_permissions_title">设置权限</string>
+    <string name="onboarding_permissions_subtitle">按需设置，每一项都可以稍后处理。</string>
+    <string name="onboarding_accounts_title">连接学习服务</string>
+    <string name="onboarding_accounts_subtitle">绑定和导入均可跳过，之后可在设置中管理。</string>
+    <string name="onboarding_finish_title">准备好了</string>
+    <string name="onboarding_finish_subtitle">你可以随时在设置中继续配置。</string>
+    <string name="onboarding_skip">跳过此步</string>
+    <string name="onboarding_next">下一步</string>
+    <string name="onboarding_start">开始使用</string>
+    <string name="onboarding_ready">已就绪</string>
+    <string name="onboarding_pending">待设置</string>
+    <string name="onboarding_unconfirmed">待检测</string>
+    <string name="onboarding_recent_check">近期检测通过</string>
+    <string name="onboarding_configure">去设置</string>
+    <string name="onboarding_authorize">去授权</string>
+    <string name="onboarding_check">检测</string>
+    <string name="onboarding_check_ok">系统允许模拟位置</string>
+    <string name="onboarding_check_failed">未能确认模拟位置，请检查开发者选项后重试。</string>
+    <string name="onboarding_check_running">请先结束当前定位任务再检测。</string>
+    <string name="onboarding_notifications_disabled">系统通知已关闭，可在设置中开启。</string>
+    <string name="onboarding_study_title">学习通</string>
+    <string name="onboarding_study_detail">在官方页面登录，用于读取课程作业；登录状态保存在本机。</string>
+    <string name="onboarding_study_bound">已绑定</string>
+    <string name="onboarding_study_unbound">未绑定</string>
+    <string name="onboarding_bind">去绑定</string>
+    <string name="onboarding_manage">管理</string>
+    <string name="onboarding_jw_title">教务课表</string>
+    <string name="onboarding_jw_detail">在教务系统登录并导入课表；应用不保存教务密码。</string>
+    <string name="onboarding_jw_imported">已导入</string>
+    <string name="onboarding_jw_unimported">未导入</string>
+    <string name="onboarding_import">导入课表</string>
+    <string name="onboarding_import_again">重新导入</string>
+    <string name="onboarding_summary_permissions">权限与定位</string>
+    <string name="onboarding_summary_permissions_value">%1$d / %2$d 项已就绪</string>
+    <string name="onboarding_summary_accounts">学习服务</string>
+    <string name="onboarding_summary_accounts_value">学习通：%1$s · 教务课表：%2$s</string>
+    <string name="settings_permissions_entry">权限与定位检查</string>
+    <string name="settings_accounts_entry">学习账号与课表</string>
+</resources>

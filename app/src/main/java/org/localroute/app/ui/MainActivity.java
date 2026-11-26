@@ -8,6 +8,8 @@ import android.view.View;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -24,6 +26,7 @@ import org.localroute.app.home.HomeAgenda;
 import org.localroute.app.home.HomeGreeting;
 import org.localroute.app.home.HomeworkDue;
 import org.localroute.app.overlay.OverlayHost;
+import org.localroute.app.settings.OnboardingState;
 import org.localroute.app.study.CustomHomework;
 import org.localroute.app.study.CustomHomeworkStore;
 import org.localroute.app.study.DayAdjustment;
@@ -50,6 +53,9 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
 
     private ActivityMainBinding binding;
+    private boolean onboardingOpen;
+    private final ActivityResultLauncher<Intent> onboardingLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> onboardingOpen = false);
     /** 快捷入口或磁贴送进来的目标页；本页可见之后再跳，那时启动内部页面才不会被系统挡。 */
     private HomeTarget pendingTarget;
     private LocalDate today;
@@ -68,6 +74,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        onboardingOpen = savedInstanceState != null && savedInstanceState.getBoolean("onboarding_open", false);
         DiagnosticLog.init(getApplicationContext());
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
@@ -97,19 +104,32 @@ public class MainActivity extends AppCompatActivity {
         FinmoriNav.bind(this, binding.bottomNav, FinmoriNav.Tab.HOME);
         OverlayHost.get(this).restore();
         // 只认冷启动那一次：进程被杀后恢复时不该把用户又甩进别的页面。
-        if (savedInstanceState == null) {
-            pendingTarget = HomeTarget.from(getIntent().getStringExtra(HomeTarget.EXTRA_TARGET));
-        }
+        pendingTarget = HomeTarget.from(savedInstanceState == null
+                ? getIntent().getStringExtra(HomeTarget.EXTRA_TARGET)
+                : savedInstanceState.getString("pending_home_target"));
     }
 
     @Override protected void onResume() {
         super.onResume();
+        if (OnboardingState.shouldShow(this)) {
+            if (!onboardingOpen) {
+                onboardingOpen = true;
+                onboardingLauncher.launch(new Intent(this, OnboardingActivity.class));
+            }
+            return;
+        }
         // 绑定、导入、抓作业都发生在别的页面，回来必须重读，否则首页还挂着旧数据。
         render();
         if (pendingTarget == null) return;
         HomeTarget target = pendingTarget;
         pendingTarget = null;
         target.open(this);
+    }
+
+    @Override protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean("onboarding_open", onboardingOpen);
+        if (pendingTarget != null) outState.putString("pending_home_target", pendingTarget.key());
+        super.onSaveInstanceState(outState);
     }
 
     @Override protected void onNewIntent(Intent intent) {

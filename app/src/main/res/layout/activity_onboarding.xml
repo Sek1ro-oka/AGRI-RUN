@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/fm_background"
+    android:orientation="vertical">
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:clipToPadding="false">
+        <LinearLayout
+            android:id="@+id/onboardingContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/space_4xl"
+            android:paddingTop="@dimen/space_5xl"
+            android:paddingBottom="@dimen/space_4xl">
+            <TextView
+                android:id="@+id/textOnboardingStep"
+                style="@style/Text.Unloop.Action"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/textOnboardingTitle"
+                style="@style/Text.Unloop.Metric"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_md"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/textOnboardingSubtitle"
+                style="@style/Text.Unloop.Meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_md" />
+            <LinearLayout
+                android:id="@+id/onboardingRows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4xl"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+    <LinearLayout
+        android:id="@+id/onboardingFooter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_4xl"
+        android:paddingBottom="@dimen/space_3xl">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonOnboardingSkip"
+            style="@style/Widget.Unloop.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/onboarding_skip" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buttonOnboardingNext"
+            style="@style/Widget.Unloop.Button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_md"
+            android:layout_weight="1"
+            android:text="@string/onboarding_next" />
+    </LinearLayout>
+</LinearLayout>

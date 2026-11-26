@@ -219,7 +219,9 @@ public class JwImportActivity extends AppCompatActivity {
                         openSchool(schools.get(which));
                     }
                 })
-                .setNegativeButton(R.string.campus_cancel, null)
+                .setNegativeButton(R.string.campus_cancel, (ignored, which) -> {
+                    if (exitWhenCancelled && school == null) finish();
+                })
                 .create();
         dialog.setOnCancelListener(ignored -> {
             if (exitWhenCancelled && school == null) {
@@ -245,8 +247,13 @@ public class JwImportActivity extends AppCompatActivity {
                 .setMessage(R.string.study_jw_school_custom_help)
                 .setView(container)
                 .setPositiveButton(android.R.string.ok, null)
-                .setNegativeButton(R.string.campus_cancel, null)
+                .setNegativeButton(R.string.campus_cancel, (ignored, which) -> {
+                    if (school == null) finish();
+                })
                 .create();
+        dialog.setOnCancelListener(ignored -> {
+            if (school == null) finish();
+        });
         dialog.setOnShowListener(ignored ->
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
                     JwSchools.School custom = JwSchools.normalizeCustom(
