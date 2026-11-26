@@ -35,6 +35,7 @@
     <!-- 阶梯外的两处：都按屏幕实际留白定出来的，不参与统一缩放。 -->
     <dimen name="inset_nav">56dp</dimen>
     <dimen name="inset_fab_clear">84dp</dimen>
+    <dimen name="content_max_width">680dp</dimen>
 
     <!-- 圆角。控件与卡片差一档即可，再多就成了噪声。 -->
     <dimen name="radius_control">12dp</dimen>

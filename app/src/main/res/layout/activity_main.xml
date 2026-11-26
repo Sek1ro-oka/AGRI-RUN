@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/fm_surface">
+    android:background="@color/fm_background">
     <ScrollView
         android:id="@+id/homeScroll"
         android:layout_width="match_parent"
@@ -33,7 +33,7 @@
                     android:textColor="@color/fm_text"
                     android:textSize="@dimen/text_hero"
                     android:textStyle="bold"
-                    android:maxLines="1"
+                    android:maxLines="2"
                     android:ellipsize="end" />
                 <TextView
                     android:id="@+id/textHomeGreetingSub"
@@ -56,7 +56,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_md"
-                    app:cardBackgroundColor="@color/fm_surface_alt"
+                    app:cardBackgroundColor="@color/fm_surface"
                     app:cardCornerRadius="@dimen/radius_sheet"
                     app:cardElevation="0dp"
                     app:strokeWidth="0dp">
@@ -64,7 +64,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="@dimen/space_md">
+                        android:padding="@dimen/space_3xl">
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -80,10 +80,10 @@
                                 android:textStyle="bold" />
                             <ImageView
                                 android:id="@+id/buttonHomeCalendar"
-                                android:layout_width="@dimen/icon_home"
-                                android:layout_height="@dimen/icon_home"
+                                android:layout_width="@dimen/touch_min"
+                                android:layout_height="@dimen/touch_min"
                                 android:background="@drawable/bg_campus_entry_icon"
-                                android:padding="@dimen/space_sm"
+                                android:padding="@dimen/space_xl"
                                 android:clickable="true"
                                 android:focusable="true"
                                 android:src="@drawable/ic_study_calendar"
@@ -102,16 +102,6 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_md"
                             android:orientation="vertical" />
-                        <LinearLayout
-                            android:id="@+id/agendaSkeleton"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_md"
-                            android:orientation="vertical"
-                            android:visibility="gone">
-                            <include layout="@layout/item_home_skeleton" />
-                            <include layout="@layout/item_home_skeleton" />
-                        </LinearLayout>
                         <LinearLayout
                             android:id="@+id/agendaEmpty"
                             android:layout_width="match_parent"
@@ -134,13 +124,15 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="@dimen/space_md"
+                                android:minHeight="@dimen/touch_min"
+                                android:gravity="center"
                                 android:background="@drawable/bg_home_pill"
                                 android:clickable="true"
                                 android:focusable="true"
                                 android:paddingHorizontal="@dimen/space_xl"
                                 android:paddingVertical="@dimen/space_sm"
                                 android:text="@string/home_agenda_import_action"
-                                android:textColor="@color/fm_surface"
+                                android:textColor="@color/fm_on_brand"
                                 android:textSize="@dimen/text_caption"
                                 android:textStyle="bold" />
                         </LinearLayout>
@@ -153,12 +145,12 @@
                             android:textSize="@dimen/text_caption" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
-<com.google.android.material.card.MaterialCardView
+                <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardHomework"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_xl"
-                    app:cardBackgroundColor="@color/fm_surface_alt"
+                    app:cardBackgroundColor="@color/fm_surface"
                     app:cardCornerRadius="@dimen/radius_sheet"
                     app:cardElevation="0dp"
                     app:strokeWidth="0dp">
@@ -166,7 +158,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="@dimen/space_md">
+                        android:padding="@dimen/space_3xl">
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -174,15 +166,6 @@
                             android:textColor="@color/fm_text"
                             android:textSize="@dimen/text_body"
                             android:textStyle="bold" />
-                        <LinearLayout
-                            android:id="@+id/homeworkSkeleton"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_sm"
-                            android:orientation="vertical"
-                            android:visibility="gone">
-                            <include layout="@layout/item_home_skeleton" />
-                        </LinearLayout>
                         <LinearLayout
                             android:id="@+id/homeworkList"
                             android:layout_width="match_parent"
@@ -211,13 +194,15 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="@dimen/space_md"
+                                android:minHeight="@dimen/touch_min"
+                                android:gravity="center"
                                 android:background="@drawable/bg_home_pill"
                                 android:clickable="true"
                                 android:focusable="true"
                                 android:paddingHorizontal="@dimen/space_xl"
                                 android:paddingVertical="@dimen/space_sm"
                                 android:text="@string/home_homework_view_action"
-                                android:textColor="@color/fm_surface"
+                                android:textColor="@color/fm_on_brand"
                                 android:textSize="@dimen/text_caption"
                                 android:textStyle="bold" />
                         </LinearLayout>

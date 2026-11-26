@@ -1000,6 +1000,8 @@ public class StudyActivity extends AppCompatActivity {
 
     private void selectTab(boolean timetable) {
         binding.textStudyTitle.setText(timetable ? R.string.fm_timetable : R.string.study_title);
+        // 账号状态只属于学习通作业；本地课表可以独立使用。
+        binding.textStudyAccount.setVisibility(timetable ? View.GONE : View.VISIBLE);
         binding.homeworkScreen.setVisibility(timetable ? View.GONE : View.VISIBLE);
         binding.timetableScreen.setVisibility(timetable ? View.VISIBLE : View.GONE);
         binding.tabHomework.setSelected(!timetable);

@@ -5,12 +5,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/fm_surface">
+    android:background="@color/fm_background">
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@color/fm_surface"
+        android:background="@color/fm_background"
         app:title="@string/fm_functions"
         app:titleTextColor="@color/fm_text" />
     <ScrollView

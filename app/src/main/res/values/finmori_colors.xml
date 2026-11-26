@@ -10,7 +10,7 @@
     <color name="fm_brand">#147C4B</color>
     <color name="fm_link">#147C4B</color>
     <color name="fm_on_brand">#FFFFFF</color>
-    <color name="fm_nav">#F5F6FA</color>
+    <color name="fm_nav">#FFFFFF</color>
     <color name="fm_on_nav">#147C4B</color>
     <color name="fm_nav_idle">#8994A5</color>
     <color name="fm_success">#147C4B</color>

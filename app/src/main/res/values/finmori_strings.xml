@@ -13,6 +13,8 @@
     <string name="fm_timetable">课程表</string>
     <string name="fm_timetable_description">查看本周课程</string>
     <string name="fm_home">首页</string>
+    <string name="virtual_active_home">虚拟定位 · %1$s</string>
+    <string name="virtual_active_detail">点此返回定位地图</string>
     <string name="fm_functions">功能</string>
     <string name="fm_profile">我的</string>
     <string name="fm_study_short">学习</string>
