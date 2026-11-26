@@ -209,14 +209,38 @@ public class JwSemesterInfoTest {
         assertTrue(plan.fromCalendar);
     }
 
+    /** 正方把第一学期写成 xqm=3：不能被当成短学期，否则倒推锚点会被学期守护拦掉。 */
+    @Test
+    public void fangzhengTermCodeAnchorsFirstSemester() throws Exception {
+        JwSemesterInfo.Plan plan = JwSemesterInfo.read(json(
+                "{\"xnm\":\"2026-2027\",\"xqm\":\"3\",\"xnWeeks\":\"9\"}")).plan(TODAY, 20);
+        assertEquals(WEEK_ONE_MONDAY, plan.semesterStart);
+        assertEquals(9, plan.week);
+        assertFalse(plan.fromCalendar);
+    }
+
+    @Test
+    public void fangzhengTermCodesCoverTheirSeasons() throws Exception {
+        assertTrue(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"3\"}"))
+                .termCoversToday(TODAY));
+        assertTrue(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"12\"}"))
+                .termCoversToday(LocalDate.of(2027, 3, 15)));
+        assertTrue(JwSemesterInfo.read(json("{\"xnm\":\"2026-2027\",\"xqm\":\"16\"}"))
+                .termCoversToday(LocalDate.of(2027, 7, 1)));
+    }
+
     @Test
     public void termLabelsParse() throws Exception {
         assertEquals(2026, JwSemesterInfo.parseTermYear("2026-2027"));
         assertEquals(2026, JwSemesterInfo.parseTermYear("2026~2027"));
         assertEquals(0, JwSemesterInfo.parseTermYear("1999-2000"));
         assertEquals(0, JwSemesterInfo.parseTermYear(null));
+        assertEquals(1, JwSemesterInfo.parseTermIndex("1"));
+        assertEquals(1, JwSemesterInfo.parseTermIndex("3"));
         assertEquals(2, JwSemesterInfo.parseTermIndex("2"));
         assertEquals(2, JwSemesterInfo.parseTermIndex(2));
+        assertEquals(2, JwSemesterInfo.parseTermIndex("12"));
+        assertEquals(3, JwSemesterInfo.parseTermIndex("16"));
         assertEquals(0, JwSemesterInfo.parseTermIndex("4"));
     }
 }

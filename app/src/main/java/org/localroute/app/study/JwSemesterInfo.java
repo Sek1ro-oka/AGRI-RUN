@@ -214,7 +214,13 @@ public final class JwSemesterInfo {
         return year >= 2000 && year <= 2099 ? year : 0;
     }
 
-    /** 学期序号只认 1/2/3（秋季、春季、短学期）。 */
+    /**
+     * 学期序号：正方常用 3/12/16 表示秋/春/短学期，部分部署直接写 1/2/3。
+     *
+     * <p>3 在两套写法里含义不同：正方把「第一学期」写成 3，
+     * {@link JwTimetableParser#termLabel} 也按这个口径展示，这里跟随它，
+     * 否则第一学期的导入会被当成短学期、被学期守护拦掉。
+     */
     static int parseTermIndex(@Nullable Object value) {
         if (!scalar(value)) {
             return 0;
@@ -223,8 +229,18 @@ public final class JwSemesterInfo {
         if (!matcher.find()) {
             return 0;
         }
-        int index = Integer.parseInt(matcher.group());
-        return index >= 1 && index <= 3 ? index : 0;
+        switch (Integer.parseInt(matcher.group())) {
+            case 1:
+            case 3:
+                return 1;
+            case 2:
+            case 12:
+                return 2;
+            case 16:
+                return 3;
+            default:
+                return 0;
+        }
     }
 
     /** 「9」「第9周」都读成 9；没有数字、超过两位或超出周数上限时返回 0。 */

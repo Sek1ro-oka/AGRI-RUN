@@ -54,8 +54,14 @@ public final class JwTimetableJavascript {
                   });
                 }
 
+                function findSelect(doc, id) {
+                  if (!doc) return null;
+                  return doc.getElementById(id) ||
+                      doc.querySelector('select[name="' + id + '"]');
+                }
+
                 function selectedOption(doc, id) {
-                  var select = doc.getElementById(id);
+                  var select = findSelect(doc, id);
                   if (!select) return '';
                   var options = nonEmptyOptions(select);
                   if (!options.length) return '';
@@ -154,7 +160,7 @@ public final class JwTimetableJavascript {
                 function pageCalendar() {
                   var out = {weeks: '', dates: [], count: 0};
                   try {
-                    var options = nonEmptyOptions(document.getElementById('xq'));
+                    var options = nonEmptyOptions(findSelect(document, 'xq'));
                     if (options.length) {
                       out.count = options.length;
                       var chosen = options.filter(function (option) {
@@ -207,6 +213,8 @@ public final class JwTimetableJavascript {
 
                 function readCalendar(term) {
                   var out = pageCalendar();
+                  // 有些入口把周次放在 URL 上，页面里没有 #xq 时可退到这里。
+                  if (!out.weeks) out.weeks = weekDigits(params['xq'] || params['week']);
                   return loadIndex(term).then(function (html) {
                     if (!html || isLoginPage(html)) return out;
                     if (!out.weeks) {
@@ -222,7 +230,7 @@ public final class JwTimetableJavascript {
                     }
                     if (!doc) return out;
                     if (!out.count) {
-                      out.count = nonEmptyOptions(doc.getElementById('xq')).length;
+                      out.count = nonEmptyOptions(findSelect(doc, 'xq')).length;
                     }
                     if (!out.weeks) out.weeks = weekDigits(selectedOption(doc, 'xq'));
                     return out;

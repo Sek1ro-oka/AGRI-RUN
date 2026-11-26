@@ -646,6 +646,14 @@
     <string name="study_import_semester_derived">\n教务显示本周第 %1$d 周，第 1 周按今天倒推为 %2$s，导入后自动定位。</string>
     <string name="study_import_semester_outside">\n教务校历：第 1 周自 %1$s 起（今天不在教学周内，不改动当前查看的周）。</string>
     <string name="study_import_semester_replaces">\n手设的开学日期 %1$s 已被替换，可在「学习 · 设置」里改回。</string>
+    <string name="study_import_semester_missing">\n教务未提供学期日期；导入完成后请选择开学第 1 周，否则课表无法定位周次。</string>
+    <string name="study_import_semester_missing_old">\n教务未提供学期日期；导入完成后请重新选择开学第 1 周（不选会清除现有的 %1$s）。</string>
+    <string name="study_import_start_missing_message">教务没有提供学期日期。选择第 1 周内任意一天，课表才能定位本周，提醒与日历导出也才准确。</string>
+    <string name="study_import_start_missing_message_old">教务没有提供学期日期。本机现有开学日期 %1$s；如果它不是本学期的，请重新选择。不选会清除这个日期，课表将暂时无法定位周次。</string>
+    <string name="study_import_start_choose">选择日期</string>
+    <string name="study_import_start_later">稍后设置</string>
+    <string name="study_import_start_saved">开学第 1 周已设为 %1$s</string>
+    <string name="study_import_start_cleared">已清除旧开学日期，可稍后在学习页重新设置</string>
     <string name="study_import_confirm">导入</string>
     <string name="study_import_append">追加到现有课表</string>
     <string name="study_import_replace_hint">未勾选追加时会覆盖现有 %1$d 门课程。</string>
