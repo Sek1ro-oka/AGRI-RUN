@@ -6,14 +6,6 @@
 
 - Finmori UI Kit：采用其色彩令牌与列表、导航组件的视觉模式；原始设计 Zoey Do，代码及令牌参考 [Finmori](https://github.com/KhoaSuperman/Finmori)（MIT）。许可全文见 [Finmori-MIT.txt](licenses/Finmori-MIT.txt)。
 
-## 插画素材
-
-- 首页横幅 `home_hero_morning.webp` / `home_hero_day.webp` / `home_hero_night.webp`：由 AI 图像生成
-  （Qoder 内置 ImageGen）按本项目自撰提示词生成，构图为本项目指定的「农林校园 + 钟楼偏右 + 左侧留白」，
-  未使用任何第三方照片、插画或参考图作为输入；夜景先出，日景与晨景以夜景为构图参考生成。
-  原始 2560×1080 PNG 由本项目缩放为 1440×608 并转 WebP（quality 82）后入库，三张合计约 402 KB。
-  生成提示词与本次改动记录见 `docs/ISSUES.md` 对应小节。
-
 ## 代码依赖
 
 | 组件 | 版本 | 许可证 | 用途 | 说明 |

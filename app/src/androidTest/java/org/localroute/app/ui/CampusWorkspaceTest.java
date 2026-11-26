@@ -40,7 +40,7 @@ public class CampusWorkspaceTest {
         onView(withId(R.id.textNavProfile)).check(matches(withText(R.string.fm_profile)));
         onView(withId(R.id.textNavSettings))
                 .check(matches(withText(R.string.home_app_settings_title)));
-        onView(withId(R.id.imageHomeHero)).check(matches(isDisplayed()));
+        onView(withId(R.id.textHomeGreeting)).check(matches(isDisplayed()));
         onView(withId(R.id.cardHomeAgenda)).check(matches(isDisplayed()));
         // 自适应折叠的承诺：首屏不用滚动就能看完，账户卡也在内。
         onView(withId(R.id.homeScroll)).check((view, error) -> {

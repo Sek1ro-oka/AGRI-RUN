@@ -18,49 +18,33 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
-            <!-- 插画通栏，问候语压在下缘；scrim 保证文字对比度，随时段换图与换字色。 -->
-            <FrameLayout
+            <!-- 纯色页头：无插画，问候语直接落在页面背景上。 -->
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="130dp">
-                <ImageView
-                    android:id="@+id/imageHomeHero"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:scaleType="centerCrop"
-                    android:contentDescription="@string/home_hero_description"
-                    android:src="@drawable/home_hero_night" />
-                <View
-                    android:id="@+id/viewHomeScrim"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/bg_home_hero_scrim_dark" />
-                <LinearLayout
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/space_4xl"
+                android:paddingTop="@dimen/space_4xl"
+                android:paddingBottom="@dimen/space_lg">
+                <TextView
+                    android:id="@+id/textHomeGreeting"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="bottom"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="@dimen/space_4xl"
-                    android:paddingBottom="@dimen/space_lg">
-                    <TextView
-                        android:id="@+id/textHomeGreeting"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:textColor="@color/fm_hero_on_dark"
-                        android:textSize="@dimen/text_hero"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-                    <TextView
-                        android:id="@+id/textHomeGreetingSub"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_hair"
-                        android:textColor="@color/fm_hero_on_dark_sub"
-                        android:textSize="@dimen/text_label"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
-                </LinearLayout>
-            </FrameLayout>
+                    android:textColor="@color/fm_text"
+                    android:textSize="@dimen/text_hero"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+                <TextView
+                    android:id="@+id/textHomeGreetingSub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_hair"
+                    android:textColor="@color/fm_text_secondary"
+                    android:textSize="@dimen/text_label"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

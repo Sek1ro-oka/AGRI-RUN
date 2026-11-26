@@ -3,9 +3,9 @@ package org.localroute.app.home;
 import androidx.annotation.NonNull;
 
 /**
- * 首页顶部的时段：决定问候语与那张插画用晨景、日景还是夜景。
+ * 首页顶部的时段：决定问候语用早上好、下午好还是晚上好。
  *
- * <p>纯 Java，只认小时数，措辞与图片资源由界面层映射，便于 JVM 断言边界。
+ * <p>纯 Java，只认小时数，措辞由界面层映射，便于 JVM 断言边界。
  */
 public final class HomeGreeting {
 

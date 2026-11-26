@@ -4,7 +4,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-/** 问候语与插画时段的边界：5 点起早晨，12 点起下午，18 点起晚上。 */
+/** 问候语时段的边界：5 点起早晨，12 点起下午，18 点起晚上。 */
 public class HomeGreetingTest {
 
     @Test public void nightCoversEveningAndSmallHours() {
