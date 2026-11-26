@@ -18,7 +18,7 @@
     <string name="fm_study_short">学习</string>
     <string name="fm_today">当前课表</string>
 
-    <!-- 新首页：问候、日程时间轴、校园账户占位 -->
+    <!-- 新首页：问候、日程时间轴与待交作业 -->
     <string name="home_greet_morning">早上好，%1$s</string>
     <string name="home_greet_day">下午好，%1$s</string>
     <string name="home_greet_night">晚上好，%1$s</string>
@@ -27,7 +27,6 @@
     <string name="home_greet_unbound">绑定学习通后显示作业截止</string>
     <string name="home_greet_unbound_all">导入课表、绑定学习通后显示日程</string>
     <string name="home_greet_no_timetable">导入课表后显示当天课程</string>
-    <string name="home_hero_description">校园插画</string>
     <string name="home_date_format">%1$d月%2$d日 星期%3$s</string>
     <string-array name="home_weekday_labels">
         <item>一</item>

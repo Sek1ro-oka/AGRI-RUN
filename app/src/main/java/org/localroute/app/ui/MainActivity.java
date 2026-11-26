@@ -42,7 +42,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 首页：插画问候 + 当天日程时间轴 + 校园账户占位。
+ * 首页：纯色问候 + 当天日程时间轴 + 待交作业。
  *
  * <p>它同时是启动页与桌面快捷方式的中转站（清单里只有本页 exported），所以 {@link HomeTarget}
  * 的转发留在这里；运行中与环境引导两张动态卡在「功能」页。
@@ -179,38 +179,18 @@ public class MainActivity extends AppCompatActivity {
     private void renderHero(StudySession session, int courseCount, int homeworkCount,
                             boolean notImported) {
         HomeGreeting.Phase phase = HomeGreeting.phaseOf(LocalTime.now().getHour());
-        int hero;
-        int scrim;
-        int textColor;
-        int subColor;
         int greetRes;
         switch (phase) {
             case MORNING:
-                hero = R.drawable.home_hero_morning;
-                scrim = R.drawable.bg_home_hero_scrim_light;
-                textColor = R.color.fm_hero_on_light;
-                subColor = R.color.fm_hero_on_light_sub;
                 greetRes = R.string.home_greet_morning;
                 break;
             case DAY:
-                hero = R.drawable.home_hero_day;
-                scrim = R.drawable.bg_home_hero_scrim_light;
-                textColor = R.color.fm_hero_on_light;
-                subColor = R.color.fm_hero_on_light_sub;
                 greetRes = R.string.home_greet_day;
                 break;
             default:
-                hero = R.drawable.home_hero_night;
-                scrim = R.drawable.bg_home_hero_scrim_dark;
-                textColor = R.color.fm_hero_on_dark;
-                subColor = R.color.fm_hero_on_dark_sub;
                 greetRes = R.string.home_greet_night;
                 break;
         }
-        binding.imageHomeHero.setImageResource(hero);
-        binding.viewHomeScrim.setBackgroundResource(scrim);
-        binding.textHomeGreeting.setTextColor(ContextCompat.getColor(this, textColor));
-        binding.textHomeGreetingSub.setTextColor(ContextCompat.getColor(this, subColor));
         String name = session != null && !session.name().isEmpty()
                 ? session.name() : getString(R.string.home_greet_guest);
         binding.textHomeGreeting.setText(getString(greetRes, name));
@@ -333,7 +313,7 @@ public class MainActivity extends AppCompatActivity {
 /**
      * 自适应折叠：整页放得下就全展开；放不下先收作业、再收课程，各自换成「展开还有 N 项」。
      *
-     * <p>用真实测量高度而不是估算，插画、间距、字号任何一处改动都不用回来调常数。
+     * <p>用真实测量高度而不是估算，页头、间距、字号任何一处改动都不用回来调常数。
      * 作业优先收，因为它有一周缓冲；课程是今天的时刻表，最后才动。
      */
     private void applyCollapse() {
