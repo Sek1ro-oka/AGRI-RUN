@@ -39,7 +39,10 @@ public class FunctionsActivity extends AppCompatActivity {
         });
         binding.cardCampusRun.setOnClickListener(v -> HomeTarget.RUN.open(this));
         binding.cardVirtualLocation.setOnClickListener(v -> HomeTarget.VIRTUAL.open(this));
-        binding.cardActiveRun.setOnClickListener(v -> HomeTarget.RUN.open(this));
+        binding.cardActiveRun.setOnClickListener(v -> {
+            RunSnapshot current = SimulationStateRepo.get().current();
+            (current.singlePoint() ? HomeTarget.VIRTUAL : HomeTarget.RUN).open(this);
+        });
         binding.cardStudy.setOnClickListener(v -> HomeTarget.STUDY.open(this));
         binding.cardTimetable.setOnClickListener(v -> HomeTarget.TIMETABLE.open(this));
         binding.cardSetupGuide.setOnClickListener(v ->
@@ -81,9 +84,12 @@ public class FunctionsActivity extends AppCompatActivity {
         int state = snapshot.state() == RunState.STARTING ? R.string.run_state_starting
                 : snapshot.state() == RunState.PAUSED ? R.string.run_state_paused
                 : snapshot.singlePoint() ? R.string.run_state_hold : R.string.run_state_running;
-        binding.textActiveRunTitle.setText(getString(R.string.run_active_home, getString(state)));
-        binding.textActiveRunDetail.setText(getString(R.string.run_active_detail,
-                CampusFormat.kilometers(snapshot.distanceMeters()),
-                CampusFormat.time(snapshot.activeElapsedMs())));
+        binding.textActiveRunTitle.setText(getString(snapshot.singlePoint()
+                ? R.string.virtual_active_home : R.string.run_active_home, getString(state)));
+        binding.textActiveRunDetail.setText(snapshot.singlePoint()
+                ? getString(R.string.virtual_active_detail)
+                : getString(R.string.run_active_detail,
+                        CampusFormat.kilometers(snapshot.distanceMeters()),
+                        CampusFormat.time(snapshot.activeElapsedMs())));
     }
 }

@@ -14,8 +14,10 @@ import org.junit.runner.RunWith;
 import org.localroute.app.R;
 import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.run.SimulationStateRepo;
+import org.localroute.app.run.RunRequest;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.RunSpeedPreferences;
+import org.localroute.core.GeoPoint;
 import org.localroute.core.RunState;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -81,6 +83,9 @@ public class CampusWorkspaceTest {
             onView(withId(R.id.timetableScreen)).check(matches(isDisplayed()));
             onView(withId(R.id.tabTimetable)).check(matches(isSelected()));
             onView(withId(R.id.textStudyTitle)).check(matches(withText(R.string.fm_timetable)));
+            onView(withId(R.id.textStudyAccount)).check(matches(withEffectiveVisibility(Visibility.GONE)));
+            onView(withId(R.id.tabHomework)).perform(click());
+            onView(withId(R.id.textStudyAccount)).check(matches(isDisplayed()));
         }
     }
     @Before public void prepare() throws Exception {
@@ -219,6 +224,16 @@ public class CampusWorkspaceTest {
             onView(withId(R.id.textRouteInfo)).check(matches(withText(containsString("A操"))));
         }
     }
+    @Test public void activeSinglePointReturnsToVirtualLocation() {
+        ActivityScenario.launch(FunctionsActivity.class);
+        SimulationService.start(context, RunRequest.createSinglePoint(new GeoPoint(30.2, 120.1)));
+        await(() -> SimulationStateRepo.get().current().isActive()
+                && SimulationStateRepo.get().current().singlePoint());
+        onView(withId(R.id.textActiveRunTitle)).perform(scrollTo())
+                .check(matches(withText(containsString(context.getString(R.string.virtual_title)))));
+        onView(withId(R.id.cardActiveRun)).perform(scrollTo(), click());
+        onView(withId(R.id.buttonVirtualMain)).check(matches(isDisplayed()));
+    }
     @Test public void runningControlsFunctionsShortcutAndExternalCommandsStayInSync() throws Exception {
         try (ActivityScenario<FunctionsActivity> functions =
                      ActivityScenario.launch(FunctionsActivity.class)) {
@@ -261,9 +276,13 @@ public class CampusWorkspaceTest {
     }
     private static void await(BooleanSupplier condition) {
         long deadline = SystemClock.elapsedRealtime() + 12000;
-        while (!condition.getAsBoolean() && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(100);
+        boolean satisfied = condition.getAsBoolean();
+        while (!satisfied && SystemClock.elapsedRealtime() < deadline) {
+            SystemClock.sleep(100);
+            satisfied = condition.getAsBoolean();
+        }
         assertTrue("Timed out waiting for service state: " + SimulationStateRepo.get().current().state()
-                + " " + SimulationStateRepo.get().current().errorMessage(), condition.getAsBoolean());
+                + " " + SimulationStateRepo.get().current().errorMessage(), satisfied);
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
     }
     @Test public void overlayPresetRemainsTheNaturalSpeedTarget() throws Exception {
@@ -279,6 +298,14 @@ public class CampusWorkspaceTest {
             android.accessibilityservice.AccessibilityServiceInfo info = automation.getServiceInfo();
             info.flags |= android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
             automation.setServiceInfo(info);
+            // 等离开地图后的悬浮窗延迟显示完成，再展开控制台。
+            SystemClock.sleep(500);
+            await(() -> {
+                for (android.view.accessibility.AccessibilityWindowInfo window : automation.getWindows()) {
+                    if (clickDescription(window.getRoot(), "更多")) return true;
+                }
+                return false;
+            });
             String ride = context.getString(R.string.overlay_gear_ride);
             await(() -> {
                 for (android.view.accessibility.AccessibilityWindowInfo window : automation.getWindows()) {

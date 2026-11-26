@@ -553,7 +553,7 @@
     <string name="study_week_total_title">学期总周数</string>
     <string name="study_week_total_message">按学校教学日历设置；导入课程超出时会自动扩展。</string>
     <string name="study_week_confirm">查看</string>
-    <string name="study_timetable_empty">还没有课表。可以从学校教务系统直接导入，也可以点击任意空白格添加课程或事件。</string>
+    <string name="study_timetable_empty">还没有课表，可以导入课表或添加课程。</string>
     <string name="study_timetable_note">%1$s · 上午 %2$s–%3$s · 下午 %4$s–%5$s · 晚课 %6$s–%7$s\n点击课程卡片可修改或删除，点击空白格可添加事件；左右滑动可切换周次。</string>
     <string name="study_timetable_import">从教务系统导入</string>
     <string name="study_timetable_add">添加课程</string>

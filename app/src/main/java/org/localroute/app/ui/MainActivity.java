@@ -230,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
             cell.textDayWeek.setText(weekdayLabels[day.getDayOfWeek().getValue() - 1]);
             cell.getRoot().setSelected(selected);
             int color = ContextCompat.getColor(this,
-                    selected ? R.color.fm_surface : R.color.fm_text_secondary);
+                    selected ? R.color.fm_on_brand : R.color.fm_text_secondary);
             cell.textDayNumber.setTextColor(color);
             cell.textDayWeek.setTextColor(color);
             cell.getRoot().setContentDescription(dateLabel(day));
@@ -252,8 +252,6 @@ public class MainActivity extends AppCompatActivity {
         boolean empty = shown.items().isEmpty();
         binding.agendaList.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.agendaEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-        binding.agendaSkeleton.setVisibility(
-                empty && shown.notImported() ? View.VISIBLE : View.GONE);
         binding.textHomeAgendaCount.setVisibility(empty ? View.GONE : View.VISIBLE);
         if (empty) {
             courseExpanded = false;
@@ -284,8 +282,6 @@ public class MainActivity extends AppCompatActivity {
         boolean empty = due.isEmpty();
         binding.homeworkList.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.homeworkEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-        binding.homeworkSkeleton.setVisibility(
-                empty && session == null ? View.VISIBLE : View.GONE);
         binding.textHomeworkFoot.setVisibility(empty ? View.GONE : View.VISIBLE);
         if (empty) {
             homeworkExpanded = false;

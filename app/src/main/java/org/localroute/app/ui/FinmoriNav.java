@@ -2,6 +2,11 @@ package org.localroute.app.ui;
 
 import android.content.Intent;
 import android.graphics.Typeface;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -47,6 +52,7 @@ final class FinmoriNav {
         FinmoriMotion.press(nav.navFunctions);
         FinmoriMotion.press(nav.navProfile);
         FinmoriMotion.press(nav.navSettings);
+        constrainWideLayout(nav.getRoot());
     }
 
     private static void apply(@NonNull AppCompatActivity activity, @NonNull android.view.View column,
@@ -57,7 +63,42 @@ final class FinmoriNav {
         icon.setImageTintList(android.content.res.ColorStateList.valueOf(color));
         label.setTextColor(color);
         label.setTypeface(selected ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        column.setSelected(selected);
         column.setContentDescription(activity.getString(labelRes));
+    }
+
+    /** Keep the four top-level pages readable when the app window is wide. */
+    private static void constrainWideLayout(View navigation) {
+        if (!(navigation.getParent() instanceof LinearLayout)) return;
+        LinearLayout root = (LinearLayout) navigation.getParent();
+        int maxWidth = root.getResources().getDimensionPixelSize(R.dimen.content_max_width);
+        root.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            int available = right - left - root.getPaddingLeft() - root.getPaddingRight();
+            if (available <= 0) return;
+            for (int i = 0; i < root.getChildCount(); i++) {
+                View child = root.getChildAt(i);
+                if (child instanceof ScrollView) {
+                    ScrollView scroll = (ScrollView) child;
+                    if (scroll.getChildCount() == 0) continue;
+                    View content = scroll.getChildAt(0);
+                    FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) content.getLayoutParams();
+                    int width = Math.min(available, maxWidth);
+                    if (params.width != width || params.gravity != Gravity.CENTER_HORIZONTAL) {
+                        params.width = width;
+                        params.gravity = Gravity.CENTER_HORIZONTAL;
+                        content.setLayoutParams(params);
+                    }
+                } else if (child == navigation || child instanceof com.google.android.material.appbar.MaterialToolbar) {
+                    LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) child.getLayoutParams();
+                    int width = Math.min(maxWidth, available - params.leftMargin - params.rightMargin);
+                    if (params.width != width || params.gravity != Gravity.CENTER_HORIZONTAL) {
+                        params.width = width;
+                        params.gravity = Gravity.CENTER_HORIZONTAL;
+                        child.setLayoutParams(params);
+                    }
+                }
+            }
+        });
     }
 
     private static void open(@NonNull AppCompatActivity activity, @NonNull Tab current,

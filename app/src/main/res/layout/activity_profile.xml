@@ -5,12 +5,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/fm_surface">
+    android:background="@color/fm_background">
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@color/fm_surface"
+        android:background="@color/fm_background"
         app:title="@string/fm_profile"
         app:titleTextColor="@color/fm_text" />
     <ScrollView
@@ -37,7 +37,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/fm_surface_alt"
+                app:cardBackgroundColor="@color/fm_surface"
                 app:cardCornerRadius="@dimen/radius_sheet"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp">
@@ -65,13 +65,15 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_xl"
+                        android:minHeight="@dimen/touch_min"
+                        android:gravity="center"
                         android:background="@drawable/bg_home_pill"
                         android:clickable="true"
                         android:focusable="true"
                         android:paddingHorizontal="@dimen/space_5xl"
                         android:paddingVertical="@dimen/space_md"
                         android:text="@string/study_account_bind"
-                        android:textColor="@color/fm_surface"
+                        android:textColor="@color/fm_on_brand"
                         android:textSize="@dimen/text_label"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -88,7 +90,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/fm_surface_alt"
+                app:cardBackgroundColor="@color/fm_surface"
                 app:cardCornerRadius="@dimen/radius_sheet"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp">
