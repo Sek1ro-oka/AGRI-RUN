@@ -13,12 +13,13 @@ import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityProfileBinding;
 import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
+import org.localroute.app.study.StudyTimetableStore;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-/** 我的：学习通账号与尚未接入的数据源。设置是独立 tab，不在这里。 */
+/** 我的：学习通绑定与教务课表导入。设置是独立 tab，不在这里。 */
 public class ProfileActivity extends AppCompatActivity {
 
     private ActivityProfileBinding binding;
@@ -34,13 +35,24 @@ public class ProfileActivity extends AppCompatActivity {
             return insets;
         });
         binding.buttonProfileAccount.setOnClickListener(v -> openAccount());
+        binding.rowProfileJwImport.setOnClickListener(v ->
+                startActivity(new Intent(this, JwImportActivity.class)));
         FinmoriMotion.press(binding.buttonProfileAccount);
+        FinmoriMotion.press(binding.rowProfileJwImport);
         FinmoriNav.bind(this, binding.bottomNav, FinmoriNav.Tab.PROFILE);
     }
 
     @Override protected void onResume() {
         super.onResume();
         renderAccount();
+        renderTimetable();
+    }
+
+    private void renderTimetable() {
+        int count = StudyTimetableStore.loadCourses(this).size();
+        binding.textProfileJwMeta.setText(count > 0
+                ? getString(R.string.profile_jw_import_count, count)
+                : getString(R.string.profile_jw_import_none));
     }
 
     private void renderAccount() {

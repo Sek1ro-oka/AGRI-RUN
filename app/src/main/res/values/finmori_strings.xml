@@ -24,7 +24,8 @@
     <string name="home_greet_night">晚上好，%1$s</string>
     <string name="home_greet_guest">同学</string>
     <string name="home_greet_summary">%1$d 节课 · %2$d 份作业</string>
-    <string name="home_greet_unbound">绑定学习通后显示今天的课程</string>
+    <string name="home_greet_unbound">绑定学习通后显示作业截止</string>
+    <string name="home_greet_unbound_all">导入课表、绑定学习通后显示日程</string>
     <string name="home_greet_no_timetable">导入课表后显示当天课程</string>
     <string name="home_hero_description">校园插画</string>
     <string name="home_date_format">%1$d月%2$d日 星期%3$s</string>
@@ -42,6 +43,8 @@
     <string name="home_agenda_count">%1$d 节课</string>
     <string name="home_homework_section">待交作业</string>
     <string name="home_homework_count">共 %1$d 份</string>
+    <string name="home_homework_empty_title">暂无待交作业</string>
+    <string name="home_homework_view_action">查看作业</string>
     <string name="home_day_today">今天</string>
     <string name="home_day_tomorrow">明天</string>
     <string name="home_agenda_expand">展开还有 %1$d 项</string>
@@ -58,13 +61,9 @@
     <string name="home_bind_title">还没绑定学习通</string>
     <string name="home_bind_action">去绑定</string>
 
-    <!-- 我的：账号与待接入。账号文案复用 study_account_* / study_settings_account_meta。 -->
+    <!-- 我的：只保留学习通绑定与教务课表导入；账号文案复用 study_account_* / study_settings_account_meta。 -->
     <string name="profile_manage_action">管理账号</string>
-    <string name="profile_pending_section">待接入</string>
-    <string name="profile_pending_hint">这些数据源尚未接入，首页校园账户区先显示未接入</string>
-    <string name="profile_pending_traffic">校园网流量</string>
-    <string name="profile_pending_power">宿舍电量</string>
-    <string name="profile_pending_card">校园卡</string>
-    <string name="profile_pending_library">图书馆预约</string>
-    <string name="profile_pending_status">未接入</string>
+    <string name="profile_jw_import_title">教务系统课程表导入</string>
+    <string name="profile_jw_import_count">已导入 %1$d 门课程</string>
+    <string name="profile_jw_import_none">尚未导入课程表</string>
 </resources>

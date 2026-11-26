@@ -119,6 +119,16 @@
                             android:layout_marginTop="@dimen/space_md"
                             android:orientation="vertical" />
                         <LinearLayout
+                            android:id="@+id/agendaSkeleton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_md"
+                            android:orientation="vertical"
+                            android:visibility="gone">
+                            <include layout="@layout/item_home_skeleton" />
+                            <include layout="@layout/item_home_skeleton" />
+                        </LinearLayout>
+                        <LinearLayout
                             android:id="@+id/agendaEmpty"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -136,7 +146,7 @@
                                 android:maxLines="1"
                                 android:ellipsize="end" />
                             <TextView
-                                android:id="@+id/buttonHomeBind"
+                                android:id="@+id/buttonHomeImport"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="@dimen/space_md"
@@ -145,7 +155,7 @@
                                 android:focusable="true"
                                 android:paddingHorizontal="@dimen/space_xl"
                                 android:paddingVertical="@dimen/space_sm"
-                                android:text="@string/home_bind_action"
+                                android:text="@string/home_agenda_import_action"
                                 android:textColor="@color/fm_surface"
                                 android:textSize="@dimen/text_caption"
                                 android:textStyle="bold" />
@@ -164,7 +174,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_xl"
-                    android:visibility="gone"
                     app:cardBackgroundColor="@color/fm_surface_alt"
                     app:cardCornerRadius="@dimen/radius_sheet"
                     app:cardElevation="0dp"
@@ -182,11 +191,52 @@
                             android:textSize="@dimen/text_body"
                             android:textStyle="bold" />
                         <LinearLayout
+                            android:id="@+id/homeworkSkeleton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_sm"
+                            android:orientation="vertical"
+                            android:visibility="gone">
+                            <include layout="@layout/item_home_skeleton" />
+                        </LinearLayout>
+                        <LinearLayout
                             android:id="@+id/homeworkList"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_sm"
                             android:orientation="vertical" />
+                        <LinearLayout
+                            android:id="@+id/homeworkEmpty"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_sm"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:visibility="gone">
+                            <TextView
+                                android:id="@+id/textHomeworkEmpty"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textColor="@color/fm_text"
+                                android:textSize="@dimen/text_meta"
+                                android:maxLines="1"
+                                android:ellipsize="end" />
+                            <TextView
+                                android:id="@+id/buttonHomeworkEmpty"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="@dimen/space_md"
+                                android:background="@drawable/bg_home_pill"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:paddingHorizontal="@dimen/space_xl"
+                                android:paddingVertical="@dimen/space_sm"
+                                android:text="@string/home_homework_view_action"
+                                android:textColor="@color/fm_surface"
+                                android:textSize="@dimen/text_caption"
+                                android:textStyle="bold" />
+                        </LinearLayout>
                         <TextView
                             android:id="@+id/textHomeworkFoot"
                             android:layout_width="match_parent"

@@ -63,6 +63,7 @@ public class CampusWorkspaceTest {
         awaitActivity(ProfileActivity.class);
         onView(withId(R.id.textProfileName)).check(matches(isDisplayed()));
         onView(withId(R.id.buttonProfileAccount)).check(matches(isDisplayed()));
+        onView(withId(R.id.rowProfileJwImport)).check(matches(isDisplayed()));
         capture("02-profile");
 
         onView(withId(R.id.navSettings)).perform(click());
