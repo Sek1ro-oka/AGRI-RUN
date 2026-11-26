@@ -379,4 +379,7 @@
                 app:icon="@drawable/ic_campus_update" />
         </LinearLayout>
     </ScrollView>
+    <include
+        android:id="@+id/bottomNav"
+        layout="@layout/view_bottom_nav" />
 </LinearLayout>

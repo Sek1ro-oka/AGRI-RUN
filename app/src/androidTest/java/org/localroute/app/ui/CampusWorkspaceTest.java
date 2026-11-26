@@ -31,9 +31,53 @@ import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class CampusWorkspaceTest {
     private Context context;
-    @Test public void homeTimetableShortcutOpensWeekView() {
-        try (ActivityScenario<MainActivity> home = ActivityScenario.launch(MainActivity.class)) {
-            onView(withId(R.id.cardTimetable)).perform(click());
+    @Test public void bottomNavReachesAllFourDestinations() throws Exception {
+        // 不用 try-with-resources：本用例一路切到别的 Activity，被跟踪的实例会离开前台，
+        // ActivityScenario.close() 那时移不到 DESTROYED 会抛 NPE。收尾统一交给 @After。
+        ActivityScenario.launch(MainActivity.class);
+        onView(withId(R.id.textNavHome)).check(matches(withText(R.string.fm_home)));
+        onView(withId(R.id.textNavFunctions)).check(matches(withText(R.string.fm_functions)));
+        onView(withId(R.id.textNavProfile)).check(matches(withText(R.string.fm_profile)));
+        onView(withId(R.id.textNavSettings))
+                .check(matches(withText(R.string.home_app_settings_title)));
+        onView(withId(R.id.imageHomeHero)).check(matches(isDisplayed()));
+        onView(withId(R.id.cardHomeAgenda)).check(matches(isDisplayed()));
+        onView(withId(R.id.cardHomeTraffic)).check(matches(isDisplayed()));
+        // 自适应折叠的承诺：首屏不用滚动就能看完，账户卡也在内。
+        onView(withId(R.id.homeScroll)).check((view, error) -> {
+            android.widget.ScrollView scroll = (android.widget.ScrollView) view;
+            assertTrue("首页内容超出首屏，折叠没生效：content="
+                            + scroll.getChildAt(0).getHeight() + " viewport=" + scroll.getHeight(),
+                    scroll.getChildAt(0).getHeight() <= scroll.getHeight());
+        });
+        // 运行中与环境引导两张动态卡搬去了功能页，首页不该再有。
+        onView(withId(R.id.cardActiveRun)).check(doesNotExist());
+        onView(withId(R.id.cardSetupGuide)).check(doesNotExist());
+        capture("01-home-redesign");
+
+        onView(withId(R.id.navFunctions)).perform(click());
+        awaitActivity(FunctionsActivity.class);
+        onView(withId(R.id.cardCampusRun)).check(matches(isDisplayed()));
+        onView(withId(R.id.cardTimetable)).perform(scrollTo()).check(matches(isDisplayed()));
+
+        onView(withId(R.id.navProfile)).perform(click());
+        awaitActivity(ProfileActivity.class);
+        onView(withId(R.id.textProfileName)).check(matches(isDisplayed()));
+        onView(withId(R.id.buttonProfileAccount)).check(matches(isDisplayed()));
+        capture("02-profile");
+
+        onView(withId(R.id.navSettings)).perform(click());
+        awaitActivity(AppSettingsActivity.class);
+        onView(withId(R.id.rowActivation)).check(matches(isDisplayed()));
+
+        onView(withId(R.id.navHome)).perform(click());
+        awaitActivity(MainActivity.class);
+        onView(withId(R.id.textHomeGreeting)).check(matches(isDisplayed()));
+    }
+    @Test public void functionsTimetableEntryOpensWeekView() {
+        try (ActivityScenario<FunctionsActivity> functions =
+                     ActivityScenario.launch(FunctionsActivity.class)) {
+            onView(withId(R.id.cardTimetable)).perform(scrollTo(), click());
             onView(withId(R.id.timetableScreen)).check(matches(isDisplayed()));
             onView(withId(R.id.tabTimetable)).check(matches(isSelected()));
             onView(withId(R.id.textStudyTitle)).check(matches(withText(R.string.fm_timetable)));
@@ -155,7 +199,9 @@ public class CampusWorkspaceTest {
             onView(withId(R.id.cardUpdate)).check(matches(isDisplayed()));
             capture("04-settings-update");
             pressBack();
-            onView(withId(R.id.rowActivation)).check(matches(isDisplayed()));
+            // 设置页多了底部导航，可视区比旧版矮 140px，返回后列表停在下沿；
+            // 像用户那样滚回去再断言，验的仍是「返回后还在设置页且激活行可达」。
+            onView(withId(R.id.rowActivation)).perform(scrollTo()).check(matches(isDisplayed()));
         }
     }
     @Test public void activationRefreshesPresetsOnAnExistingMap() {
@@ -173,9 +219,10 @@ public class CampusWorkspaceTest {
             onView(withId(R.id.textRouteInfo)).check(matches(withText(containsString("A操"))));
         }
     }
-    @Test public void runningControlsHomeShortcutAndExternalCommandsStayInSync() throws Exception {
-        try (ActivityScenario<MainActivity> home = ActivityScenario.launch(MainActivity.class)) {
-            onView(withId(R.id.cardCampusRun)).perform(click());
+    @Test public void runningControlsFunctionsShortcutAndExternalCommandsStayInSync() throws Exception {
+        try (ActivityScenario<FunctionsActivity> functions =
+                     ActivityScenario.launch(FunctionsActivity.class)) {
+            onView(withId(R.id.cardCampusRun)).perform(scrollTo(), click());
             onView(withId(R.id.buttonRunMain)).perform(click());
             await(() -> SimulationStateRepo.get().current().state() == RunState.RUNNING);
             String runId = SimulationStateRepo.get().current().runId();
@@ -191,7 +238,7 @@ public class CampusWorkspaceTest {
             onView(withId(R.id.cardActiveRun)).check(matches(isDisplayed()));
             onView(withId(R.id.textActiveRunTitle))
                     .check(matches(withText(containsString(context.getString(R.string.run_state_paused)))));
-            capture("05-home-paused-task");
+            capture("05-functions-paused-task");
             onView(withId(R.id.cardActiveRun)).perform(click());
             assertEquals(runId, SimulationStateRepo.get().current().runId());
             onView(withId(R.id.buttonRunMain)).perform(click());
@@ -220,8 +267,9 @@ public class CampusWorkspaceTest {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
     }
     @Test public void overlayPresetRemainsTheNaturalSpeedTarget() throws Exception {
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            onView(withId(R.id.cardCampusRun)).perform(click());
+        try (ActivityScenario<FunctionsActivity> scenario =
+                     ActivityScenario.launch(FunctionsActivity.class)) {
+            onView(withId(R.id.cardCampusRun)).perform(scrollTo(), click());
             onView(withId(R.id.buttonRunMain)).perform(click());
             await(() -> SimulationStateRepo.get().current().state() == RunState.RUNNING);
             InstrumentationRegistry.getInstrumentation().runOnMainSync(() ->

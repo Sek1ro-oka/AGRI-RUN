@@ -22,4 +22,9 @@
     <color name="fm_go_end">#147C4B</color>
     <color name="fm_tab_selected">#DDEFE4</color>
     <color name="fm_dark_map_chip">#E612151C</color>
+    <!-- 首页插画上的文字：跟着插画明暗走，不跟 App 深浅色切换，所以 values-night 不覆盖。 -->
+    <color name="fm_hero_on_dark">#F2F5FA</color>
+    <color name="fm_hero_on_dark_sub">#C6CEDC</color>
+    <color name="fm_hero_on_light">#182130</color>
+    <color name="fm_hero_on_light_sub">#4E6270</color>
 </resources>

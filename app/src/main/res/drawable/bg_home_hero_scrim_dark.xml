@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 压在插画下缘，保证问候语在夜景上有对比度；不随 App 深浅色切换。 -->
+<shape
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="270"
+        android:startColor="#00121628"
+        android:endColor="#D0121628" />
+</shape>
