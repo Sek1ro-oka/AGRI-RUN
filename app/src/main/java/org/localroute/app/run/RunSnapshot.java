@@ -157,8 +157,7 @@ public final class RunSnapshot {
         if (singlePoint) {
             return "单点";
         }
-        int target = targetLoops <= 0 ? 0 : targetLoops;
-        return completedLoops + " / " + target;
+        return targetLoops <= 0 ? completedLoops + " 圈" : completedLoops + " / " + targetLoops;
     }
 
     public String elapsedText() {

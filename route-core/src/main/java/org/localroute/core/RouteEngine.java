@@ -18,7 +18,9 @@ public final class RouteEngine {
 
     /** 本次运行的目标总距离 = 单圈长度 × 圈数（开口单程就是全程）。 */
     public static double targetDistanceMeters(CompiledRoute route, RunConfig config) {
-        return route.lapLengthMeters() * effectiveRepeatCount(route, config.loopCount());
+        int count = effectiveRepeatCount(route, config.loopCount());
+        return count == RunConfig.NO_LOOP_TARGET ? Double.POSITIVE_INFINITY
+                : route.lapLengthMeters() * count;
     }
 
     /** 根据有效运行时间计算当前进度。 */
@@ -42,7 +44,7 @@ public final class RouteEngine {
         double target = lap * loopCount;
         double distance = Math.max(0d, distanceMeters);
 
-        if (distance >= target - 1e-6d) {
+        if (loopCount != RunConfig.NO_LOOP_TARGET && distance >= target - 1e-6d) {
             // 到达终点：闭合/往返精确回到起点，开口单程停在最后一个节点；不多走。
             boolean single = route.endBehavior().isSingleRun();
             GeoPoint end = single ? route.vertex(route.vertexCount() - 1) : route.vertex(0);
@@ -59,7 +61,7 @@ public final class RouteEngine {
         }
 
         int completedLoops = (int) Math.floor(distance / lap + 1e-9d);
-        if (completedLoops > loopCount) {
+        if (loopCount != RunConfig.NO_LOOP_TARGET && completedLoops > loopCount) {
             completedLoops = loopCount;
         }
         GeoPoint point = route.pointAt(distance);

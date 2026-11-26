@@ -17,10 +17,15 @@ import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.run.RunRequest;
 import org.localroute.app.service.SimulationService;
 import org.localroute.app.settings.RunSpeedPreferences;
+import org.localroute.core.CompiledRoute;
+import org.localroute.core.EndBehavior;
 import org.localroute.core.GeoPoint;
+import org.localroute.core.RouteCompiler;
+import org.localroute.core.RunConfig;
 import org.localroute.core.RunState;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.Arrays;
 import java.util.function.BooleanSupplier;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.Espresso.pressBack;
@@ -154,6 +159,68 @@ public class CampusWorkspaceTest {
             onView(withId(R.id.buttonAdvanced)).check(matches(not(isEnabled())));
             onView(withId(R.id.buttonDrawCancel)).perform(click());
             onView(withId(R.id.textRouteInfo)).check(matches(withText(containsString("B操"))));
+        }
+    }
+    @Test public void lapGoalIsOptionalAndResetsAfterRun() {
+        context.getSharedPreferences("campus_run", 0).edit().putInt("laps", 7).commit();
+        try (ActivityScenario<CampusRunActivity> scenario = ActivityScenario.launch(CampusRunActivity.class)) {
+            onView(withId(R.id.textLaps)).check(matches(withText(R.string.run_laps_unset)));
+            onView(withId(R.id.textLaps)).perform(click());
+            onView(withId(R.id.inputRunValue)).perform(replaceText("2"), closeSoftKeyboard());
+            onView(withText("保存")).perform(click());
+            scenario.recreate();
+            onView(withId(R.id.textLaps)).check(matches(withText("2 圈")));
+            onView(withId(R.id.buttonRunMain)).perform(click());
+            await(() -> SimulationStateRepo.get().current().state() == RunState.RUNNING);
+            assertEquals(2, SimulationStateRepo.get().current().targetLoops());
+            onView(withId(R.id.buttonEndRun)).perform(click());
+            await(() -> !SimulationStateRepo.get().current().isActive());
+            onView(withId(R.id.buttonDoneBack)).perform(click());
+            onView(withId(R.id.textLaps)).check(matches(withText(R.string.run_laps_unset)));
+            onView(withId(R.id.textLaps)).perform(click());
+            onView(withId(R.id.inputRunValue)).perform(replaceText("3"), closeSoftKeyboard());
+            onView(withText("保存")).perform(click());
+            onView(withId(R.id.textLaps)).perform(click());
+            onView(withText(R.string.run_laps_clear)).perform(click());
+            onView(withId(R.id.textLaps)).check(matches(withText(R.string.run_laps_unset)));
+            onView(withId(R.id.buttonRunMain)).perform(click());
+            await(() -> SimulationStateRepo.get().current().state() == RunState.RUNNING);
+            assertEquals(RunConfig.NO_LOOP_TARGET, SimulationStateRepo.get().current().targetLoops());
+            onView(withId(R.id.textLapInfo)).check(matches(withText(containsString("第 1 圈"))));
+            onView(withId(R.id.buttonEndRun)).perform(click());
+            await(() -> !SimulationStateRepo.get().current().isActive());
+        }
+    }
+
+    @Test public void noGoalServiceKeepsRunningAcrossLapsAndCanPauseAndStop() throws Exception {
+        try (ActivityScenario<CampusRunActivity> scenario = ActivityScenario.launch(CampusRunActivity.class)) {
+            CompiledRoute route = RouteCompiler.compile(Arrays.asList(
+                    new GeoPoint(30.2, 120.1), new GeoPoint(30.20001, 120.1)), EndBehavior.LOOP);
+            SimulationService.start(context, RunRequest.create("测试路线", route,
+                    new RunConfig(60d, RunConfig.NO_LOOP_TARGET)));
+            await(() -> SimulationStateRepo.get().current().completedLoops() >= 3);
+            assertEquals(RunState.RUNNING, SimulationStateRepo.get().current().state());
+            assertEquals(RunConfig.NO_LOOP_TARGET, SimulationStateRepo.get().current().targetLoops());
+            SimulationService.pause(context);
+            await(() -> SimulationStateRepo.get().current().state() == RunState.PAUSED);
+            SimulationService.resume(context);
+            await(() -> SimulationStateRepo.get().current().state() == RunState.RUNNING);
+            SimulationService.stop(context);
+            await(() -> !SimulationStateRepo.get().current().isActive());
+            SimulationService.start(context, RunRequest.create("测试路线", route, new RunConfig(60d, 1)));
+            await(() -> SimulationStateRepo.get().current().state() == RunState.COMPLETED);
+            assertEquals(1, SimulationStateRepo.get().current().completedLoops());
+        }
+    }
+
+    @Test public void readinessShowsNoGoalInsteadOfZeroDistance() throws Exception {
+        shell("appops set " + context.getPackageName() + " android:mock_location deny");
+        try (ActivityScenario<CampusRunActivity> scenario = ActivityScenario.launch(CampusRunActivity.class)) {
+            onView(withId(R.id.buttonRunMain)).perform(click());
+            onView(withText(R.string.run_plan_unlimited)).check(matches(isDisplayed()));
+            onView(withText(containsString("目标距离 0.00"))).check(doesNotExist());
+        } finally {
+            shell("appops set " + context.getPackageName() + " android:mock_location allow");
         }
     }
     @Test public void preciseInputsValidateAndRememberEachSport() throws Exception {
