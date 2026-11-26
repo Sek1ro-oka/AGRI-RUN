@@ -370,6 +370,24 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/rowPermissions"
+                style="@style/Widget.Unloop.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/touch_min"
+                android:layout_marginHorizontal="@dimen/space_3xl"
+                android:layout_marginTop="@dimen/space_3xl"
+                android:text="@string/settings_permissions_entry"
+                app:icon="@drawable/ic_campus_settings" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/rowAccounts"
+                style="@style/Widget.Unloop.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/touch_min"
+                android:layout_marginHorizontal="@dimen/space_3xl"
+                android:layout_marginTop="@dimen/space_md"
+                android:text="@string/settings_accounts_entry"
+                app:icon="@drawable/ic_fm_profile" />
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/rowUpdate"
                 style="@style/Widget.Unloop.OutlinedButton"
                 android:layout_width="match_parent"

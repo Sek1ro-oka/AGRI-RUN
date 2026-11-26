@@ -121,6 +121,8 @@ public class AppSettingsActivity extends AppCompatActivity {
         prefs = getSharedPreferences(PresetUnlock.PREFS_NAME, MODE_PRIVATE);
         PresetUnlock.migrate(prefs);
         binding.rowUpdate.setOnClickListener(v -> startActivity(new Intent(this, UpdatesActivity.class)));
+        binding.rowPermissions.setOnClickListener(v -> startActivity(new Intent(this, SettingsCheckActivity.class)));
+        binding.rowAccounts.setOnClickListener(v -> startActivity(new Intent(this, ProfileActivity.class)));
         binding.rowActivation.setOnClickListener(v -> showActivationDialog());
         refreshAppearance();
         binding.rowAppearance.setOnClickListener(v -> showAppearanceDialog());
