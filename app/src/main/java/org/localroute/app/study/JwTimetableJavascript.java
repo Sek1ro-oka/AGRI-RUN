@@ -16,6 +16,17 @@ public final class JwTimetableJavascript {
 
     public static final String FETCH_JS = """
             (function () {
+              var lastHtml = '';
+              function pageSample() {
+                if (lastHtml) return lastHtml.slice(0, 800);
+                try {
+                  var text = document.body && document.body.innerText
+                      ? String(document.body.innerText) : '';
+                  return (String(document.title || '') + ' ' + text).slice(0, 800);
+                } catch (ignored) {
+                  return '';
+                }
+              }
               function done(payload) {
                 try {
                   window.LegionJw.onResult(JSON.stringify(payload));
@@ -23,7 +34,7 @@ public final class JwTimetableJavascript {
                 }
               }
               function fail(kind, error) {
-                done({ok: false, kind: kind, error: error || ''});
+                done({ok: false, kind: kind, error: error || '', page: pageSample()});
               }
               try {
                 var path = location.pathname || '';
@@ -91,6 +102,7 @@ public final class JwTimetableJavascript {
                   }).then(function (response) {
                     return response.text();
                   }).then(function (text) {
+                    lastHtml = text;
                     indexHtml = text;
                     return text;
                   });
@@ -289,6 +301,8 @@ public final class JwTimetableJavascript {
                     try {
                       data = JSON.parse(text);
                     } catch (ignored) {
+                      // 网关拦截页也是 200 + HTML，留一段正文给原生侧识别。
+                      lastHtml = text;
                       return null;
                     }
                     var kbList = findKbList(data, 0);
@@ -337,6 +351,22 @@ public final class JwTimetableJavascript {
                 });
               } catch (error) {
                 fail('FORMAT_ERROR', String(error));
+              }
+            })();
+            """;
+
+    /**
+     * 页面加载完取一小段可见文本交给原生侧，用于识别学校网关的拦截页。
+     * 只取标题与正文前 800 字，不读表单、不写日志、不外传。
+     */
+    public static final String PAGE_SAMPLE_JS = """
+            (function () {
+              try {
+                var text = document.body && document.body.innerText
+                    ? String(document.body.innerText) : '';
+                window.LegionJw.onPage(
+                    (String(document.title || '') + ' ' + text).replace(/\\s+/g, ' ').slice(0, 800));
+              } catch (ignored) {
               }
             })();
             """;
