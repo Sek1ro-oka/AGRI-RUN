@@ -29,7 +29,6 @@
     <string name="home_greet_unbound">绑定学习通后显示作业截止</string>
     <string name="home_greet_unbound_all">导入课表、绑定学习通后显示日程</string>
     <string name="home_greet_no_timetable">导入课表后显示当天课程</string>
-    <string name="home_date_format">%1$d月%2$d日 星期%3$s</string>
     <string-array name="home_weekday_labels">
         <item>一</item>
         <item>二</item>
@@ -39,23 +38,37 @@
         <item>六</item>
         <item>日</item>
     </string-array>
-    <string name="home_agenda_closed">这一天放假</string>
-    <string name="home_agenda_empty">这一天没有课程</string>
-    <string name="home_agenda_count">%1$d 节课</string>
+    <string name="home_upcoming_title">接下来</string>
+    <string name="home_upcoming_full">完整课表 →</string>
+    <string name="home_upcoming_meta_week">第 %1$d 周 · 现在 %2$s</string>
+    <string name="home_upcoming_meta">现在 %1$s</string>
+    <string name="home_upcoming_today">今天 · 周%1$s %2$d</string>
+    <string name="home_upcoming_tomorrow">明天 · 周%1$s %2$d</string>
+    <string name="home_upcoming_weekday">周%1$s %2$d</string>
+    <string name="home_upcoming_other_month">%1$d月%2$d日 周%3$s</string>
+    <string name="home_upcoming_today_counts">已上 %1$d 节 · 余 %2$d 节</string>
+    <string name="home_upcoming_today_remaining">余 %1$d 节</string>
+    <string name="home_upcoming_day_count">%1$d 节</string>
+    <string name="home_upcoming_closed">放假</string>
+    <string name="home_upcoming_more">%1$s还有 %2$d 节</string>
+    <string name="home_upcoming_more_trimmed">还有更多课</string>
+    <string name="home_upcoming_next_weekday">周%1$s</string>
+    <string name="home_upcoming_next_date">%1$d月%2$d日</string>
+    <string name="home_upcoming_empty">接下来没有课</string>
+    <string name="home_upcoming_today_closed">今天放假</string>
+    <string name="home_homework_header">待交作业 %1$d</string>
+    <string name="home_homework_all">全部 →</string>
+    <string name="home_homework_more">还有 %1$d 份</string>
     <string name="home_homework_section">待交作业</string>
-    <string name="home_homework_count">共 %1$d 份</string>
     <string name="home_homework_empty_title">暂无待交作业</string>
     <string name="home_homework_view_action">查看作业</string>
     <string name="home_day_today">今天</string>
     <string name="home_day_tomorrow">明天</string>
-    <string name="home_agenda_expand">展开还有 %1$d 项</string>
-    <string name="home_agenda_collapse">收起</string>
     <string name="home_agenda_all_done">今天的课都结束了</string>
     <string name="home_class_done">已结束</string>
     <string name="home_class_live">进行中</string>
     <string name="home_class_upcoming">未开始</string>
     <string name="home_task_undated">未标注</string>
-    <string name="home_task_pending">待交</string>
     <string name="home_task_custom">自建作业</string>
     <string name="home_agenda_no_timetable">还没有课表</string>
     <string name="home_agenda_import_action">去导入</string>

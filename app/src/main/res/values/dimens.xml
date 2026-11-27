@@ -44,6 +44,8 @@
 
     <!-- 触摸目标：手指点不准的按钮，做小就等于让人多点几次。 -->
     <dimen name="touch_min">48dp</dimen>
+    <!-- 首页接下来/作业的紧凑行：44dp 仍接近触摸下限，用来把 6+2 收进首屏 -->
+    <dimen name="home_row_height">44dp</dimen>
 
     <!-- 主页入口图标 32dp：这是用户自己挑过的大小，别再随手调。 -->
     <dimen name="icon_home">32dp</dimen>
