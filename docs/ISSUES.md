@@ -676,3 +676,26 @@ v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位�
 这台机器与上一节的记录不同：`AGENTS.md`／`docs/BUILD.md` 写的 `D:\Java\jdk-21` 与 `E:\Android\Sdk` 在此都不存在，实际用 `JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.20.8-hotspot`（JDK 17，AGP 8.9.2 够用）与 `sdk.dir=C:\Users\Xiaoyuan\AppData\Local\Android\Sdk`（platform 35 + build-tools 35.0.0）；工程路径 `E:\codes\AGRI-RUN` 是纯 ASCII，第 2 节的中文路径坑不适用。上一节「本机无 adb、无模拟器」那句对这台机器不成立，本支正是靠这里的模拟器才把导航点击跑成设备级证据。
 
 不在本支范围：`docs/11_使用手册.md:104` 与 `delivery/README_安装与使用.md:104` 写的「打开 App → 右上角菜单 → **设置检查**」本来就和当前代码不符（齿轮开的是 `AppSettingsActivity`，设置检查页在主页是从引导卡进的）。这是既有的文档漂移，本支只在 PR 里点出来，不顺手改写；改完之后那两句里的「右上角菜单」更是彻底没有对应物了，等下一次界面文案收敛一起处理。
+
+## 2026-11-27 更新进度、取消重试与启动提醒（Issue #112，已实现待真机验证）
+
+需求来源：Issue #112「更新页显示更新下载进度，优化整体更新流程，每次有新版本更新时，弹窗提醒用户一次，不要重复提醒，尽量复用或改进现有组件」。此前更新页只有一句「正在下载」，进度只在系统通知里；应用也完全没有自动检查，提醒中心明写「只在手动点的时候提示」。
+
+与用户对齐的四条：① 冷启动静默检查，不阻塞进入 App，失败不打扰；② 复用更新页现有的「发现新版本」完整对话框，点「下载并安装」直接开始下载；③ 更新页做到进度条 + 百分比 + 已下/总量，并支持取消下载与失败重试；④ 同一版本只自动弹一次，点「暂不更新」后不再自动弹，手动检查不受限。
+
+| 位置 | 内容 |
+| --- | --- |
+| `update/UpdatePromptPolicy`（新） | 纯 Java 的「要不要自动弹」判断：远端版本确实更新、且与已提醒版本不同才弹。`UpdatePromptPolicyTest` 覆盖同版本、旧版本、空值/空白与跨版本升级 |
+| `ui/UpdateDialogs`（新） | 手动检查与启动检查共用的「发现新版本」对话框；展示即写 `prompted_version`（同一版本不再自动弹），自动模式关闭按钮写「暂不更新」并说明本版本不再自动提醒；没有 APK 时改为打开发布页 |
+| `update/UpdateManager` | 新增 `DownloadState`（状态/已下/总量/百分比，排队、下载中、系统暂停都算 active）、`sizeLabel`、`cancelDownload`（移除系统任务 + 删除文件 + 清记录）、`retryDownload`（用失败记录里的原始附件地址重新探测线路）、`canRetry`、`promptedVersion`/`markPrompted`；下载开始顺手保存附件原始地址，重试不必再查一次 Release |
+| `ui/MainActivity` | 首页冷启动静默检查一次（后台线程，失败只写诊断日志）；结果返回时要求页面仍 `RESUMED`、有窗口焦点、没在引导/跳快捷入口，否则不弹、留给下次冷启动；发现新版本时直接复用完整对话框，点下载后交给系统下载器，进度看系统通知或更新页 |
+| `ui/UpdatesActivity` + 布局 | 卡片内新增 `LinearProgressIndicator`，每 500ms 读一次 `DownloadManager` 刷新「正在下载 0.13.0… 42% / 31.2 / 74.4 MiB」；选择线路和校验阶段显示不确定进度；下载中显示「取消下载」，失败显示「重试」（无附件地址的旧记录退回重新检查）；页面离开即停轮询，广播到完成/失败仍照旧处理 |
+| `study/ReminderCenter` + 文案 | 更新项从 `MANUAL_ONLY` 改为 `STARTUP_CHECK`，提醒中心写「启动时静默检查，新版本只提醒一次」；2026-11-24 提醒中心一节里「版本更新永远只在手动点的时候提示」的口径随本支作废 |
+
+已知取舍：① 只在首页冷启动时检查，没有 WorkManager/JobScheduler 后台轮询；从快捷方式直接进目标页的启动不查，回到首页后的那次 `onResume` 才查；② 同一版本只自动弹一次，是否装上是用户的选择，失败或已下载未安装不会再次自动弹（按用户拍板），更新页里仍有失败重试与安装入口；③ 自动检查每次冷启动都会并发请求 GitHub 与镜像的 Release 元数据（几 KB），失败静默；④ 下载进度靠 500ms 轮询，`DownloadManager` 的系统通知仍保留，页面不在前台时轮询停止；⑤ 取消下载会删除半成品与记录，不能续传；重试会重新探测最快线路，可能换线路，旧的失败任务留在系统下载列表里（这样探测再次失败时页面仍保留「重试」，不会连状态都丢）；⑥ 升级前留下的失败记录没有附件地址，按钮退回「重新检查」；⑦ `app_update`（下载记录与已提醒版本）不进备份，换机后需要重新提醒一次；⑧ 启动提醒的「下载」与更新页一致，只负责开始下载，安装仍需用户在系统安装器确认；⑨ 首页的检查走进程级后台线程，旋转不会打断刚点下的线路探测，但已弹出的对话框不会跨旋转保留。
+
+验证（分口径）：
+
+- **自动化（本机）**：`:app:testDebugUnitTest` 591 条、`:route-core:test` 109 条、`:simulation-core:test` 55 条，0 失败（数字从各模块 `build/test-results/**/TEST-*.xml` 现汇总；app 较基线 584 增加 7 条，即 `UpdatePromptPolicyTest` 4 + `UpdateManagerStateTest` 3，`ReminderCenterTest` 为改名不增数）；`:app:lintDebug` 0 errors / 287 warnings；`:app:assembleDebug` 与 `:app:compileDebugAndroidTestJavaWithJavac` 通过。
+- **仪器测试**：新增 `UpdateDialogTest` 两条（启动对话框展示文案、展示即写已提醒版本、点「暂不更新」不会创建下载；点「下载并安装」会执行下载回调）；在新建的 Nexus 5 / API 35 x86_64 AVD 上跑 `:app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.localroute.app.update.UpdateDialogTest`，`Starting 2 tests` / `Finished 2 tests`，BUILD SUCCESSFUL。此前这台机器 `emulator -list-avds` 为空，是 SDK/AVD 迁移到中文路径后 QEMU 无法打开镜像；用 ASCII 目录映射后原 AVD 也能正常冷启动。
+- **真机/界面**：启动检查与对话框已在模拟器上走通，但更新页进度条与两行进度文案的视觉效果仍未截图。需要补看：首页启动后弹窗出现时机是否打扰、更新页进度条在深浅色与窄屏下的排版、取消后系统通知是否消失、失败重试是否能重新选到可用线路、下载完成后校验与安装链路是否仍正常。

@@ -61,6 +61,16 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_hair"
                     android:text="@string/home_update_idle" />
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/progressUpdate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_sm"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone"
+                    app:indicatorColor="@color/campus_mint"
+                    app:trackColor="@color/campus_track"
+                    app:trackThickness="@dimen/space_xs" />
             </LinearLayout>
             <ImageView
                 android:layout_width="20dp"
@@ -69,6 +79,16 @@
                 android:src="@drawable/ic_campus_chevron_right" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/buttonUpdateAction"
+        style="@style/Widget.Unloop.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_xl"
+        android:layout_marginEnd="@dimen/space_xl"
+        android:textColor="@color/campus_ink"
+        android:textSize="@dimen/text_meta"
+        android:visibility="gone" />
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

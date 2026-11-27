@@ -33,7 +33,7 @@ public final class ReminderCenter {
         ADJUSTMENT,
         /** 作息换季：不会响，但所有钟点都会跟着变。 */
         SEASON,
-        /** 版本更新：本应用不自动检查，只在手动点的时候才说。 */
+        /** 版本更新：启动时静默检查，新版本只提醒一次。 */
         UPDATE
     }
 
@@ -49,8 +49,8 @@ public final class ReminderCenter {
         WILL_CHANGE,
         /** 作息被手动钉住了，不会自己变。 */
         PINNED_SEASON,
-        /** 这件事压根没有开关，只在用户自己点的时候才发生（更新检查）。 */
-        MANUAL_ONLY,
+        /** 这件事没有开关，应用启动时静默检查，新版本只提醒一次（更新检查）。 */
+        STARTUP_CHECK,
         /** 开着但近期没有可提醒的内容。 */
         NOTHING_PENDING
     }
@@ -135,7 +135,7 @@ public final class ReminderCenter {
                 state.nextAdjustmentDate, state.adjustmentCount));
         entries.add(new Entry(Kind.SEASON, !state.seasonManuallyPinned, null,
                 state.nextSeasonChange, 0));
-        // 更新检查没有后台调度，这一项永远是「不会主动响」，写出来是为了不让人以为它会。
+        // 更新检查只在应用冷启动时静默查一次，不占用系统通知，也不会自行响铃。
         entries.add(new Entry(Kind.UPDATE, false, null, null, 0));
         entries.sort(Comparator.comparingInt(ReminderCenter::rank)
                 .thenComparing(ReminderCenter::sortMoment)
@@ -153,7 +153,7 @@ public final class ReminderCenter {
                 // 钉住了就是钉住了：没有「下一次」可说。
                 return entry.enabled ? Status.WILL_CHANGE : Status.PINNED_SEASON;
             case UPDATE:
-                return Status.MANUAL_ONLY;
+                return Status.STARTUP_CHECK;
             case ADJUSTMENT:
                 // 调课没有开关，所以它永远不该说「没开」，只该说「近期没有安排」。
                 return entry.nextDate != null ? Status.SCHEDULE_AHEAD : Status.NOTHING_PENDING;
