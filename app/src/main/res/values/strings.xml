@@ -930,7 +930,7 @@
     <string name="run_speed_input">例如 9.5</string>
 
     <!-- 桌面课表小组件 -->
-    <string name="widget_timetable_label">课表</string>
+    <string name="widget_timetable_label">今日课表</string>
     <string name="widget_timetable_description">今天几节课、下一节还有多久；点按打开课表页</string>
     <string name="widget_timetable_title">今日课表 · %1$s</string>
     <string name="widget_timetable_week">第 %1$d 周</string>
@@ -954,11 +954,41 @@
     <string name="widget_timetable_footer_next">这节课之后 · %1$s %2$s</string>
     <string name="widget_timetable_footer_open">点按查看完整课表</string>
     <!-- 初次添加到桌面、还没被代码填过内容时先显示这三句，预览里也是一样的样子。 -->
+    <string name="widget_choose_title">添加课表小组件</string>
+    <string name="widget_choose_today">今日课表 · 2×2（原有样式）</string>
+    <string name="widget_choose_wide">双日课表 · 4×2/4×3（时间线）</string>
+    <string name="widget_timetable_wide_label">双日课表</string>
+    <string name="widget_timetable_wide_dot">●</string>
+    <string name="widget_timetable_wide_description">今天未结束的课程 + 下一个有课日；课程左侧时间线，4×2/4×3</string>
+    <string name="widget_timetable_wide_week">第 %1$d 周</string>
+    <string name="widget_timetable_wide_week_unknown">未设开学日期</string>
+    <string name="widget_timetable_wide_week_off">非教学周</string>
+    <string name="widget_timetable_wide_weekday">周%1$s</string>
+    <string name="widget_timetable_wide_today_counts">已上 %1$d 节 · 余 %2$d 节</string>
+    <string name="widget_timetable_wide_today_remaining">余 %1$d 节</string>
+    <string name="widget_timetable_wide_today_done">已上 %1$d 节 · 今天的课都结束了</string>
+    <string name="widget_timetable_wide_today_empty">今天没有课程</string>
+    <string name="widget_timetable_wide_today_holiday">今天放假</string>
+    <string name="widget_timetable_wide_next_tomorrow">明天 · 周%1$s %2$d</string>
+    <string name="widget_timetable_wide_next_date">%1$d月%2$d日 周%3$s</string>
+    <string name="widget_timetable_wide_next_date_year">%1$d年%2$d月%3$d日 周%4$s</string>
+    <string name="widget_timetable_wide_next_count">%1$d 节</string>
+    <string name="widget_timetable_wide_other">其他 %1$d 节</string>
+    <string name="widget_timetable_wide_no_next">未来 %1$d 天没有课</string>
+    <string name="widget_timetable_wide_not_imported">还没有课表
+点按导入教务课表，或手动添加</string>
+    <string name="widget_timetable_wide_open">点按查看完整课表</string>
+    <string name="widget_timetable_wide_preview_date">27</string>
+    <string name="widget_timetable_wide_preview_week">第 1 周</string>
+    <string name="widget_timetable_wide_preview_weekday">周五</string>
+    <string name="widget_timetable_wide_preview_status">已上 1 节 · 余 2 节</string>
+    <string name="widget_timetable_wide_preview_next">明天 · 周六 28</string>
+    <string name="widget_timetable_wide_preview_count">2 节</string>
     <string name="widget_timetable_title_placeholder">今日课表 · 第 1 周</string>
     <string name="widget_timetable_status_placeholder">今天没有课</string>
     <string name="widget_timetable_footer_placeholder">点按查看完整课表</string>
     <string name="app_settings_widget_title">桌面课表小组件</string>
-    <string name="app_settings_widget_subtitle">桌面上直接看今天几节课、下一节还有多久</string>
+    <string name="app_settings_widget_subtitle">今日课表 2×2 或双日课表 4×2/4×3，任选一种</string>
     <string name="widget_pin_requested">已请求添加，请在桌面弹出的确认框里点「添加到桌面」</string>
 
     <!-- 提醒中心：所有会主动通知的事，加上不发通知但会改上课安排的事。 -->
@@ -983,5 +1013,5 @@
     <string name="reminder_center_open_notifications">系统通知设置</string>
     <string name="reminder_center_open_study">课表与作业提醒设置</string>
     <string name="reminder_center_open_failed">这台系统没给通知设置留入口，请在系统设置里找「应用 → UNLOOP → 通知」</string>
-    <string name="widget_pin_unsupported">当前桌面不支持应用直接添加。请长按桌面空白处 → 「小组件」 → 找到 UNLOOP 的「课表」。</string>
+    <string name="widget_pin_unsupported">当前桌面不支持应用直接添加。请长按桌面空白处 → 「小组件」 → 找到 UNLOOP 的「今日课表」或「双日课表」。</string>
 </resources>

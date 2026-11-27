@@ -46,6 +46,7 @@ import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
 import org.localroute.app.study.TimetableDay;
 import org.localroute.app.widget.TimetableWidgetProvider;
+import org.localroute.app.widget.TimetableWidgetWideProvider;
 import org.localroute.app.widget.TimetableWidgetSync;
 
 import java.time.LocalDate;
@@ -130,7 +131,7 @@ public class AppSettingsActivity extends AppCompatActivity {
         binding.rowBackupImport.setOnClickListener(v -> startImportPick());
         binding.rowRunHistory.setOnClickListener(v ->
                 startActivity(new Intent(this, RunHistoryActivity.class)));
-        binding.rowTimetableWidget.setOnClickListener(v -> requestTimetableWidgetPin());
+        binding.rowTimetableWidget.setOnClickListener(v -> showTimetableWidgetChooser());
         refreshReminders();
         binding.rowReminders.setOnClickListener(v -> showReminderCenter());
     }
@@ -142,9 +143,8 @@ public class AppSettingsActivity extends AppCompatActivity {
      * 那种情况必须给出可操作的手动路径，否则点完毫无反应会被当成 bug。放置本身仍要用户确认，
      * 应用无法代劳。
      */
-    private void requestTimetableWidgetPin() {
+    private void showTimetableWidgetChooser() {
         AppWidgetManager manager = AppWidgetManager.getInstance(this);
-        ComponentName provider = new ComponentName(this, TimetableWidgetProvider.class);
         if (!manager.isRequestPinAppWidgetSupported()) {
             new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.app_settings_widget_title)
@@ -153,6 +153,21 @@ public class AppSettingsActivity extends AppCompatActivity {
                     .show();
             return;
         }
+        String[] styles = {
+                getString(R.string.widget_choose_today),
+                getString(R.string.widget_choose_wide)
+        };
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.widget_choose_title)
+                .setItems(styles, (dialog, which) -> pinTimetableWidget(which == 0
+                        ? TimetableWidgetProvider.class : TimetableWidgetWideProvider.class))
+                .setNegativeButton(R.string.campus_cancel, null)
+                .show();
+    }
+
+    private void pinTimetableWidget(@NonNull Class<?> providerClass) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(this);
+        ComponentName provider = new ComponentName(this, providerClass);
         manager.requestPinAppWidget(provider, null, null);
         // 组件落地后马上挂上数据变更监听，改完课表桌面上就能跟着变。
         TimetableWidgetSync.attach(this);

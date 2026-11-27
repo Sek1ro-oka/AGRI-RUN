@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 时间线的一节：起止时间、圆点/竖线、课程与教室。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widgetWideRow"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="36dp"
+    android:baselineAligned="false"
+    android:orientation="horizontal"
+    tools:ignore="SmallSp,DisableBaselineAlignment">
+
+    <LinearLayout
+        android:layout_width="32dp"
+        android:layout_height="match_parent"
+        android:gravity="end"
+        android:orientation="vertical"
+        android:paddingTop="1dp">
+
+        <TextView
+            android:id="@+id/widgetWideRowStart"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="@color/campus_ink"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widgetWideRowEnd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="@color/campus_muted"
+            android:textSize="7sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="9dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="4dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widgetWideRowDot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="@string/widget_timetable_wide_dot"
+            android:textColor="@color/campus_mint_dark"
+            android:textSize="7sp" />
+
+        <TextView
+            android:layout_width="1dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@color/fm_border" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widgetWideRowName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="@color/campus_ink"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widgetWideRowPlace"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="@color/campus_muted"
+            android:textSize="8sp" />
+    </LinearLayout>
+</LinearLayout>

@@ -740,3 +740,24 @@ v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位�
 - **模拟器（短屏）**：API 35 / 1080×1920 @480（360dp 宽）上同一 UI 测试 1/1 通过：自适应收行后课程行少于 6、作业保留 2，两卡同屏、内容不滚动；未单独要求 6 节。
 - **截图**：三张（高屏浅色/深色、短屏浅色）作为 PR 预览附件放在 fork 的 evidence 分支，未进入代码分支/上游仓库。
 - **真机**：未验证（6+2 与短屏收行只在模拟器上验证；真机字体缩放、刘海/手势区与系统栏高度仍需复验）。
+
+## 2026-11-27 新增双日课表桌面小组件（Issue #121，模拟器渲染已验证）
+
+需求来源：Issue #121 给出两张参考图——左边日期、右边下一个上课日的双栏课表组件，课程左侧原本是彩色竖条。用户确认：**保留现有「今日课表」2×2 组件不动**，新增 4×2/4×3 的「双日课表」宽版，让用户在组件选择器里自选；右栏显示**下一个有课日**（跳过周末/无课/放假）；课程左侧改为**起止时间 + 课程色圆点的时线**；今天**只列未结束的课**，已结束只写「已上 N 节」。
+
+| 位置 | 内容 |
+| --- | --- |
+| `widget/TimetableWidgetWidePlan`（新） | 纯 Java 的双日数据：今天未结束的课（含正在上，按时间排序）、今天已结束数、星期、周次；右栏从明天起找第一个有课且不放假的日期（`HORIZON_DAYS = 7`），返回完整课程列表；`maxRows(heightDp)` 把 4×2 折成 1 行、4×3 折成 2 行，`todayRows/nextRows` 与隐藏数分开；`TimetableWidgetWidePlanTest` 10 例覆盖未结束过滤、直播、周末跳过、放假跳过、今天全结束、无开学日期、行数截断、7 天外无课 |
+| `widget/TimetableWidgetWideProvider`（新） | 独立 provider，和旧「今日课表」并列；只读 RemoteViews：左栏日期/周次/星期 + 「已上 N 节 · 余 M 节」+ 今天时线；右栏下一个有课日 + 日期/节数 + 时线；每行起止时间、课程色圆点（沿用完整课表的五色 palette）、课程名与教室；行高按宿主高度 1/2 行，超出「其他 N 节」，无下一节「未来 7 天没有课」，无课表走空态；点组件进完整课表；跨天/改时钟/换时区/开机/覆盖安装与旧 provider 同一套广播；`buildViews` 包内可见供渲染测试 |
+| 布局/规格 | `widget_timetable_wide.xml`（双栏 + 空态）、`widget_timetable_wide_row.xml`（时间/圆点/竖线/课程）、`timetable_wide_widget_info.xml`（label 双日课表、target 4×2、min 250×110、只允许纵向拉到 4×3）；旧的 `widget_timetable*` 布局与 2×2 行为完全未改，旧组件 label 从「课表」改为「今日课表」以区分 |
+| 刷新/入口 | `TimetableWidgetSync` 的写入监听同时刷新新旧两个 provider；`detachIfUnused` 在两个课表组件都没实例时才解除；`UnloopApplication` 任一存在就挂监听；设置页「桌面课表小组件」改为样式选择对话框（今日课表 2×2 / 双日课表 4×2/4×3），仍走 `requestPinAppWidget` |
+| 测试 | 新增 10 条 `TimetableWidgetWidePlanTest`；新增 `TimetableWidgetWideRenderTest`：真正 `RemoteViews.apply` 后测量/绘制 4×3、4×2、浅色、深色四张图，四张都通过（不是 mock 截图）；旧的 `TimetableWidgetPlanTest` 14 条保持不动 |
+
+已知取舍：① 双日组件只面向 4×2/4×3，2×2 仍由旧的「今日课表」提供；两个 provider 会同时出现在桌面组件选择器，这是用户明确要的「自选样式」；② 4×2 每栏 1 行、4×3 每栏 2 行，依据宿主上报的可视高度；更长的课程列表用「其他 N 节」收口，不把组件撑高；③ 时线按课程顺序 + 起止时间画，不做按时长比例的空隙——RemoteViews 不是自由画布，但时间、圆点、竖线连续可读；④ 今天只列未结束课程，已结束只写「已上 N 节」；新样式不再显示旧组件的「还剩 X 分/下一节倒计时」，需要倒计时可继续用「今日课表」；⑤ 右栏只找未来 7 天，超出就写「未来 7 天没有课」；跨周/调课/节假日沿用 `TimetableDay` 同一套规则；⑥ 组件只读，点击整卡进完整课表，不提供在桌面改课表或按课程跳转；⑦ 旧「今日课表」的代码、布局、2×2 视觉不变，仅改了选择器 label。
+
+验证（分口径）：
+
+- **自动化**：`:app:testDebugUnitTest` 613 条、`:route-core:test` 109 条、`:simulation-core:test` 55 条，0 失败（app 较上一节 603 新增 `TimetableWidgetWidePlanTest` 10 条）；`:app:lintDebug` 0 errors / 287 warnings（新组件的密集小字号/嵌套权重在布局根上用 `tools:ignore` 说明，未抬高基线）；`:app:assembleDebug` 与 `:app:compileDebugAndroidTestJavaWithJavac` 通过。
+- **仪器渲染**：API 35 / 1080×1920 @480（360×640dp）上 `TimetableWidgetWideRenderTest` 1/1 通过；4×3（330×190dp）与 4×2（330×120dp）在浅色/深色下都真正 inflate、measure、draw 成功，共四张真实 RemoteViews 截图；左/右行数与尺寸上限一致。截图本地复核，作为 PR 预览附件走 fork evidence 分支，不入代码分支。
+- **旧组件回归**：`TimetableWidgetPlanTest` 14 条、旧 provider 的 2×2 布局与设置入口代码未改；设置页只把 pin 入口扩成样式选择。
+- **未验证**：真实桌面（Launcher）里的组件选择器是否按 target 4×2 放置、拉高到 4×3 后宿主上报的高度是否如预期、`requestPinAppWidget` 在各家桌面上的确认框、跨天/省电策略下的刷新送达——本机只验证了 RemoteViews 真实渲染，没有把组件真正钉到桌面（桌面自动化成本高）。真机也未验证。

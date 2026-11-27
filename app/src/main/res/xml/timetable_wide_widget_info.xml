@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    双日课表小组件：固定四列宽，默认 4×2，可纵向拉到 4×3。
+    目标只是 4×2/4×3，2×2 与原有实现留给「今日课表」，不在这里强行压缩。
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:description="@string/widget_timetable_wide_description"
+    android:initialLayout="@layout/widget_timetable_wide"
+    android:maxHeight="400dp"
+    android:maxWidth="420dp"
+    android:minHeight="110dp"
+    android:minWidth="250dp"
+    android:previewLayout="@layout/widget_timetable_wide"
+    android:resizeMode="vertical"
+    android:targetCellHeight="2"
+    android:targetCellWidth="4"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen"
+    tools:ignore="UnusedAttribute" />

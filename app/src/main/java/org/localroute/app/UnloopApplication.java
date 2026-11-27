@@ -5,6 +5,7 @@ import android.app.Application;
 import org.localroute.app.diagnostics.CrashStore;
 import org.localroute.app.settings.AppearancePreferences;
 import org.localroute.app.widget.TimetableWidgetProvider;
+import org.localroute.app.widget.TimetableWidgetWideProvider;
 import org.localroute.app.widget.TimetableWidgetSync;
 
 /**
@@ -23,7 +24,8 @@ public final class UnloopApplication extends Application {
         super.onCreate();
         CrashStore.install(this);
         AppearancePreferences.apply(this);
-        if (TimetableWidgetProvider.hasInstances(this)) {
+        if (TimetableWidgetProvider.hasInstances(this)
+                || TimetableWidgetWideProvider.hasInstances(this)) {
             TimetableWidgetSync.attach(this);
         }
     }
