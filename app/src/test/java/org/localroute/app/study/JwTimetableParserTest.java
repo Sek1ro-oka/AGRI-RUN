@@ -79,6 +79,85 @@ public class JwTimetableParserTest {
     }
 
     @Test
+    public void splitsWeekSegmentsThatCarryTheirOwnParity() throws Exception {
+        JSONArray kbList = new JSONArray();
+        kbList.put(new JSONObject()
+                .put("kcmc", "高等数学")
+                .put("xqj", 1)
+                .put("jc", "6-7")
+                .put("zcd", "4-6周(双),7-17周"));
+
+        List<TimetableCourse> courses = JwTimetableParser.parse(kbList.toString()).courses();
+
+        assertEquals(2, courses.size());
+        assertEquals("4-6双", courses.get(0).weeks());
+        assertEquals("7-17", courses.get(1).weeks());
+        assertEquals(6, courses.get(1).startPeriod());
+        assertEquals(7, courses.get(1).endPeriod());
+    }
+
+    @Test
+    public void splitsOddAndEvenWeekSegments() throws Exception {
+        JSONArray kbList = new JSONArray();
+        kbList.put(new JSONObject()
+                .put("kcmc", "大学英语")
+                .put("xqj", 4)
+                .put("jc", "8-9")
+                .put("zcd", "1-8周(单),9-16周(双)"));
+
+        List<TimetableCourse> courses = JwTimetableParser.parse(kbList.toString()).courses();
+
+        assertEquals(2, courses.size());
+        assertEquals("1-8单", courses.get(0).weeks());
+        assertEquals("9-16双", courses.get(1).weeks());
+    }
+
+    @Test
+    public void keepsTrailingParityForWholeCourse() throws Exception {
+        JSONArray kbList = new JSONArray();
+        kbList.put(new JSONObject()
+                .put("kcmc", "大学物理")
+                .put("xqj", 5)
+                .put("jc", "1-2")
+                .put("zcd", "4-6,8-16周(双)"));
+
+        List<TimetableCourse> courses = JwTimetableParser.parse(kbList.toString()).courses();
+
+        assertEquals(1, courses.size());
+        assertEquals("4-6,8-16双", courses.get(0).weeks());
+    }
+
+    @Test
+    public void acceptsChineseWeekSeparators() {
+        assertEquals(List.of("4-17"), JwTimetableParser.parseWeekVariants("第4至17周"));
+        assertEquals(List.of("4-17"), JwTimetableParser.parseWeekVariants("第4～17周"));
+        assertEquals(List.of("1-3", "5-7双"),
+                JwTimetableParser.parseWeekVariants("1-3周、5-7周(双)"));
+        assertEquals(List.of("1-8", "9-16单"),
+                JwTimetableParser.parseWeekVariants("1-8周；9-16周(单)"));
+    }
+
+    @Test
+    public void dropsWeekSegmentsCoveredByAnotherSegment() {
+        assertEquals(List.of("1-16"),
+                JwTimetableParser.parseWeekVariants("1-10周(单),1-16周"));
+        assertEquals(List.of("4-6双", "7-17"),
+                JwTimetableParser.parseWeekVariants("4-6周(双),7-17周"));
+    }
+
+    @Test
+    public void treatsBothParityMarkersAsEveryWeek() {
+        assertEquals(List.of("1-16"),
+                JwTimetableParser.parseWeekVariants("1-16周(单双)"));
+    }
+
+    @Test
+    public void mergesConsecutiveSegmentsWithSameParity() {
+        assertEquals(List.of("2-4,6-8双", "9-16"),
+                JwTimetableParser.parseWeekVariants("2-4周(双),6-8周(双),9-16周"));
+    }
+
+    @Test
     public void supportsChineseSectionAndWeekdayText() throws Exception {
         JSONArray kbList = new JSONArray();
         kbList.put(new JSONObject()
@@ -234,9 +313,9 @@ public class JwTimetableParserTest {
 
     @Test
     public void parsesSectionAndWeekHelpers() {
-        assertEquals("1-16", JwTimetableParser.parseWeeks(null));
-        assertEquals("1-16", JwTimetableParser.parseWeeks("1-16周"));
-        assertEquals("1-16", JwTimetableParser.parseWeeks("周次未知"));
+        assertEquals(List.of("1-16"), JwTimetableParser.parseWeekVariants(null));
+        assertEquals(List.of("1-16"), JwTimetableParser.parseWeekVariants("1-16周"));
+        assertEquals(List.of("1-16"), JwTimetableParser.parseWeekVariants("周次未知"));
         List<int[]> ranges = JwTimetableParser.parseSections("1-2, 8");
         assertEquals(2, ranges.size());
         assertEquals(1, ranges.get(0)[0]);
