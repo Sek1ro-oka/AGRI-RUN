@@ -512,13 +512,13 @@
     <string name="study_login_continue">继续登录</string>
     <string name="study_homework_summary_loading">正在读取作业…</string>
     <string name="study_homework_summary_progress">正在读取 %1$s（%2$d/%3$d）</string>
-    <string name="study_homework_summary_updated">更新于 %1$s · 近一周 %2$d 条</string>
-    <string name="study_homework_summary_failed_courses">更新于 %1$s · 近一周 %2$d 条 · %3$d 门课程读取失败</string>
+    <string name="study_homework_summary_updated">更新于 %1$s · %2$d 条</string>
+    <string name="study_homework_summary_failed_courses">更新于 %1$s · %2$d 条 · %3$d 门课程读取失败</string>
     <string name="study_homework_empty_title">暂无作业</string>
     <string name="study_homework_empty_hint">当前账号的课程里没有待办作业，稍后刷新即可。</string>
     <string name="study_homework_recent_empty_title">近一周暂无作业</string>
-    <string name="study_homework_recent_empty_hint">只显示近一周内的作业；已截止超过一周或没有截止时间的作业不再列出。</string>
-    <string name="study_homework_recent_empty_hint_count">学习通本次返回了 %1$d 条作业，但都没有可用的截止时间或已超出近一周，因此未在此列出。作业本身已成功读取。</string>
+    <string name="study_homework_recent_empty_hint">已截止超过一周的作业不再列出；没有截止时间的作业排在列表最后。</string>
+    <string name="study_homework_recent_empty_hint_count">学习通本次返回了 %1$d 条作业，但都已截止超过一周，因此未在此列出。作业本身已成功读取。</string>
     <string name="study_homework_error_title">读取失败</string>
     <string name="study_homework_retry">重试</string>
     <string name="study_homework_unbound_title">还没有绑定学习通</string>
