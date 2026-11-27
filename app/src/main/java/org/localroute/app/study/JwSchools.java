@@ -25,6 +25,7 @@ public final class JwSchools {
     private static final String KEY_NAME = "school_name";
     private static final String KEY_LOGIN_URL = "school_login_url";
     private static final String JWGLXT = "/jwglxt";
+    private static final String LOGIN_SUFFIX = "/xtgl/login_slogin.html";
 
     /** 一所学校的教务入口。 */
     public static final class School {
@@ -102,8 +103,12 @@ public final class JwSchools {
     }
 
     /**
-     * 把用户填写的地址规范成正方登录页：
-     * 缺协议时补 http://，缺少 /jwglxt 路径时补全，指向其它页面时换成登录页。
+     * 把用户填写的地址规范成正方登录页：缺协议时补 http://，只填域名或站点根时
+     * 补全正方登录页路径；填的是正方站点里的其它页面时换成登录页。
+     *
+     * <p>不含 <code>/jwglxt</code> 且带具体路径的地址一律原样保留：webvpn 的加密入口、
+     * 统一认证页等本来就不是正方路径，强行补 <code>/jwglxt/xtgl/login_slogin.html</code>
+     * 只会把用户从浏览器里复制来的可用地址改坏。
      *
      * @return 无法解析、没有主机名或主机名不像学校域名时返回 null
      */
@@ -128,11 +133,10 @@ public final class JwSchools {
         }
         String path = uri.getPath() == null ? "" : uri.getPath();
         int marker = path.indexOf(JWGLXT);
-        if (marker < 0) {
-            path = JWGLXT + "/xtgl/login_slogin.html";
-        } else if (path.indexOf("login_slogin", marker) < 0) {
-            String base = path.substring(0, marker + JWGLXT.length());
-            path = base + "/xtgl/login_slogin.html";
+        if (marker >= 0 && path.indexOf("login_slogin", marker) < 0) {
+            path = path.substring(0, marker + JWGLXT.length()) + LOGIN_SUFFIX;
+        } else if (marker < 0 && isSiteRoot(path)) {
+            path = JWGLXT + LOGIN_SUFFIX;
         }
         try {
             URI login = new URI(uri.getScheme(), uri.getUserInfo(), host, uri.getPort(),
@@ -141,6 +145,11 @@ public final class JwSchools {
         } catch (URISyntaxException ignored) {
             return null;
         }
+    }
+
+    /** 只填了域名或站点根，没有指向任何具体页面。 */
+    private static boolean isSiteRoot(@NonNull String path) {
+        return path.isEmpty() || path.equals("/");
     }
 
     /** 主机名至少要有一级域名，避免把误输入的单个单词当成学校地址。 */
@@ -162,7 +171,9 @@ public final class JwSchools {
 
     /**
      * 学校课表接口的根地址（用于清理登录 Cookie），例如
-     * https://host/jwglxt/。地址异常时退回登录页所在主机。
+     * https://host/jwglxt/。非正方入口（webvpn、统一认证页）没有 <code>/jwglxt</code>
+     * 可退，按站点根清理，否则「重新登录」会去清一个用户从未访问过的路径。
+     * 地址异常时退回登录页本身。
      */
     @NonNull
     public static String baseUrl(@NonNull School school) {
@@ -171,8 +182,8 @@ public final class JwSchools {
             String path = uri.getPath() == null ? "" : uri.getPath();
             int marker = path.indexOf(JWGLXT);
             String basePath = marker < 0
-                    ? JWGLXT : path.substring(0, marker + JWGLXT.length());
-            return uri.getScheme() + "://" + uri.getAuthority() + basePath + "/";
+                    ? "/" : path.substring(0, marker + JWGLXT.length()) + "/";
+            return uri.getScheme() + "://" + uri.getAuthority() + basePath;
         } catch (URISyntaxException ignored) {
             return school.loginUrl();
         }
