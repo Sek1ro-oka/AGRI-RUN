@@ -233,10 +233,8 @@ public final class ChaoxingHtmlParser {
                         && status != HomeworkItem.Status.SUBMITTED) {
                     expired = true;
                 }
-            } else if (status == HomeworkItem.Status.PENDING) {
-                // 未交但没有时间块：按接口文档视为已过期。
-                expired = true;
             }
+            // 没有时间块不代表已截止：老师可以不设截止时间，交给列表按「未标注截止时间」展示。
             if (expired) {
                 status = HomeworkItem.Status.EXPIRED;
             }

@@ -9,11 +9,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 作业列表的「近一周」视图。
+ * 作业列表的「近期」视图。
  *
- * <p>学习通列表页只在作业未截止时给出「剩余 X 小时」倒计时，已截止作业会直接移除时间块；
- * 因此这里只保留能确定截止时间的作业：未截止的按截止时间从早到晚排在前面，
- * 近 7 天内已截止的排在最后。超过 7 天或没有截止时间的旧作业不再显示。
+ * <p>有截止时间的作业：未截止的按截止时间从早到晚排在前面，近 7 天内已截止的排在
+ * 最后；截止超过 7 天的旧作业不再显示。
+ *
+ * <p>没有可用截止时间的作业不做丢弃——学习通允许不设截止时间，隐藏它们会让作业
+ * 「凭空消失」。这类作业按状态（待完成 → 待批阅 → 已完成 → 已截止）排在最后，
+ * 时间栏由界面显示「未标注截止时间」。
  */
 public final class HomeworkFilter {
 
@@ -26,20 +29,31 @@ public final class HomeworkFilter {
     public static List<HomeworkItem> recent(@NonNull List<HomeworkItem> items, long nowMillis) {
         List<HomeworkItem> upcoming = new ArrayList<>();
         List<HomeworkItem> recentlyExpired = new ArrayList<>();
+        List<HomeworkItem> undated = new ArrayList<>();
         for (HomeworkItem item : items) {
             long deadline = item.deadlineEpochMillis();
-            if (deadline <= 0L) {
-                continue;
-            }
             if (deadline > nowMillis) {
                 upcoming.add(item);
-            } else if (deadline >= nowMillis - RECENT_WINDOW_MS) {
-                recentlyExpired.add(item);
+            } else if (deadline > 0L) {
+                if (deadline >= nowMillis - RECENT_WINDOW_MS) {
+                    recentlyExpired.add(item);
+                }
+            } else {
+                undated.add(item);
             }
         }
         sortByDeadline(upcoming);
         sortByDeadline(recentlyExpired);
+        undated.sort((left, right) -> {
+            int status = Integer.compare(left.statusRank(), right.statusRank());
+            if (status != 0) {
+                return status;
+            }
+            int course = left.courseName().compareTo(right.courseName());
+            return course != 0 ? course : left.title().compareTo(right.title());
+        });
         upcoming.addAll(recentlyExpired);
+        upcoming.addAll(undated);
         return upcoming;
     }
 

@@ -32,10 +32,34 @@ public class HomeworkFilterTest {
         List<HomeworkItem> recent = HomeworkFilter.recent(
                 Arrays.asList(later, sooner, expiredRecently, expiredLongAgo, noDeadline), NOW);
 
-        assertEquals(3, recent.size());
+        assertEquals(4, recent.size());
         assertEquals("Unit 3", recent.get(0).title());
         assertEquals("第二次作业", recent.get(1).title());
         assertEquals("实验报告", recent.get(2).title());
+        assertEquals("打卡", recent.get(3).title());
+    }
+
+    @Test
+    public void keepsUndatedItemsSortedByStatus() {
+        HomeworkItem done = item("A 课程", "已完成无时间", "https://x/work/view?workId=10",
+                HomeworkItem.Status.DONE, 0L);
+        HomeworkItem pending = item("B 课程", "待完成无时间", "https://x/work/view?workId=11",
+                HomeworkItem.Status.PENDING, 0L);
+        HomeworkItem submitted = item("C 课程", "待批阅无时间", "https://x/work/view?workId=12",
+                HomeworkItem.Status.SUBMITTED, 0L);
+        HomeworkItem expiredUndated = item("D 课程", "已截止无时间", "https://x/work/view?workId=13",
+                HomeworkItem.Status.EXPIRED, 0L);
+        HomeworkItem expiredLongAgo = item("E 课程", "过期很久", "https://x/work/view?workId=14",
+                HomeworkItem.Status.EXPIRED, NOW - 10 * DAY);
+
+        List<HomeworkItem> recent = HomeworkFilter.recent(
+                Arrays.asList(done, pending, submitted, expiredUndated, expiredLongAgo), NOW);
+
+        assertEquals(4, recent.size());
+        assertEquals("待完成无时间", recent.get(0).title());
+        assertEquals("待批阅无时间", recent.get(1).title());
+        assertEquals("已完成无时间", recent.get(2).title());
+        assertEquals("已截止无时间", recent.get(3).title());
     }
 
     @Test
