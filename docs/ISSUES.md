@@ -697,5 +697,5 @@ v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位�
 验证（分口径）：
 
 - **自动化（本机）**：`:app:testDebugUnitTest` 591 条、`:route-core:test` 109 条、`:simulation-core:test` 55 条，0 失败（数字从各模块 `build/test-results/**/TEST-*.xml` 现汇总；app 较基线 584 增加 7 条，即 `UpdatePromptPolicyTest` 4 + `UpdateManagerStateTest` 3，`ReminderCenterTest` 为改名不增数）；`:app:lintDebug` 0 errors / 287 warnings；`:app:assembleDebug` 与 `:app:compileDebugAndroidTestJavaWithJavac` 通过。
-- **仪器测试**：新增 `UpdateDialogTest` 两条（启动对话框展示文案、展示即写已提醒版本、点「暂不更新」不会创建下载；点「下载并安装」会执行下载回调），已编译通过；本机无可用 AVD（`emulator -list-avds` 为空），未在设备上执行。
-- **真机/界面**：未验证。需要补看：首页启动后弹窗出现时机是否打扰、更新页进度条在深浅色与窄屏下的排版、取消后系统通知是否消失、失败重试是否能重新选到可用线路、下载完成后校验与安装链路是否仍正常。
+- **仪器测试**：新增 `UpdateDialogTest` 两条（启动对话框展示文案、展示即写已提醒版本、点「暂不更新」不会创建下载；点「下载并安装」会执行下载回调）；在新建的 Nexus 5 / API 35 x86_64 AVD 上跑 `:app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.localroute.app.update.UpdateDialogTest`，`Starting 2 tests` / `Finished 2 tests`，BUILD SUCCESSFUL。此前这台机器 `emulator -list-avds` 为空，是 SDK/AVD 迁移到中文路径后 QEMU 无法打开镜像；用 ASCII 目录映射后原 AVD 也能正常冷启动。
+- **真机/界面**：启动检查与对话框已在模拟器上走通，但更新页进度条与两行进度文案的视觉效果仍未截图。需要补看：首页启动后弹窗出现时机是否打扰、更新页进度条在深浅色与窄屏下的排版、取消后系统通知是否消失、失败重试是否能重新选到可用线路、下载完成后校验与安装链路是否仍正常。
