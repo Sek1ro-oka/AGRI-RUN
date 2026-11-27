@@ -699,3 +699,23 @@ v0.10.0 之后并入 main 的两个 PR——#88 `a21168b`（课表连堂占位�
 - **自动化（本机）**：`:app:testDebugUnitTest` 591 条、`:route-core:test` 109 条、`:simulation-core:test` 55 条，0 失败（数字从各模块 `build/test-results/**/TEST-*.xml` 现汇总；app 较基线 584 增加 7 条，即 `UpdatePromptPolicyTest` 4 + `UpdateManagerStateTest` 3，`ReminderCenterTest` 为改名不增数）；`:app:lintDebug` 0 errors / 287 warnings；`:app:assembleDebug` 与 `:app:compileDebugAndroidTestJavaWithJavac` 通过。
 - **仪器测试**：新增 `UpdateDialogTest` 两条（启动对话框展示文案、展示即写已提醒版本、点「暂不更新」不会创建下载；点「下载并安装」会执行下载回调）；在新建的 Nexus 5 / API 35 x86_64 AVD 上跑 `:app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.localroute.app.update.UpdateDialogTest`，`Starting 2 tests` / `Finished 2 tests`，BUILD SUCCESSFUL。此前这台机器 `emulator -list-avds` 为空，是 SDK/AVD 迁移到中文路径后 QEMU 无法打开镜像；用 ASCII 目录映射后原 AVD 也能正常冷启动。
 - **真机/界面**：启动检查与对话框已在模拟器上走通，但更新页进度条与两行进度文案的视觉效果仍未截图。需要补看：首页启动后弹窗出现时机是否打扰、更新页进度条在深浅色与窄屏下的排版、取消后系统通知是否消失、失败重试是否能重新选到可用线路、下载完成后校验与安装链路是否仍正常。
+
+## 2026-11-27 环境检查的定位权限直达（Issue #115，模拟器已验证）
+
+需求来源：Issue #115——功能页的授权卡进入环境检查页后，点「定位权限」原本会跳去跑圈页；跑圈页只有在选路线并点开始后才打开跑前准备，落地页只是一张普通地图，授权入口和跑圈流程重叠。用户明确要求「直接提供权限设置的按钮，而非直接跳转」，并确认保留功能页授权卡与环境检查页，只把定位权限行改成直达。
+
+| 位置 | 内容 |
+| --- | --- |
+| `settings/SetupItem` | `LOCATION_PERMISSION` 的入口从 `Entry.RUN` 改为 `Entry.RUNTIME_PERMISSION`，删掉「运行时授权只能在跑圈页发起」的旧约定；其余四项入口不变 |
+| `ui/SettingsCheckActivity` | 行内「授权定位」直接处理：首次或还能再询问时 `requestPermissions(FINE + COARSE)`；用私有偏好 `location_asked` + `shouldShowRequestPermissionRationale` 判断永久拒绝，永久拒绝后按钮变「打开权限设置」并走已有的 `openAppDetails()`；`onRequestPermissionsResult` 与 `onResume` 都重绘检查列表，不再 `startActivity(CampusRunActivity)` |
+| `res/values/strings.xml` | 删除 `guide_action_run`（去跑圈页授权），新增「授权定位」与「打开权限设置」两条文案 |
+| 未改 | 功能页授权卡仍是「下一步」总览入口，点击进检查页；首次引导页和跑圈页跑前准备已有的直接授权逻辑不动，避免把三处流程一起改大 |
+
+已知取舍：① 永久拒绝后打开的是系统「应用详情」页，不是直接定位权限子页——AOSP 没有统一的本应用单权限设置 action，用户还要点一次「权限」；② `location_asked` 存在 `SettingsCheckActivity` 的私有偏好，只用于区分「第一次请求」与「不再询问」，不参与授权判断；授权成功后会清掉，系统自动回收闲置权限后仍可重新弹框；③ 检查页仍负责总览所有环境项，功能页卡片不直接执行单项授权；④ 授权结果返回后靠 `onResume` / `onRequestPermissionsResult` 刷新，不额外发广播；⑤ 只授予「大致位置」仍算未授权（运行需要精确位置），行会继续提示授权或打开设置；⑥ 首次引导页与本页各自记录是否问过，若在引导页已永久拒绝，本页第一次点「授权定位」可能不弹框、直接变成「打开权限设置」，再点一次即可。
+
+验证（分口径）：
+
+- **自动化**：`:app:testDebugUnitTest` 591 条、`:route-core:test` 109 条、`:simulation-core:test` 55 条，0 失败（本支实跑，数字与上一节相同）；`:app:lintDebug` 0 errors / 287 warnings；`:app:assembleDebug` 与 `:app:compileDebugAndroidTestJavaWithJavac` 通过。
+- **模拟器**（Nexus 5 / API 35 x86_64，1080×1920 @480 ⇒ 360dp 宽）：功能页卡片显示「下一步：定位权限（精确位置）」并进入检查页；行内按钮显示「授权定位」而非「去跑圈页授权」；点击后 `topResumedActivity` 是 `com.android.permissioncontroller/.permission.ui.GrantPermissionsActivity`，系统授权框出现，未跳跑圈页；连续两次拒绝后按钮变为「打开权限设置」，点击打开系统 Settings 的 UNLOOP 应用详情（含 Permissions 行）；用 `pm grant` 同时授予 FINE 与 COARSE 后返回，行状态变为「已授权」、动作按钮消失；随后用 `pm revoke` 撤销并重新进入，按钮回到「授权定位」（`location_asked` 已随授权清除，仍可重新弹框）。
+- **截图**：授权前、永久拒绝后、系统授权框、应用详情各一张，本地复核，不入仓库。
+- **真机**：未验证（本机模拟器覆盖了按钮文案、系统弹窗与三处页面跳转；真机权限页的 ROM 差异仍需复验）。
