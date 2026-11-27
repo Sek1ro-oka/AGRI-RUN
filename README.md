@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/Sek1ro-oka/AGRI-RUN"><img src="app/src/main/res/drawable-nodpi/ic_launcher_foreground.png" width="96" height="96" alt="UNLOOP 应用图标" /></a>
+  <a href="https://github.com/Sek1ro-oka/AGRI-RUN"><img src="app/src/main/res/drawable-nodpi/ic_launcher_foreground.png" width="180" height="180" alt="UNLOOP 应用图标" /></a>
 </p>
 
 <h1 align="center">UNLOOP · 校园生活小工具</h1>
