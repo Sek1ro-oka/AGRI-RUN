@@ -76,7 +76,7 @@ public final class TimetableWidgetProvider extends AppWidgetProvider {
     @Override
     public void onDisabled(@NonNull Context context) {
         // 最后一个实例被删掉，就不再需要为课表写入重画组件。
-        TimetableWidgetSync.detach(context);
+        TimetableWidgetSync.detachIfUnused(context);
     }
 
     /** 应用内主动刷新所有实例：改完课表、换完作息、跨天都要走这里。 */

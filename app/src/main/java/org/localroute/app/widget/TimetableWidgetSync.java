@@ -32,9 +32,21 @@ public final class TimetableWidgetSync {
             return;
         }
         Context appContext = context.getApplicationContext();
-        listener = (preferences, key) -> TimetableWidgetProvider.updateAll(appContext);
+        listener = (preferences, key) -> {
+            TimetableWidgetProvider.updateAll(appContext);
+            TimetableWidgetWideProvider.updateAll(appContext);
+        };
         appContext.getSharedPreferences(StudyTimetableStore.PREFS, Context.MODE_PRIVATE)
                 .registerOnSharedPreferenceChangeListener(listener);
+    }
+
+    /** 两个课表组件都没实例时才解除监听；任意一个还在桌面上就继续刷新。 */
+    public static void detachIfUnused(@NonNull Context context) {
+        if (TimetableWidgetProvider.hasInstances(context)
+                || TimetableWidgetWideProvider.hasInstances(context)) {
+            return;
+        }
+        detach(context);
     }
 
     /** 最后一个小组件被移除后解除监听，省掉之后每一次课表写入的重画。 */
