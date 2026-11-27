@@ -48,6 +48,38 @@ public class JwSchoolsTest {
     }
 
     @Test
+    public void keepsWebVpnStyleEntryUntouched() {
+        // 实测中南林业科技大学的 webvpn 改写域名：不含 /jwglxt 的完整地址不能被改坏。
+        JwSchools.School school = JwSchools.normalizeCustom(
+                "https://https-jwxt-csuft-edu-cn-443.webvpn.csuft.edu.cn/xtgl/index_initMenu.html");
+        assertNotNull(school);
+        assertEquals("https-jwxt-csuft-edu-cn-443.webvpn.csuft.edu.cn", school.name());
+        assertEquals("https://https-jwxt-csuft-edu-cn-443.webvpn.csuft.edu.cn"
+                + "/xtgl/index_initMenu.html", school.loginUrl());
+        // 非正方入口按站点根清理 Cookie，而不是补一个没访问过的 /jwglxt。
+        assertEquals("https://https-jwxt-csuft-edu-cn-443.webvpn.csuft.edu.cn/",
+                JwSchools.baseUrl(school));
+    }
+
+    @Test
+    public void keepsEncryptedWebVpnPathUntouched() {
+        JwSchools.School school = JwSchools.normalizeCustom(
+                "https://webvpn.example.edu.cn/http/77726476706e69736865642f6a77676c2f6a77");
+        assertNotNull(school);
+        assertEquals("https://webvpn.example.edu.cn/http/77726476706e69736865642f6a77676c2f6a77",
+                school.loginUrl());
+    }
+
+    @Test
+    public void stillCompletesZhengfangLoginPath() {
+        JwSchools.School portal = JwSchools.normalizeCustom("https://jwxt.example.edu.cn/jwglxt");
+        assertNotNull(portal);
+        assertEquals("https://jwxt.example.edu.cn/jwglxt/xtgl/login_slogin.html",
+                portal.loginUrl());
+        assertEquals("https://jwxt.example.edu.cn/jwglxt/", JwSchools.baseUrl(portal));
+    }
+
+    @Test
     public void rejectsInvalidAddress() {
         assertNull(JwSchools.normalizeCustom(null));
         assertNull(JwSchools.normalizeCustom(""));

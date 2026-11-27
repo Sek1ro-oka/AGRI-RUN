@@ -16,6 +16,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -38,6 +39,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityJwImportBinding;
+import org.localroute.app.study.JwAccessDiagnosis;
 import org.localroute.app.study.JwSchools;
 import org.localroute.app.study.JwSemesterInfo;
 import org.localroute.app.study.JwTimetableJavascript;
@@ -54,6 +56,9 @@ import java.util.Locale;
  * 教务登录页。账号密码只在教务系统官方 WebView 页面里输入，应用不读取、不保存；
  * 登录成功后由页面内脚本调用学校自己的课表接口，只把课程 JSON 带回本机。
  * 本页不写日志、不上传任何页面内容。
+ *
+ * <p>不少高校的教务只对校内网或学校 VPN 开放，网关返回的拦截页在 WebView 看来是加载
+ * 成功的。本页识别这类页面并说明是学校的访问限制，不尝试绕过（不改 UA、不伪造来源）。
  */
 public class JwImportActivity extends AppCompatActivity {
 
@@ -63,6 +68,8 @@ public class JwImportActivity extends AppCompatActivity {
     private JwSchools.School school;
     private boolean pageLoaded;
     private boolean fetching;
+    /** 当前状态栏显示的是「学校侧拦截」提示，页面恢复正常时自动清掉。 */
+    private boolean blockNoticeShown;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable timeout = () -> {
@@ -84,6 +91,8 @@ public class JwImportActivity extends AppCompatActivity {
         public void onPageFinished(WebView view, String url) {
             pageLoaded = true;
             binding.jwLoading.setVisibility(View.GONE);
+            // 拦截页是 200 正文，只能靠页面文字识别；取一小段文本回主线程判定。
+            view.evaluateJavascript(JwTimetableJavascript.PAGE_SAMPLE_JS, null);
         }
 
         @Override
@@ -92,6 +101,23 @@ public class JwImportActivity extends AppCompatActivity {
             if (request.isForMainFrame()) {
                 pageLoaded = true;
                 binding.jwLoading.setVisibility(View.GONE);
+                showStatus(getString(R.string.study_jw_web_error));
+            }
+        }
+
+        @Override
+        public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                                        WebResourceResponse errorResponse) {
+            if (!request.isForMainFrame()) {
+                return;
+            }
+            pageLoaded = true;
+            binding.jwLoading.setVisibility(View.GONE);
+            String kind = JwAccessDiagnosis.classifyStatus(errorResponse.getStatusCode());
+            if (kind != null) {
+                showBlockNotice(getString(R.string.study_jw_http_blocked,
+                        errorResponse.getStatusCode()));
+            } else {
                 showStatus(getString(R.string.study_jw_web_error));
             }
         }
@@ -328,7 +354,7 @@ public class JwImportActivity extends AppCompatActivity {
         }
         if (!root.optBoolean("ok", false)) {
             finishFetch();
-            showStatus(errorMessage(root.optString("kind", "")));
+            showFetchError(root);
             return;
         }
         JSONArray kbList = root.optJSONArray("kbList");
@@ -375,11 +401,45 @@ public class JwImportActivity extends AppCompatActivity {
 
     private void showStatus(@Nullable String message) {
         if (message == null || message.isEmpty()) {
+            blockNoticeShown = false;
             binding.textJwStatus.setVisibility(View.GONE);
             return;
         }
         binding.textJwStatus.setText(message);
         binding.textJwStatus.setVisibility(View.VISIBLE);
+    }
+
+    /** 学校网关拦截：状态栏常驻说明，页面恢复正常后由采样结果自动清掉。 */
+    private void showBlockNotice(@NonNull String message) {
+        blockNoticeShown = true;
+        showStatus(message);
+    }
+
+    /** 页面文本里出现拦截文案时给出准确说明，否则不动当前状态。 */
+    private void onPageSample(@Nullable String pageText) {
+        String kind = JwAccessDiagnosis.classifyText(pageText);
+        if (kind != null) {
+            showBlockNotice(accessMessage(kind));
+        } else if (blockNoticeShown) {
+            showStatus(null);
+        }
+    }
+
+    @NonNull
+    private String accessMessage(@NonNull String kind) {
+        return getString(JwAccessDiagnosis.UNAUTHORIZED_APP.equals(kind)
+                ? R.string.study_jw_error_unauthorized_app
+                : R.string.study_jw_error_blocked);
+    }
+
+    /** 抓取失败：先看脚本带回的页面正文是不是学校的拦截页，再按失败类型给提示。 */
+    private void showFetchError(@NonNull JSONObject root) {
+        String access = JwAccessDiagnosis.classifyText(root.optString("page", ""));
+        if (access != null) {
+            showBlockNotice(accessMessage(access));
+            return;
+        }
+        showStatus(errorMessage(root.optString("kind", "")));
     }
 
     @NonNull
@@ -416,6 +476,15 @@ public class JwImportActivity extends AppCompatActivity {
             mainHandler.post(() -> {
                 if (!isFinishing() && !isDestroyed()) {
                     onFetchResult(payload);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void onPage(String pageText) {
+            mainHandler.post(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    onPageSample(pageText);
                 }
             });
         }
