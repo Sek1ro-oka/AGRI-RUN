@@ -129,8 +129,32 @@ public class JwTimetableParserTest {
 
     @Test
     public void acceptsChineseWeekSeparators() {
-        assertEquals("4-17", JwTimetableParser.parseWeeks("第4至17周"));
-        assertEquals("4-17", JwTimetableParser.parseWeeks("第4～17周"));
+        assertEquals(List.of("4-17"), JwTimetableParser.parseWeekVariants("第4至17周"));
+        assertEquals(List.of("4-17"), JwTimetableParser.parseWeekVariants("第4～17周"));
+        assertEquals(List.of("1-3", "5-7双"),
+                JwTimetableParser.parseWeekVariants("1-3周、5-7周(双)"));
+        assertEquals(List.of("1-8", "9-16单"),
+                JwTimetableParser.parseWeekVariants("1-8周；9-16周(单)"));
+    }
+
+    @Test
+    public void dropsWeekSegmentsCoveredByAnotherSegment() {
+        assertEquals(List.of("1-16"),
+                JwTimetableParser.parseWeekVariants("1-10周(单),1-16周"));
+        assertEquals(List.of("4-6双", "7-17"),
+                JwTimetableParser.parseWeekVariants("4-6周(双),7-17周"));
+    }
+
+    @Test
+    public void treatsBothParityMarkersAsEveryWeek() {
+        assertEquals(List.of("1-16"),
+                JwTimetableParser.parseWeekVariants("1-16周(单双)"));
+    }
+
+    @Test
+    public void mergesConsecutiveSegmentsWithSameParity() {
+        assertEquals(List.of("2-4,6-8双", "9-16"),
+                JwTimetableParser.parseWeekVariants("2-4周(双),6-8周(双),9-16周"));
     }
 
     @Test
@@ -289,9 +313,9 @@ public class JwTimetableParserTest {
 
     @Test
     public void parsesSectionAndWeekHelpers() {
-        assertEquals("1-16", JwTimetableParser.parseWeeks(null));
-        assertEquals("1-16", JwTimetableParser.parseWeeks("1-16周"));
-        assertEquals("1-16", JwTimetableParser.parseWeeks("周次未知"));
+        assertEquals(List.of("1-16"), JwTimetableParser.parseWeekVariants(null));
+        assertEquals(List.of("1-16"), JwTimetableParser.parseWeekVariants("1-16周"));
+        assertEquals(List.of("1-16"), JwTimetableParser.parseWeekVariants("周次未知"));
         List<int[]> ranges = JwTimetableParser.parseSections("1-2, 8");
         assertEquals(2, ranges.size());
         assertEquals(1, ranges.get(0)[0]);
