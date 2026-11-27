@@ -14,9 +14,9 @@ import java.util.Map;
  * <p>有截止时间的作业：未截止的按截止时间从早到晚排在前面，近 7 天内已截止的排在
  * 最后；截止超过 7 天的旧作业不再显示。
  *
- * <p>没有可用截止时间的作业不做丢弃——学习通允许不设截止时间，隐藏它们会让作业
- * 「凭空消失」。这类作业按状态（待完成 → 待批阅 → 已完成 → 已截止）排在最后，
- * 时间栏由界面显示「未标注截止时间」。
+ * <p>没有可用截止时间的作业只保留「待完成」：学习通允许作业不设截止时间，这类作业
+ * 不做丢弃，按课程名、标题排在最后，时间栏显示「未标注截止时间」。无时间的已完成、
+ * 已提交与已截止条目不再列出，避免列表随学期无限变长。
  */
 public final class HomeworkFilter {
 
@@ -38,17 +38,13 @@ public final class HomeworkFilter {
                 if (deadline >= nowMillis - RECENT_WINDOW_MS) {
                     recentlyExpired.add(item);
                 }
-            } else {
+            } else if (item.status() == HomeworkItem.Status.PENDING) {
                 undated.add(item);
             }
         }
         sortByDeadline(upcoming);
         sortByDeadline(recentlyExpired);
         undated.sort((left, right) -> {
-            int status = Integer.compare(left.statusRank(), right.statusRank());
-            if (status != 0) {
-                return status;
-            }
             int course = left.courseName().compareTo(right.courseName());
             return course != 0 ? course : left.title().compareTo(right.title());
         });

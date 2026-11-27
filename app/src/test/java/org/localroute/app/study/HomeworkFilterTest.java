@@ -40,7 +40,7 @@ public class HomeworkFilterTest {
     }
 
     @Test
-    public void keepsUndatedItemsSortedByStatus() {
+    public void keepsOnlyPendingAmongUndated() {
         HomeworkItem done = item("A 课程", "已完成无时间", "https://x/work/view?workId=10",
                 HomeworkItem.Status.DONE, 0L);
         HomeworkItem pending = item("B 课程", "待完成无时间", "https://x/work/view?workId=11",
@@ -55,11 +55,8 @@ public class HomeworkFilterTest {
         List<HomeworkItem> recent = HomeworkFilter.recent(
                 Arrays.asList(done, pending, submitted, expiredUndated, expiredLongAgo), NOW);
 
-        assertEquals(4, recent.size());
+        assertEquals(1, recent.size());
         assertEquals("待完成无时间", recent.get(0).title());
-        assertEquals("待批阅无时间", recent.get(1).title());
-        assertEquals("已完成无时间", recent.get(2).title());
-        assertEquals("已截止无时间", recent.get(3).title());
     }
 
     @Test
