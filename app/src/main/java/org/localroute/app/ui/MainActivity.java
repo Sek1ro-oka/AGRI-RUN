@@ -7,10 +7,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -24,12 +24,14 @@ import androidx.lifecycle.Lifecycle;
 import org.localroute.app.BuildConfig;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityMainBinding;
-import org.localroute.app.databinding.ItemHomeAgendaBinding;
-import org.localroute.app.databinding.ItemHomeWeekDayBinding;
+import org.localroute.app.databinding.ItemHomeHomeworkRowBinding;
+import org.localroute.app.databinding.ItemHomeUpcomingDayBinding;
+import org.localroute.app.databinding.ItemHomeUpcomingRowBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
 import org.localroute.app.entry.HomeTarget;
 import org.localroute.app.home.HomeAgenda;
 import org.localroute.app.home.HomeGreeting;
+import org.localroute.app.home.HomeUpcoming;
 import org.localroute.app.home.HomeworkDue;
 import org.localroute.app.overlay.OverlayHost;
 import org.localroute.app.settings.OnboardingState;
@@ -57,12 +59,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 首页：纯色问候 + 当天日程时间轴 + 待交作业。
+ * 首页：纯色问候 + 「接下来」跨天课程 + 待交作业。
  *
  * <p>它同时是启动页与桌面快捷方式的中转站（清单里只有本页 exported），所以 {@link HomeTarget}
  * 的转发留在这里；运行中与环境引导两张动态卡在「功能」页。
  */
 public class MainActivity extends AppCompatActivity {
+
+    private static final int HOME_HOMEWORK_LIMIT = 2;
 
     private ActivityMainBinding binding;
     private boolean onboardingOpen;
@@ -71,18 +75,16 @@ public class MainActivity extends AppCompatActivity {
     /** 快捷入口或磁贴送进来的目标页；本页可见之后再跳，那时启动内部页面才不会被系统挡。 */
     private HomeTarget pendingTarget;
     private LocalDate today;
-    private LocalDate selectedDay;
-    private List<LocalDate> weekDays = new ArrayList<>();
     private String[] weekdayLabels;
-    /** 课程时间轴与待交作业各自折叠，各自记展开态。 */
-    private boolean courseExpanded;
-    private boolean homeworkExpanded;
-    private boolean courseFootActionable;
-    private boolean homeworkFootActionable;
-    private int courseTotal;
-    private int collapseRetries;
+    private final List<View> upcomingRows = new ArrayList<>();
+    private final List<UpcomingGroupViews> upcomingGroups = new ArrayList<>();
+    private final List<View> homeworkRows = new ArrayList<>();
+    private int upcomingHiddenBase;
+    private int upcomingTrimmed;
+    private String nextHiddenLabel;
     private int homeworkTotal;
-    private final Runnable collapsePass = this::applyCollapse;
+    private int fitRetries;
+    private final Runnable fitPass = this::fitHome;
     /** 冷启动静默检查只跑一次；旋转重建或从别的页面返回都不重复。 */
     private boolean updateCheckStarted;
     /** 带 saved state 重建（旋转等）时不再触发更新检查。 */
@@ -113,19 +115,11 @@ public class MainActivity extends AppCompatActivity {
         binding.buttonHomeCalendar.setOnClickListener(v -> HomeTarget.TIMETABLE.open(this));
         binding.buttonHomeImport.setOnClickListener(v -> openJwImport());
         binding.buttonHomeworkEmpty.setOnClickListener(v -> onHomeworkEmptyAction());
-        binding.textHomeAgendaCount.setOnClickListener(v -> {
-            if (!courseFootActionable) return;
-            courseExpanded = !courseExpanded;
-            render();
-        });
-        binding.textHomeworkFoot.setOnClickListener(v -> {
-            if (!homeworkFootActionable) return;
-            homeworkExpanded = !homeworkExpanded;
-            render();
-        });
+        binding.buttonHomeworkAll.setOnClickListener(v -> HomeTarget.STUDY.open(this));
         FinmoriMotion.press(binding.buttonHomeCalendar);
         FinmoriMotion.press(binding.buttonHomeImport);
         FinmoriMotion.press(binding.buttonHomeworkEmpty);
+        FinmoriMotion.press(binding.buttonHomeworkAll);
         FinmoriNav.bind(this, binding.bottomNav, FinmoriNav.Tab.HOME);
         OverlayHost.get(this).restore();
         // 只认冷启动那一次：进程被杀后恢复时不该把用户又甩进别的页面。
@@ -249,19 +243,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void render() {
-        LocalDate now = LocalDate.now();
-        if (today == null || !today.equals(now)) {
-            today = now;
-            LocalDate monday = SemesterCalendar.mondayOf(today);
-            weekDays = new ArrayList<>();
-            for (int offset = 0; offset < 7; offset++) {
-                weekDays.add(monday.plusDays(offset));
-            }
-            selectedDay = today;
-        }
-        if (selectedDay == null) {
-            selectedDay = today;
-        }
+        today = LocalDate.now();
 
         StudySession session = StudySessionStore.load(this);
         List<HomeworkDue.Task> tasks = loadTasks(session);
@@ -273,18 +255,15 @@ public class MainActivity extends AppCompatActivity {
         LocalTime clock = LocalTime.now();
         int nowMinutes = clock.getHour() * 60 + clock.getMinute();
 
-        HomeAgenda.Day todayAgenda = HomeAgenda.of(courses, schedule, semesterStart, totalWeeks,
-                adjustments, today, today, nowMinutes);
-        HomeAgenda.Day shown = selectedDay.equals(today) ? todayAgenda
-                : HomeAgenda.of(courses, schedule, semesterStart, totalWeeks, adjustments,
-                selectedDay, today, nowMinutes);
-
+        HomeUpcoming.Feed feed = HomeUpcoming.of(courses, schedule, semesterStart, totalWeeks,
+                adjustments, today, nowMinutes, HomeUpcoming.DEFAULT_LIMIT);
         List<HomeworkDue.Item> due = HomeworkDue.upcoming(tasks, today, HomeworkDue.HORIZON_DAYS);
-        renderHero(session, todayAgenda.courseCount(), due.size(), todayAgenda.notImported());
-        renderDate();
-        renderWeekStrip();
-        renderAgenda(shown);
+        int week = SemesterCalendar.teachingWeek(semesterStart, today, totalWeeks);
+
+        renderHero(session, feed.todayTotal(), due.size(), feed.notImported());
+        renderUpcoming(feed, week, nowMinutes);
         renderHomework(due, session);
+        scheduleHomeFit();
     }
 
     /** 学习通缓存与自建作业合成同一份待办；截止时刻为 0 的由 HomeworkDue 排到末尾。 */
@@ -340,188 +319,79 @@ public class MainActivity extends AppCompatActivity {
         binding.textHomeGreetingSub.setText(subRes);
     }
 
-    private void renderDate() {
-        binding.textHomeDate.setText(dateLabel(selectedDay));
-    }
-
-    private String dateLabel(LocalDate day) {
-        return getString(R.string.home_date_format, day.getMonthValue(), day.getDayOfMonth(),
-                weekdayLabels[day.getDayOfWeek().getValue() - 1]);
-    }
-
-    private void renderWeekStrip() {
-        binding.weekStrip.removeAllViews();
-        LayoutInflater inflater = LayoutInflater.from(this);
-        for (LocalDate day : weekDays) {
-            ItemHomeWeekDayBinding cell =
-                    ItemHomeWeekDayBinding.inflate(inflater, binding.weekStrip, false);
-            boolean selected = day.equals(selectedDay);
-            cell.textDayNumber.setText(String.valueOf(day.getDayOfMonth()));
-            cell.textDayWeek.setText(weekdayLabels[day.getDayOfWeek().getValue() - 1]);
-            cell.getRoot().setSelected(selected);
-            int color = ContextCompat.getColor(this,
-                    selected ? R.color.fm_on_brand : R.color.fm_text_secondary);
-            cell.textDayNumber.setTextColor(color);
-            cell.textDayWeek.setTextColor(color);
-            cell.getRoot().setContentDescription(dateLabel(day));
-            cell.getRoot().setOnClickListener(v -> {
-                selectedDay = day;
-                courseExpanded = false;
-                homeworkExpanded = false;
-                render();
-            });
-            binding.weekStrip.addView(cell.getRoot());
-        }
-    }
-
-    private void renderAgenda(HomeAgenda.Day shown) {
-        binding.homeScroll.removeCallbacks(collapsePass);
-        courseFootActionable = false;
-        courseTotal = shown.courseCount();
+    private void renderUpcoming(@NonNull HomeUpcoming.Feed feed, int week, int nowMinutes) {
         binding.agendaList.removeAllViews();
-        boolean empty = shown.items().isEmpty();
+        upcomingRows.clear();
+        upcomingGroups.clear();
+        upcomingTrimmed = 0;
+        upcomingHiddenBase = feed.nextHiddenCount();
+        nextHiddenLabel = feed.nextHiddenDate() == null ? null
+                : nextHiddenDayLabel(feed.nextHiddenDate());
+        binding.textUpcomingMeta.setText(week > 0
+                ? getString(R.string.home_upcoming_meta_week, week,
+                StudySchedule.formatMinutes(nowMinutes))
+                : getString(R.string.home_upcoming_meta,
+                StudySchedule.formatMinutes(nowMinutes)));
+
+        boolean empty = feed.empty();
         binding.agendaList.setVisibility(empty ? View.GONE : View.VISIBLE);
         binding.agendaEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-        binding.textHomeAgendaCount.setVisibility(empty ? View.GONE : View.VISIBLE);
         if (empty) {
-            courseExpanded = false;
-            renderEmpty(shown);
+            renderUpcomingEmpty(feed);
+            binding.textHomeAgendaCount.setText("");
+            binding.textHomeAgendaCount.setVisibility(View.GONE);
             return;
         }
+
         LayoutInflater inflater = LayoutInflater.from(this);
-        List<HomeAgenda.Item> items = shown.items();
-        for (int i = 0; i < items.size(); i++) {
-            HomeAgenda.Item item = items.get(i);
-            ItemHomeAgendaBinding row =
-                    ItemHomeAgendaBinding.inflate(inflater, binding.agendaList, false);
-            bindRow(row, item, i == items.size() - 1);
-            binding.agendaList.addView(row.getRoot());
-        }
-        binding.textHomeAgendaCount.setText(getString(R.string.home_agenda_count,
-                courseTotal));
-    }
-
-    /** 待交作业：跨天清单；没有内容时保留一张空态卡，不整块消失。 */
-    private void renderHomework(List<HomeworkDue.Item> due, StudySession session) {
-        binding.homeScroll.removeCallbacks(collapsePass);
-        collapseRetries = 0;
-        homeworkFootActionable = false;
-        homeworkTotal = due.size();
-        binding.homeworkList.removeAllViews();
-        binding.cardHomework.setVisibility(View.VISIBLE);
-        boolean empty = due.isEmpty();
-        binding.homeworkList.setVisibility(empty ? View.GONE : View.VISIBLE);
-        binding.homeworkEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-        binding.textHomeworkFoot.setVisibility(empty ? View.GONE : View.VISIBLE);
-        if (empty) {
-            homeworkExpanded = false;
-            boolean unbound = session == null;
-            binding.textHomeworkEmpty.setText(unbound
-                    ? R.string.home_bind_title : R.string.home_homework_empty_title);
-            binding.buttonHomeworkEmpty.setText(unbound
-                    ? R.string.home_bind_action : R.string.home_homework_view_action);
-            binding.textHomeworkFoot.setText("");
-            binding.homeScroll.post(collapsePass);
-            return;
-        }
-        LayoutInflater inflater = LayoutInflater.from(this);
-        for (HomeworkDue.Item item : due) {
-            ItemHomeAgendaBinding row =
-                    ItemHomeAgendaBinding.inflate(inflater, binding.homeworkList, false);
-            bindHomeworkRow(row, item);
-            binding.homeworkList.addView(row.getRoot());
-        }
-        binding.textHomeworkFoot.setText(getString(R.string.home_homework_count, homeworkTotal));
-        // 两段都渲染完之后量一次真实高度，再决定各自收起几条。
-        binding.homeScroll.post(collapsePass);
-    }
-
-/**
-     * 自适应折叠：整页放得下就全展开；放不下先收作业、再收课程，各自换成「展开还有 N 项」。
-     *
-     * <p>用真实测量高度而不是估算，页头、间距、字号任何一处改动都不用回来调常数。
-     * 作业优先收，因为它有一周缓冲；课程是今天的时刻表，最后才动。
-     */
-    private void applyCollapse() {
-        int viewport = binding.homeScroll.getHeight();
-        if (viewport <= 0) return;
-
-        int cRows = binding.agendaList.getChildCount();
-        int hRows = binding.homeworkList.getChildCount();
-        int cH = cRows > 0 ? binding.agendaList.getChildAt(0).getHeight() : 0;
-        int hH = hRows > 0 ? binding.homeworkList.getChildAt(0).getHeight() : 0;
-        // 刚加进来的行可能还没量完高度，读到 0 就等下一帧再量；否则会误判成「一条都放不下」。
-        if ((cRows > 0 && cH == 0) || (hRows > 0 && hH == 0)) {
-            if (collapseRetries < 3) {
-                collapseRetries++;
-                binding.homeScroll.post(collapsePass);
+        for (HomeUpcoming.DayGroup group : feed.groups()) {
+            ItemHomeUpcomingDayBinding header = ItemHomeUpcomingDayBinding.inflate(
+                    inflater, binding.agendaList, false);
+            header.textUpcomingDayTitle.setText(dayTitle(group.date()));
+            header.textUpcomingDayCount.setText(dayCountLabel(group));
+            int titleColor = group.closed() ? R.color.fm_warning
+                    : group.date().equals(today) ? R.color.fm_link : R.color.fm_text;
+            int countColor = group.closed() ? R.color.fm_warning : R.color.fm_text_secondary;
+            header.textUpcomingDayTitle.setTextColor(ContextCompat.getColor(this, titleColor));
+            header.textUpcomingDayCount.setTextColor(ContextCompat.getColor(this, countColor));
+            binding.agendaList.addView(header.getRoot());
+            UpcomingGroupViews groupViews = new UpcomingGroupViews(header.getRoot(), group.closed());
+            for (HomeAgenda.Item item : group.items()) {
+                ItemHomeUpcomingRowBinding row = ItemHomeUpcomingRowBinding.inflate(
+                        inflater, binding.agendaList, false);
+                bindUpcomingRow(row, item);
+                binding.agendaList.addView(row.getRoot());
+                groupViews.rows.add(row.getRoot());
+                upcomingRows.add(row.getRoot());
             }
-            return;
+            upcomingGroups.add(groupViews);
         }
-        collapseRetries = 0;
-        int rowsHeight = cRows * cH + hRows * hH;
-        int available = viewport - (binding.homeContent.getHeight() - rowsHeight);
-
-        // 按可用高度统一分配：课程优先占位，作业吃剩下的；手动展开的一段不参与裁剪。
-        int cFit = courseExpanded ? cRows
-                : (cH > 0 ? Math.max(0, Math.min(cRows, available / cH)) : 0);
-        int rest = available - cFit * cH;
-        int hFit = homeworkExpanded ? hRows
-                : (hH > 0 ? Math.max(0, Math.min(hRows, rest / hH)) : 0);
-        // 作业有内容却一条都分不到时，从课程匀一条给它：只剩一个标题的作业块看起来像坏了。
-        // 先算换得来几条再动课程，换不到就别白丢一条课。
-        if (!homeworkExpanded && !courseExpanded && hRows > 0 && hFit == 0 && cFit > 1) {
-            int shifted = Math.min(hRows,
-                    Math.max(0, available - (cFit - 1) * cH) / Math.max(1, hH));
-            if (shifted > 0) {
-                cFit--;
-                hFit = shifted;
-            }
-        }
-
-        int cHidden = cRows - cFit;
-        for (int i = cRows - 1; i >= cFit; i--) {
-            binding.agendaList.removeViewAt(i);
-        }
-        if (cFit > 0) {
-            binding.agendaList.getChildAt(cFit - 1)
-                    .findViewById(R.id.viewItemLine).setVisibility(View.INVISIBLE);
-        }
-        applySectionFooter(binding.textHomeAgendaCount, cRows, cHidden, courseExpanded,
-                courseTotal, R.string.home_agenda_count);
-        courseFootActionable = cRows > 0 && (courseExpanded || cHidden > 0);
-
-        int hHidden = hRows - hFit;
-        for (int i = hRows - 1; i >= hFit; i--) {
-            binding.homeworkList.removeViewAt(i);
-        }
-        applySectionFooter(binding.textHomeworkFoot, hRows, hHidden, homeworkExpanded,
-                homeworkTotal, R.string.home_homework_count);
-        homeworkFootActionable = hRows > 0 && (homeworkExpanded || hHidden > 0);
+        updateUpcomingFooter();
     }
 
-    private void applySectionFooter(TextView footer, int rows, int hidden, boolean expanded,
-                                    int total, int countRes) {
-        if (rows == 0) {
-            footer.setText("");
-        } else if (expanded) {
-            footer.setText(R.string.home_agenda_collapse);
-        } else if (hidden > 0) {
-            footer.setText(getString(R.string.home_agenda_expand, hidden));
+    private void renderUpcomingEmpty(@NonNull HomeUpcoming.Feed feed) {
+        binding.agendaList.setVisibility(View.GONE);
+        binding.agendaEmpty.setVisibility(View.VISIBLE);
+        binding.buttonHomeImport.setVisibility(View.GONE);
+        if (feed.notImported()) {
+            binding.textHomeEmptyTitle.setText(R.string.home_agenda_no_timetable);
+            binding.buttonHomeImport.setText(R.string.home_agenda_import_action);
+            binding.buttonHomeImport.setVisibility(View.VISIBLE);
+        } else if (feed.todayClosed()) {
+            binding.textHomeEmptyTitle.setText(R.string.home_upcoming_today_closed);
+        } else if (feed.todayFinished() > 0) {
+            binding.textHomeEmptyTitle.setText(R.string.home_agenda_all_done);
         } else {
-            footer.setText(getString(countRes, total));
+            binding.textHomeEmptyTitle.setText(R.string.home_upcoming_empty);
         }
     }
 
-    private void bindRow(ItemHomeAgendaBinding row, HomeAgenda.Item item, boolean last) {
-        row.textItemTime.setText(item.timeLabel());
-        row.textItemTime.setTextColor(ContextCompat.getColor(this, R.color.fm_text));
-        row.textItemTitle.setText(item.title());
-        row.textItemMeta.setText(item.subtitle());
-        row.textItemMeta.setVisibility(item.subtitle().isEmpty() ? View.GONE : View.VISIBLE);
-        row.viewItemLine.setVisibility(last ? View.INVISIBLE : View.VISIBLE);
-        row.viewItemDot.setBackgroundTintList(
-                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.fm_link)));
+    private void bindUpcomingRow(@NonNull ItemHomeUpcomingRowBinding row,
+                                 @NonNull HomeAgenda.Item item) {
+        row.textUpcomingTime.setText(item.timeLabel());
+        row.textUpcomingTitle.setText(item.title());
+        row.textUpcomingMeta.setText(item.subtitle());
+        row.textUpcomingMeta.setVisibility(item.subtitle().isEmpty() ? View.GONE : View.VISIBLE);
 
         int tagText;
         int tagColor = R.color.fm_muted;
@@ -539,34 +409,221 @@ public class MainActivity extends AppCompatActivity {
                 tagText = R.string.home_class_upcoming;
                 break;
         }
-        row.textItemTag.setText(tagText);
-        row.textItemTag.setTextColor(ContextCompat.getColor(this, tagColor));
-        row.textItemTag.setBackgroundResource(solid
+        row.textUpcomingTag.setText(tagText);
+        row.textUpcomingTag.setTextColor(ContextCompat.getColor(this, tagColor));
+        row.textUpcomingTag.setBackgroundResource(solid
                 ? R.drawable.bg_home_tag_solid : R.drawable.bg_home_tag_outline);
-        row.cardItem.setContentDescription(row.textItemTime.getText() + " " + item.title());
-        row.cardItem.setOnClickListener(v -> HomeTarget.TIMETABLE.open(this));
-        FinmoriMotion.press(row.cardItem);
+
+        boolean evening = item.minutes() >= 18 * 60;
+        int tone = ContextCompat.getColor(this, evening ? R.color.fm_warning : R.color.fm_link);
+        row.viewUpcomingBar.setBackgroundTintList(ColorStateList.valueOf(tone));
+        row.textUpcomingTime.setTextColor(ContextCompat.getColor(this,
+                evening ? R.color.fm_warning : R.color.fm_text));
+        row.getRoot().setContentDescription(item.timeLabel() + " " + item.title()
+                + " " + getString(tagText));
+        row.getRoot().setOnClickListener(v -> HomeTarget.TIMETABLE.open(this));
+        FinmoriMotion.press(row.getRoot());
     }
 
-    /** 作业行沿用同一套行布局：左列放「今天／明天／日期」，副行放时刻与课程。 */
-    private void bindHomeworkRow(ItemHomeAgendaBinding row, HomeworkDue.Item item) {
-        row.textItemTime.setText(item.undated()
-                ? getString(R.string.home_task_undated) : dayLabel(item.dayOffset()));
-        row.textItemTime.setTextColor(ContextCompat.getColor(this, R.color.fm_warning));
-        row.textItemTitle.setText(item.title());
-        String meta = item.undated() || item.timeLabel() == null
-                ? item.course() : item.timeLabel() + " · " + item.course();
-        row.textItemMeta.setText(meta);
-        row.textItemMeta.setVisibility(meta.isEmpty() ? View.GONE : View.VISIBLE);
-        row.viewItemLine.setVisibility(View.INVISIBLE);
-        row.viewItemDot.setBackgroundTintList(
-                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.fm_warning)));
-        row.textItemTag.setText(R.string.home_task_pending);
-        row.textItemTag.setTextColor(ContextCompat.getColor(this, R.color.fm_warning));
-        row.textItemTag.setBackgroundResource(R.drawable.bg_home_tag_outline);
-        row.cardItem.setContentDescription(row.textItemTime.getText() + " " + item.title());
-        row.cardItem.setOnClickListener(v -> HomeTarget.STUDY.open(this));
-        FinmoriMotion.press(row.cardItem);
+    @NonNull
+    private String dayTitle(@NonNull LocalDate day) {
+        long offset = day.toEpochDay() - today.toEpochDay();
+        String weekday = weekdayLabels[day.getDayOfWeek().getValue() - 1];
+        if (offset == 0) {
+            return getString(R.string.home_upcoming_today, weekday, day.getDayOfMonth());
+        }
+        if (offset == 1) {
+            return getString(R.string.home_upcoming_tomorrow, weekday, day.getDayOfMonth());
+        }
+        if (day.getYear() == today.getYear() && day.getMonthValue() == today.getMonthValue()) {
+            return getString(R.string.home_upcoming_weekday, weekday, day.getDayOfMonth());
+        }
+        return getString(R.string.home_upcoming_other_month, day.getMonthValue(),
+                day.getDayOfMonth(), weekday);
+    }
+
+    @NonNull
+    private String dayCountLabel(@NonNull HomeUpcoming.DayGroup group) {
+        if (group.closed()) {
+            return getString(R.string.home_upcoming_closed);
+        }
+        if (group.date().equals(today)) {
+            return group.finished() > 0
+                    ? getString(R.string.home_upcoming_today_counts, group.finished(),
+                    group.remaining())
+                    : getString(R.string.home_upcoming_today_remaining, group.remaining());
+        }
+        return getString(R.string.home_upcoming_day_count, group.remaining());
+    }
+
+    @NonNull
+    private String nextHiddenDayLabel(@NonNull LocalDate date) {
+        long offset = date.toEpochDay() - today.toEpochDay();
+        if (offset == 0) {
+            return getString(R.string.home_day_today);
+        }
+        if (offset == 1) {
+            return getString(R.string.home_day_tomorrow);
+        }
+        String weekday = weekdayLabels[date.getDayOfWeek().getValue() - 1];
+        if (date.getYear() == today.getYear() && date.getMonthValue() == today.getMonthValue()) {
+            return getString(R.string.home_upcoming_next_weekday, weekday);
+        }
+        return getString(R.string.home_upcoming_next_date, date.getMonthValue(),
+                date.getDayOfMonth());
+    }
+
+    private void updateUpcomingFooter() {
+        int hidden = upcomingHiddenBase + upcomingTrimmed;
+        if (hidden <= 0) {
+            binding.textHomeAgendaCount.setText("");
+            binding.textHomeAgendaCount.setVisibility(View.GONE);
+            return;
+        }
+        binding.textHomeAgendaCount.setVisibility(View.VISIBLE);
+        if (upcomingTrimmed > 0) {
+            binding.textHomeAgendaCount.setText(R.string.home_upcoming_more_trimmed);
+        } else {
+            binding.textHomeAgendaCount.setText(getString(R.string.home_upcoming_more,
+                    nextHiddenLabel, hidden));
+        }
+    }
+
+    /** 待交作业只占两行；没有内容时保留空态卡，不整块消失。 */
+    private void renderHomework(@NonNull List<HomeworkDue.Item> due,
+                                @Nullable StudySession session) {
+        binding.homeworkList.removeAllViews();
+        homeworkRows.clear();
+        homeworkTotal = due.size();
+        binding.cardHomework.setVisibility(View.VISIBLE);
+        boolean empty = due.isEmpty();
+        binding.homeworkList.setVisibility(empty ? View.GONE : View.VISIBLE);
+        binding.homeworkEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+        binding.buttonHomeworkAll.setVisibility(empty ? View.GONE : View.VISIBLE);
+        if (empty) {
+            binding.textHomeworkSection.setText(R.string.home_homework_section);
+            boolean unbound = session == null;
+            binding.textHomeworkEmpty.setText(unbound
+                    ? R.string.home_bind_title : R.string.home_homework_empty_title);
+            binding.buttonHomeworkEmpty.setText(unbound
+                    ? R.string.home_bind_action : R.string.home_homework_view_action);
+            binding.textHomeworkFoot.setText("");
+            binding.textHomeworkFoot.setVisibility(View.GONE);
+            return;
+        }
+
+        binding.textHomeworkSection.setText(getString(R.string.home_homework_header, homeworkTotal));
+        LayoutInflater inflater = LayoutInflater.from(this);
+        int limit = Math.min(HOME_HOMEWORK_LIMIT, due.size());
+        for (int i = 0; i < limit; i++) {
+            ItemHomeHomeworkRowBinding row = ItemHomeHomeworkRowBinding.inflate(
+                    inflater, binding.homeworkList, false);
+            bindHomeworkRow(row, due.get(i));
+            binding.homeworkList.addView(row.getRoot());
+            homeworkRows.add(row.getRoot());
+        }
+        updateHomeworkFooter();
+    }
+
+    private void bindHomeworkRow(@NonNull ItemHomeHomeworkRowBinding row,
+                                 @NonNull HomeworkDue.Item item) {
+        row.textHomeworkTitle.setText(item.title());
+        String due = homeworkDueLabel(item);
+        row.textHomeworkDue.setText(due);
+        row.viewHomeworkDot.setBackgroundTintList(ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.fm_warning)));
+        row.getRoot().setContentDescription(item.title() + " " + due);
+        row.getRoot().setOnClickListener(v -> HomeTarget.STUDY.open(this));
+        FinmoriMotion.press(row.getRoot());
+    }
+
+    @NonNull
+    private String homeworkDueLabel(@NonNull HomeworkDue.Item item) {
+        if (item.undated()) {
+            return getString(R.string.home_task_undated);
+        }
+        return dayLabel(item.dayOffset()) + " " + item.timeLabel();
+    }
+
+    private void updateHomeworkFooter() {
+        int hidden = homeworkTotal - homeworkRows.size();
+        if (hidden <= 0) {
+            binding.textHomeworkFoot.setText("");
+            binding.textHomeworkFoot.setVisibility(View.GONE);
+            return;
+        }
+        binding.textHomeworkFoot.setText(getString(R.string.home_homework_more, hidden));
+        binding.textHomeworkFoot.setVisibility(View.VISIBLE);
+    }
+
+    private void scheduleHomeFit() {
+        fitRetries = 0;
+        binding.homeScroll.removeCallbacks(fitPass);
+        binding.homeScroll.post(fitPass);
+    }
+
+    /**
+     * 固定六节 + 两条作业是目标；只在屏幕真的放不下时从尾部收课程，再收作业。
+     * 被收掉的条数写进底部「还有 N 节/份」，而不是让内容被裁掉或整页被迫滚动。
+     */
+    private void fitHome() {
+        if (binding == null) {
+            return;
+        }
+        int viewport = binding.homeScroll.getHeight();
+        int content = binding.homeContent.getHeight();
+        if (viewport <= 0 || (content <= 0
+                && (!upcomingRows.isEmpty() || !homeworkRows.isEmpty()))) {
+            if (fitRetries < 3) {
+                fitRetries++;
+                binding.homeScroll.post(fitPass);
+            }
+            return;
+        }
+        if (content <= viewport) {
+            fitRetries = 0;
+            return;
+        }
+        if (!upcomingRows.isEmpty()) {
+            trimLastUpcomingRow();
+            updateUpcomingFooter();
+            binding.homeScroll.post(fitPass);
+            return;
+        }
+        if (!homeworkRows.isEmpty()) {
+            trimLastHomeworkRow();
+            updateHomeworkFooter();
+            binding.homeScroll.post(fitPass);
+            return;
+        }
+        fitRetries = 0;
+    }
+
+    private void trimLastUpcomingRow() {
+        if (upcomingRows.isEmpty()) {
+            return;
+        }
+        View row = upcomingRows.remove(upcomingRows.size() - 1);
+        binding.agendaList.removeView(row);
+        upcomingTrimmed++;
+        for (int i = upcomingGroups.size() - 1; i >= 0; i--) {
+            UpcomingGroupViews group = upcomingGroups.get(i);
+            if (group.rows.remove(row)) {
+                if (group.rows.isEmpty() && !group.closed) {
+                    binding.agendaList.removeView(group.header);
+                    upcomingGroups.remove(i);
+                }
+                return;
+            }
+        }
+    }
+
+    private void trimLastHomeworkRow() {
+        if (homeworkRows.isEmpty()) {
+            return;
+        }
+        View row = homeworkRows.remove(homeworkRows.size() - 1);
+        binding.homeworkList.removeView(row);
     }
 
     private String dayLabel(int dayOffset) {
@@ -576,22 +633,15 @@ public class MainActivity extends AppCompatActivity {
         return day.getMonthValue() + "-" + day.getDayOfMonth();
     }
 
-    /** 课程空态：今天都结束了、没导入课表、放假、这天真的没安排。作业不在这张卡里管。 */
-    private void renderEmpty(HomeAgenda.Day shown) {
-        if (shown.hiddenFinished() > 0) {
-            binding.textHomeEmptyTitle.setText(R.string.home_agenda_all_done);
-            binding.buttonHomeImport.setVisibility(View.GONE);
-            return;
+    private static final class UpcomingGroupViews {
+        final View header;
+        final boolean closed;
+        final List<View> rows = new ArrayList<>();
+
+        UpcomingGroupViews(View header, boolean closed) {
+            this.header = header;
+            this.closed = closed;
         }
-        if (shown.notImported()) {
-            binding.textHomeEmptyTitle.setText(R.string.home_agenda_no_timetable);
-            binding.buttonHomeImport.setText(R.string.home_agenda_import_action);
-            binding.buttonHomeImport.setVisibility(View.VISIBLE);
-            return;
-        }
-        binding.textHomeEmptyTitle.setText(shown.closed()
-                ? R.string.home_agenda_closed : R.string.home_agenda_empty);
-        binding.buttonHomeImport.setVisibility(View.GONE);
     }
 
     /** 课表统一走教务导入这条既有链路，不在首页另造一套绑定。 */
