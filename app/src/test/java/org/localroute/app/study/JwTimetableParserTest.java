@@ -79,6 +79,61 @@ public class JwTimetableParserTest {
     }
 
     @Test
+    public void splitsWeekSegmentsThatCarryTheirOwnParity() throws Exception {
+        JSONArray kbList = new JSONArray();
+        kbList.put(new JSONObject()
+                .put("kcmc", "高等数学")
+                .put("xqj", 1)
+                .put("jc", "6-7")
+                .put("zcd", "4-6周(双),7-17周"));
+
+        List<TimetableCourse> courses = JwTimetableParser.parse(kbList.toString()).courses();
+
+        assertEquals(2, courses.size());
+        assertEquals("4-6双", courses.get(0).weeks());
+        assertEquals("7-17", courses.get(1).weeks());
+        assertEquals(6, courses.get(1).startPeriod());
+        assertEquals(7, courses.get(1).endPeriod());
+    }
+
+    @Test
+    public void splitsOddAndEvenWeekSegments() throws Exception {
+        JSONArray kbList = new JSONArray();
+        kbList.put(new JSONObject()
+                .put("kcmc", "大学英语")
+                .put("xqj", 4)
+                .put("jc", "8-9")
+                .put("zcd", "1-8周(单),9-16周(双)"));
+
+        List<TimetableCourse> courses = JwTimetableParser.parse(kbList.toString()).courses();
+
+        assertEquals(2, courses.size());
+        assertEquals("1-8单", courses.get(0).weeks());
+        assertEquals("9-16双", courses.get(1).weeks());
+    }
+
+    @Test
+    public void keepsTrailingParityForWholeCourse() throws Exception {
+        JSONArray kbList = new JSONArray();
+        kbList.put(new JSONObject()
+                .put("kcmc", "大学物理")
+                .put("xqj", 5)
+                .put("jc", "1-2")
+                .put("zcd", "4-6,8-16周(双)"));
+
+        List<TimetableCourse> courses = JwTimetableParser.parse(kbList.toString()).courses();
+
+        assertEquals(1, courses.size());
+        assertEquals("4-6,8-16双", courses.get(0).weeks());
+    }
+
+    @Test
+    public void acceptsChineseWeekSeparators() {
+        assertEquals("4-17", JwTimetableParser.parseWeeks("第4至17周"));
+        assertEquals("4-17", JwTimetableParser.parseWeeks("第4～17周"));
+    }
+
+    @Test
     public void supportsChineseSectionAndWeekdayText() throws Exception {
         JSONArray kbList = new JSONArray();
         kbList.put(new JSONObject()
