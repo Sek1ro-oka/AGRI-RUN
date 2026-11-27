@@ -57,6 +57,6 @@
     <color name="study_state_expired_fill">#EEF2F0</color>
     <color name="study_state_other_fill">#EAF1FC</color>
 
-    <!-- 应用图标：暖米色底 + 薄荷绿主色 -->
-    <color name="ic_launcher_background">#FCF8E9</color>
+    <!-- 应用图标背景 -->
+    <color name="ic_launcher_background">#FDFEFB</color>
 </resources>
