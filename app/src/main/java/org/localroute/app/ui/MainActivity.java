@@ -266,19 +266,30 @@ public class MainActivity extends AppCompatActivity {
         scheduleHomeFit();
     }
 
-    /** 学习通缓存与自建作业合成同一份待办；截止时刻为 0 的由 HomeworkDue 排到末尾。 */
+    /**
+     * 学习通缓存与自建作业合成同一份待办。
+     *
+     * <p>首页「待交作业」按截止时间排，只收有截止时间的条目；无截止时间的待完成
+     * 留在作业页兜底展示，不把首页计数撑大。
+     */
     private List<HomeworkDue.Task> loadTasks(StudySession session) {
         List<HomeworkDue.Task> tasks = new ArrayList<>();
         if (session != null) {
             StudyHomeworkCache cache = StudyHomeworkCache.load(this, session.uid());
             if (cache != null) {
                 for (HomeworkItem item : cache.items) {
+                    if (item.deadlineEpochMillis() <= 0L) {
+                        continue;
+                    }
                     tasks.add(new HomeworkDue.Task(item.title(), item.courseName(),
                             item.deadlineEpochMillis(), item.status()));
                 }
             }
         }
         for (CustomHomework item : CustomHomeworkStore.load(this)) {
+            if (item.deadlineEpochMillis() <= 0L) {
+                continue;
+            }
             tasks.add(new HomeworkDue.Task(item.title(), getString(R.string.home_task_custom),
                     item.deadlineEpochMillis(), HomeworkItem.Status.PENDING));
         }

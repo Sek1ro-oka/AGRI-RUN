@@ -121,6 +121,25 @@ public class ChaoxingHtmlParserTest {
     }
 
     @Test
+    public void keepsPendingWorkWithoutTimeBlock() {
+        long now = fixedNow();
+        String html = "<ul>"
+                + "<li data=\"https://mooc1.chaoxing.com/work/view?workId=91\">"
+                + "<p class=\"overHidden2\">无截止作业</p>"
+                + "<p class=\"status\">待做</p>"
+                + "</li></ul>";
+
+        ChaoxingHtmlParser.WorkPage page = ChaoxingHtmlParser.parseWorkPage(
+                html, "大学英语", now);
+
+        assertEquals(1, page.items.size());
+        HomeworkItem item = page.items.get(0);
+        assertEquals(HomeworkItem.Status.PENDING, item.status());
+        assertEquals(0L, item.deadlineEpochMillis());
+        assertEquals("未标注截止时间", item.deadlineLabel());
+    }
+
+    @Test
     public void parsesRemainingDurations() {
         assertEquals(((2L * 24 + 3) * 60 + 5) * 60 * 1000,
                 ChaoxingHtmlParser.parseRemainingMillis("剩余2天3小时5分钟"));

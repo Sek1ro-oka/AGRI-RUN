@@ -318,7 +318,7 @@ public class StudyActivity extends AppCompatActivity {
         }
     }
 
-    /** 只保留未截止与近 7 天截止的作业，并按截止时间排序。 */
+    /** 保留未截止、近 7 天截止以及没有截止时间的待完成作业；其余无时间条目不再列出。 */
     private void applyHomework(List<HomeworkItem> items) {
         homework.clear();
         homework.addAll(HomeworkFilter.recent(items, System.currentTimeMillis()));
