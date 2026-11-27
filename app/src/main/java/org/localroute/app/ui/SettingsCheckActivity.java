@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -33,7 +34,6 @@ import org.localroute.app.R;
 import org.localroute.app.campus.PresetUnlock;
 import org.localroute.app.databinding.ActivitySettingsCheckBinding;
 import org.localroute.app.diagnostics.DiagnosticLog;
-import org.localroute.app.entry.HomeTarget;
 import org.localroute.app.overlay.OverlayPanel;
 import org.localroute.app.run.SimulationStateRepo;
 import org.localroute.app.settings.SetupGuide;
@@ -45,14 +45,15 @@ import java.util.List;
 /**
  * 设置页：主页同款白底 + 薄荷绿卡片。
  *
- * <p>环境检查只读，权限探测由用户主动触发，不修改任何系统设置；
- * 唯一会写入的是应用自己的「预设重名询问」开关，与激活码导入共用
- * {@link PresetUnlock} 的本地偏好。悬浮窗开关统一放在「校园快跑」页，
- * 这里只展示授权状态并提供跳转，避免两处开关状态不一致。
+ * <p>环境检查只读，权限探测与系统授权都由用户主动触发；行内入口才会发起
+ * 系统授权框或跳转系统设置。悬浮窗开关统一放在「校园快跑」页，这里只展示
+ * 授权状态并提供跳转，避免两处开关状态不一致。
  */
 public class SettingsCheckActivity extends AppCompatActivity {
 
     private static final int REQUEST_NOTIFICATIONS = 41;
+    private static final int REQUEST_LOCATION = 42;
+    private static final String KEY_LOCATION_ASKED = "location_asked";
 
     private ActivitySettingsCheckBinding binding;
     private SharedPreferences prefs;
@@ -90,7 +91,7 @@ public class SettingsCheckActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_NOTIFICATIONS) {
+        if (requestCode == REQUEST_NOTIFICATIONS || requestCode == REQUEST_LOCATION) {
             renderChecks();
         }
     }
@@ -116,6 +117,7 @@ public class SettingsCheckActivity extends AppCompatActivity {
     // ---------------------------------------------------------------- 环境检查
 
     private void renderChecks() {
+        clearLocationAskedIfGranted();
         binding.checkContainer.removeAllViews();
         List<SettingsInspector.Check> checks = SettingsInspector.inspect(this);
         SettingsInspector.Check next = SetupGuide.next(checks);
@@ -208,7 +210,9 @@ public class SettingsCheckActivity extends AppCompatActivity {
     private String entryLabel(SetupItem item) {
         switch (item) {
             case LOCATION_PERMISSION:
-                return getString(R.string.guide_action_run);
+                return getString(locationPermissionPermanentlyDenied()
+                        ? R.string.guide_action_permission_settings
+                        : R.string.guide_action_location_permission);
             case LOCATION_SWITCH:
                 return getString(R.string.guide_action_location_switch);
             case MOCK_APP:
@@ -224,9 +228,8 @@ public class SettingsCheckActivity extends AppCompatActivity {
 
     private void openEntry(SetupItem.Entry entry) {
         switch (entry) {
-            case RUN:
-                // 运行时授权只能在跑圈页发起：那里才知道用户点「开始」时该弹什么。
-                HomeTarget.RUN.open(this);
+            case RUNTIME_PERMISSION:
+                requestLocationPermission();
                 break;
             case SYSTEM_LOCATION_SETTINGS:
                 openSystemSettings(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
@@ -243,6 +246,46 @@ public class SettingsCheckActivity extends AppCompatActivity {
             case NONE:
             default:
                 break;
+        }
+    }
+
+    /**
+     * 定位权限直接在本页处理：首次或还能再询问时弹系统运行时授权，
+     * 永久拒绝后改为打开本应用详情页，不再绕去跑圈页。
+     */
+    private void requestLocationPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            renderChecks();
+            return;
+        }
+        if (locationPermissionPermanentlyDenied()) {
+            openAppDetails();
+            return;
+        }
+        getPreferences(MODE_PRIVATE).edit().putBoolean(KEY_LOCATION_ASKED, true).apply();
+        ActivityCompat.requestPermissions(this, new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        }, REQUEST_LOCATION);
+    }
+
+    /** 已问过且系统不再允许弹框：用户选了「不再询问」或被系统自动永久拒绝。 */
+    private boolean locationPermissionPermanentlyDenied() {
+        return getPreferences(MODE_PRIVATE).getBoolean(KEY_LOCATION_ASKED, false)
+                && !ActivityCompat.shouldShowRequestPermissionRationale(
+                this, Manifest.permission.ACCESS_FINE_LOCATION);
+    }
+
+    /**
+     * 授权成功后清掉「问过」标记：系统自动回收闲置应用权限时会清 USER_SET，
+     * 若保留标记会把仍可弹框的情况误判成永久拒绝，把用户引到应用详情页。
+     */
+    private void clearLocationAskedIfGranted() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                && getPreferences(MODE_PRIVATE).contains(KEY_LOCATION_ASKED)) {
+            getPreferences(MODE_PRIVATE).edit().remove(KEY_LOCATION_ASKED).apply();
         }
     }
 

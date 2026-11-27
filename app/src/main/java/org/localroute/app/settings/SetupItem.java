@@ -9,7 +9,7 @@ package org.localroute.app.settings;
  */
 public enum SetupItem {
 
-    LOCATION_PERMISSION(Entry.RUN, true),
+    LOCATION_PERMISSION(Entry.RUNTIME_PERMISSION, true),
     LOCATION_SWITCH(Entry.SYSTEM_LOCATION_SETTINGS, true),
     MOCK_APP(Entry.DEVELOPER_OPTIONS, true),
     OVERLAY(Entry.OVERLAY_SETTINGS, false),
@@ -19,8 +19,8 @@ public enum SetupItem {
     public enum Entry {
         /** 已就绪，无需跳转。 */
         NONE,
-        /** 应用内运行时授权，只在跑圈页发起：那里统一处理「不再询问」后的降级说明。 */
-        RUN,
+        /** 应用内运行时授权：首次弹系统授权框，永久拒绝后退回本应用详情/权限页。 */
+        RUNTIME_PERMISSION,
         SYSTEM_LOCATION_SETTINGS,
         DEVELOPER_OPTIONS,
         OVERLAY_SETTINGS,
