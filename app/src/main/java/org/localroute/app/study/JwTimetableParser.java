@@ -29,6 +29,7 @@ public final class JwTimetableParser {
     /** 节次里的区间连接符，教务系统会用「-」「~」「至」「到」四种写法。 */
     private static final Pattern SECTION_SEPARATOR = Pattern.compile("[-~至到]");
     private static final Pattern SECTION_NUMBER = Pattern.compile("^\\d{1,2}$");
+    private static final Pattern WEEK_RANGE = Pattern.compile("\\d+(?:-\\d+)?");
 
     private JwTimetableParser() {
     }
@@ -103,16 +104,19 @@ public final class JwTimetableParser {
                 }
                 continue;
             }
-            String weeks = parseWeeks(firstString(item, "zcd", "kkzc", "zc"));
-            String key = name + '|' + teacher + '|' + location + '|' + weekday + '|' + weeks;
-            Group group = groups.get(key);
-            if (group == null) {
-                group = new Group(name, teacher, location, weekday, weeks);
-                groups.put(key, group);
-            }
-            for (int[] range : ranges) {
-                for (int period = range[0]; period <= range[1]; period++) {
-                    group.periods.add(period);
+            List<String> weekVariants =
+                    parseWeekVariants(firstString(item, "zcd", "kkzc", "zc"));
+            for (String weeks : weekVariants) {
+                String key = name + '|' + teacher + '|' + location + '|' + weekday + '|' + weeks;
+                Group group = groups.get(key);
+                if (group == null) {
+                    group = new Group(name, teacher, location, weekday, weeks);
+                    groups.put(key, group);
+                }
+                for (int[] range : ranges) {
+                    for (int period = range[0]; period <= range[1]; period++) {
+                        group.periods.add(period);
+                    }
                 }
             }
         }
@@ -419,39 +423,174 @@ public final class JwTimetableParser {
         return ranges;
     }
 
-    /** zcd（如 1-16周、1-16周(单)）转成应用内的周次文本。 */
+    /**
+     * zcd 里的周次区间，按各自的单双周标记拆开。
+     *
+     * <p>教务会把不同单双周的区间分段写，例如「4-6周(双),7-17周」或
+     * 「1-8周(单),9-16周(双)」。逗号连接时，末尾的「单/双」按整组处理
+     * （「4-6,8-16周(双)」）；顿号、分号连接视为独立分组，各组分别处理
+     * （「1-3周、5-7周(双)」不会让 1-3 被 5-7 的「双」扣住）。
+     *
+     * <p>完全被另一段覆盖的区间会被去掉，避免同一节次在重叠周里出现两门同名课；
+     * 「单双」写成一对表示每周都上，不再只按单周处理。
+     */
     @NonNull
-    static String parseWeeks(@Nullable String raw) {
-        if (raw == null || raw.trim().isEmpty()) {
-            return "1-16";
-        }
-        String value = raw.trim()
+    static List<String> parseWeekVariants(@Nullable String raw) {
+        String value = raw == null ? "" : raw.trim()
                 .replace("第", "")
                 .replace("周", "")
+                .replace("，", ",")
                 .replace("（", "")
                 .replace("）", "")
                 .replace("(", "")
                 .replace(")", "")
                 .replace(" ", "")
+                .replaceAll("[~至到—–－～]", "-")
                 .toUpperCase(Locale.US);
-        boolean odd = value.contains("单");
-        boolean even = value.contains("双");
-        Matcher matcher = Pattern.compile("\\d+(?:-\\d+)?(?:,\\d+(?:-\\d+)?)*")
-                .matcher(value);
-        String base = matcher.find() ? matcher.group() : "";
-        if (base.isEmpty()) {
-            return "1-16";
+        if (value.isEmpty()) {
+            return List.of("1-16");
         }
-        String normalized = TimetableText.normalizeWeeks(base);
-        if (normalized == null) {
-            return "1-16";
+        List<String> variants = new ArrayList<>();
+        for (String group : value.split("[、；;]")) {
+            if (!group.isEmpty()) {
+                variants.addAll(parseWeekGroup(group));
+            }
         }
-        if (odd) {
-            return normalized + "单";
+        List<String> kept = removeCoveredVariants(variants);
+        return kept.isEmpty() ? List.of("1-16") : kept;
+    }
+
+    /** 逗号分隔的一组周次；末尾的单双标记作用于整组。 */
+    @NonNull
+    private static List<String> parseWeekGroup(@NonNull String group) {
+        List<String> ranges = new ArrayList<>();
+        List<Character> parities = new ArrayList<>();
+        for (String part : group.split(",")) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            boolean odd = part.indexOf('单') >= 0;
+            boolean even = part.indexOf('双') >= 0;
+            char parity = odd == even ? 0 : (odd ? '单' : '双');
+            Matcher matcher = WEEK_RANGE.matcher(part);
+            String normalized = matcher.find()
+                    ? TimetableText.normalizeWeeks(matcher.group()) : null;
+            if (normalized == null) {
+                if (parity != 0 && !ranges.isEmpty()) {
+                    // 单独的「单/双」写在最后：按整组处理，兼容旧写法。
+                    parities.set(parities.size() - 1, parity);
+                }
+                continue;
+            }
+            ranges.add(normalized);
+            parities.add(parity);
         }
-        if (even) {
-            return normalized + "双";
+        if (ranges.isEmpty()) {
+            return List.of();
         }
-        return normalized;
+        int last = ranges.size() - 1;
+        if (parities.get(last) != 0) {
+            boolean parityOnlyOnLast = true;
+            for (int i = 0; i < last; i++) {
+                if (parities.get(i) != 0) {
+                    parityOnlyOnLast = false;
+                    break;
+                }
+            }
+            if (parityOnlyOnLast) {
+                return List.of(String.join(",", ranges) + parities.get(last));
+            }
+        }
+        List<String> variants = new ArrayList<>();
+        StringBuilder joined = new StringBuilder();
+        char currentParity = 0;
+        for (int i = 0; i < ranges.size(); i++) {
+            char parity = parities.get(i);
+            if (joined.length() == 0) {
+                joined.append(ranges.get(i));
+                currentParity = parity;
+            } else if (parity == currentParity) {
+                joined.append(',').append(ranges.get(i));
+            } else {
+                addWeekVariant(variants, joined, currentParity);
+                joined = new StringBuilder(ranges.get(i));
+                currentParity = parity;
+            }
+        }
+        addWeekVariant(variants, joined, currentParity);
+        return variants;
+    }
+
+    private static void addWeekVariant(@NonNull List<String> variants,
+                                       @NonNull StringBuilder ranges, char parity) {
+        if (ranges.length() == 0) {
+            return;
+        }
+        String weeks = ranges + (parity == 0 ? "" : String.valueOf(parity));
+        if (TimetableText.normalizeWeeks(weeks) == null) {
+            return;
+        }
+        if (!variants.contains(weeks)) {
+            variants.add(weeks);
+        }
+    }
+
+    /** 去掉被另一段完整覆盖的周次，避免同一节次在重叠周里出现两门同名课。 */
+    @NonNull
+    private static List<String> removeCoveredVariants(@NonNull List<String> variants) {
+        if (variants.size() <= 1) {
+            return variants;
+        }
+        boolean[][] active = new boolean[variants.size()][];
+        for (int i = 0; i < variants.size(); i++) {
+            active[i] = activeWeeks(variants.get(i));
+        }
+        List<String> kept = new ArrayList<>();
+        for (int i = 0; i < variants.size(); i++) {
+            if (!hasActiveWeek(active[i])) {
+                kept.add(variants.get(i));
+                continue;
+            }
+            boolean covered = false;
+            for (int j = 0; j < variants.size() && !covered; j++) {
+                if (i == j || !covers(active[j], active[i])) {
+                    continue;
+                }
+                boolean equal = covers(active[i], active[j]);
+                // 完全相同的两段只留第一段，避免重复行。
+                covered = !equal || j < i;
+            }
+            if (!covered) {
+                kept.add(variants.get(i));
+            }
+        }
+        return kept;
+    }
+
+    private static boolean[] activeWeeks(@NonNull String weeks) {
+        boolean[] active = new boolean[StudyTimetableStore.MAX_TOTAL_WEEKS + 1];
+        for (int week = 1; week < active.length; week++) {
+            active[week] = TimetableText.activeInWeek(weeks, week);
+        }
+        return active;
+    }
+
+    private static boolean hasActiveWeek(@NonNull boolean[] active) {
+        for (int week = 1; week < active.length; week++) {
+            if (active[week]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** {@code outer} 是否覆盖 {@code inner} 的每一周。 */
+    private static boolean covers(@NonNull boolean[] outer, @NonNull boolean[] inner) {
+        for (int week = 1; week < inner.length; week++) {
+            if (inner[week] && !outer[week]) {
+                return false;
+            }
+        }
+        return true;
     }
 }
