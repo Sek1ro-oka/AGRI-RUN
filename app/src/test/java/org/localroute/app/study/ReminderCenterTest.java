@@ -124,13 +124,13 @@ public class ReminderCenterTest {
                 find(ReminderCenter.entries(state), ReminderCenter.Kind.ADJUSTMENT)));
     }
 
-    /** 更新检查没有后台调度，写「没开」是假话——它根本没有开关。 */
+    /** 更新检查没有开关，只在冷启动时静默查一次；写「没开」是假话。 */
     @Test
-    public void updateCheckNeverAnnouncesItself() {
+    public void updateCheckRunsAtStartupWithoutSwitch() {
         ReminderCenter.Entry entry = find(ReminderCenter.entries(everythingOn()),
                 ReminderCenter.Kind.UPDATE);
         assertFalse(entry.enabled);
-        assertEquals(ReminderCenter.Status.MANUAL_ONLY, ReminderCenter.status(entry));
+        assertEquals(ReminderCenter.Status.STARTUP_CHECK, ReminderCenter.status(entry));
     }
 
     @Test

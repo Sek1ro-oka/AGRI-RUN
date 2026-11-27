@@ -51,6 +51,10 @@ public final class UpdateManager {
     private static final String KEY_DOWNLOAD_VERSION = "download_version";
     private static final String KEY_DOWNLOAD_PATH = "download_path";
     private static final String KEY_DOWNLOAD_SHA256 = "download_sha256";
+    /** 原始附件地址：失败后用同一份 Release 重新探测线路，不必再请求一次元数据。 */
+    private static final String KEY_DOWNLOAD_APK_URL = "download_apk_url";
+    /** 启动时自动弹过的版本；同一版本只弹一次。 */
+    private static final String KEY_PROMPTED_VERSION = "prompted_version";
 
     /** 线路探测：每个源最多读约 96 KB，用实际吞吐挑最快的一条。 */
     private static final int PROBE_CONNECT_TIMEOUT_MS = 6_000;
@@ -83,6 +87,14 @@ public final class UpdateManager {
         if (target.exists() && !target.delete()) {
             throw new IOException("cannot replace old apk");
         }
+        // 换版本下载时顺手清掉上一份安装包，避免应用私有目录里越攒越多。
+        String previousPath = prefs(context).getString(KEY_DOWNLOAD_PATH, null);
+        if (previousPath != null && !previousPath.equals(target.getAbsolutePath())) {
+            File previous = new File(previousPath);
+            if (previous.isFile() && !previous.delete()) {
+                DiagnosticLog.warn("旧更新包删除失败：" + previous.getName());
+            }
+        }
 
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(apkUrl))
                 .setTitle(context.getString(R.string.home_update_notification_title))
@@ -108,6 +120,8 @@ public final class UpdateManager {
                 .putString(KEY_DOWNLOAD_PATH, target.getAbsolutePath())
                 .putString(KEY_DOWNLOAD_SHA256, release.apkSha256() == null
                         ? "" : release.apkSha256())
+                .putString(KEY_DOWNLOAD_APK_URL, release.apkUrl() == null
+                        ? "" : release.apkUrl())
                 .apply();
     }
 
@@ -140,20 +154,96 @@ public final class UpdateManager {
         return prefs(context).getString(KEY_DOWNLOAD_VERSION, "");
     }
 
-    public static boolean isDownloadActive(@NonNull Context context) {
-        int status = queryStatus(context);
-        return status == DownloadManager.STATUS_PENDING
-                || status == DownloadManager.STATUS_RUNNING;
+    /** 启动时自动弹过的版本；空串表示还没自动提醒过。 */
+    @NonNull
+    public static String promptedVersion(@NonNull Context context) {
+        return prefs(context).getString(KEY_PROMPTED_VERSION, "");
     }
 
-    public static boolean isDownloadSuccessful(@NonNull Context context) {
-        return queryStatus(context) == DownloadManager.STATUS_SUCCESSFUL;
+    /** 展示过「发现新版本」就记下来，同一版本不再自动弹。 */
+    public static void markPrompted(@NonNull Context context, @NonNull String version) {
+        prefs(context).edit().putString(KEY_PROMPTED_VERSION, version).apply();
+    }
+
+    /** 系统下载器里这次更新的状态与进度；没有记录或读不到时为 null。 */
+    @Nullable
+    public static DownloadState downloadState(@NonNull Context context) {
+        long id = pendingDownloadId(context);
+        if (id < 0) {
+            return null;
+        }
+        DownloadManager manager =
+                (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) {
+            return null;
+        }
+        try (Cursor cursor = manager.query(
+                new DownloadManager.Query().setFilterById(id))) {
+            if (cursor == null || !cursor.moveToFirst()) {
+                return null;
+            }
+            return new DownloadState(
+                    intColumn(cursor, DownloadManager.COLUMN_STATUS, -1),
+                    longColumn(cursor, DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR, 0),
+                    longColumn(cursor, DownloadManager.COLUMN_TOTAL_SIZE_BYTES, 0));
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    /** 下载器的一次状态快照：更新页按它画进度条与按钮。 */
+    public static final class DownloadState {
+        public final int status;
+        public final long bytes;
+        public final long total;
+
+        DownloadState(int status, long bytes, long total) {
+            this.status = status;
+            this.bytes = bytes;
+            this.total = total;
+        }
+
+        /** 排队、下载中、被系统暂停都算「还没结束」。 */
+        public boolean active() {
+            return status == DownloadManager.STATUS_PENDING
+                    || status == DownloadManager.STATUS_RUNNING
+                    || status == DownloadManager.STATUS_PAUSED;
+        }
+
+        public boolean failed() {
+            return status == DownloadManager.STATUS_FAILED;
+        }
+
+        public boolean successful() {
+            return status == DownloadManager.STATUS_SUCCESSFUL;
+        }
+
+        /** 0–100；总量未知时为 -1。 */
+        public int percent() {
+            if (total <= 0) {
+                return -1;
+            }
+            long value = bytes * 100 / total;
+            return (int) Math.max(0, Math.min(100, value));
+        }
+    }
+
+    public static boolean isDownloadActive(@NonNull Context context) {
+        DownloadState state = downloadState(context);
+        return state != null && state.active();
     }
 
     /** 已完成且文件仍在时返回 APK；下载中或失败返回 null。 */
     @Nullable
     public static File downloadedFile(@NonNull Context context) {
-        if (!isDownloadSuccessful(context)) {
+        return downloadedFile(context, downloadState(context));
+    }
+
+    /** 已经拿到状态快照时复用，避免进度轮询每次多查一遍 DownloadManager。 */
+    @Nullable
+    public static File downloadedFile(@NonNull Context context,
+                                      @Nullable DownloadState state) {
+        if (state == null || !state.successful()) {
             return null;
         }
         String path = prefs(context).getString(KEY_DOWNLOAD_PATH, null);
@@ -216,10 +306,10 @@ public final class UpdateManager {
             text.append("，原因 ").append(reasonLabel(reason));
         }
         if (totalBytes > 0) {
-            text.append("，已下 ").append(mebibytes(bytesSoFar))
-                    .append('/').append(mebibytes(totalBytes)).append(" MiB");
+            text.append("，已下 ").append(sizeLabel(bytesSoFar))
+                    .append('/').append(sizeLabel(totalBytes)).append(" MiB");
         } else if (bytesSoFar > 0) {
-            text.append("，已下 ").append(mebibytes(bytesSoFar)).append(" MiB");
+            text.append("，已下 ").append(sizeLabel(bytesSoFar)).append(" MiB");
         }
         if (sourceLabel != null && !sourceLabel.isEmpty()) {
             text.append("，线路 ").append(sourceLabel);
@@ -272,7 +362,9 @@ public final class UpdateManager {
         }
     }
 
-    private static String mebibytes(long bytes) {
+    /** 进度文案里的体积数字（MiB，保留一位小数）。 */
+    @NonNull
+    public static String sizeLabel(long bytes) {
         return String.format(Locale.ROOT, "%.1f", bytes / 1048576.0);
     }
 
@@ -302,7 +394,54 @@ public final class UpdateManager {
                 .remove(KEY_DOWNLOAD_VERSION)
                 .remove(KEY_DOWNLOAD_PATH)
                 .remove(KEY_DOWNLOAD_SHA256)
+                .remove(KEY_DOWNLOAD_APK_URL)
                 .apply();
+    }
+
+    /** 用户取消：同时清掉系统下载任务、目标文件与记录，系统通知也会消失。 */
+    public static void cancelDownload(@NonNull Context context) {
+        long id = pendingDownloadId(context);
+        DownloadManager manager =
+                (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager != null && id >= 0) {
+            try {
+                manager.remove(id);
+            } catch (RuntimeException ignored) {
+                // 记录已被系统清理时不影响下面的本地清理。
+            }
+        }
+        discardDownload(context);
+    }
+
+    /** 失败记录里是否保留了足够的附件信息，能直接重新探测线路下载。 */
+    public static boolean canRetry(@NonNull Context context) {
+        return canRetry(context, downloadState(context));
+    }
+
+    /** 已经拿到状态快照时复用，避免进度轮询每次多查一遍 DownloadManager。 */
+    public static boolean canRetry(@NonNull Context context, @Nullable DownloadState state) {
+        String apkUrl = prefs(context).getString(KEY_DOWNLOAD_APK_URL, "");
+        return state != null && state.failed() && apkUrl != null && !apkUrl.isEmpty();
+    }
+
+    /**
+     * 用失败记录里的版本、附件地址与摘要重新选择线路下载。
+     *
+     * <p>升级前留下的记录没有附件地址，调用方据此退回「重新检查更新」。
+     */
+    public static void retryDownload(@NonNull Context context) throws IOException {
+        String apkUrl = prefs(context).getString(KEY_DOWNLOAD_APK_URL, "");
+        String version = pendingVersion(context);
+        String sha256 = prefs(context).getString(KEY_DOWNLOAD_SHA256, "");
+        if (apkUrl == null || apkUrl.isEmpty() || version.isEmpty()) {
+            throw new IOException("没有可重试的下载记录");
+        }
+        // 旧失败任务先留着：探测线路失败时记录还在，重试按钮不会丢；
+        // 新任务入队成功会覆盖 prefs 里的 id，旧任务只是系统下载列表里多一条失败记录。
+        UpdateChecker.Release release = new UpdateChecker.Release(
+                version, "", "", "", apkUrl, null,
+                sha256 == null || sha256.isEmpty() ? null : sha256, 0, "");
+        startDownload(context, release);
     }
 
     public static boolean canInstall(@NonNull Context context) {
@@ -471,28 +610,6 @@ public final class UpdateManager {
         double speed() {
             return bytes / (double) elapsedMs;
         }
-    }
-
-    private static int queryStatus(@NonNull Context context) {
-        long id = pendingDownloadId(context);
-        if (id < 0) {
-            return -1;
-        }
-        DownloadManager manager =
-                (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
-        if (manager == null) {
-            return -1;
-        }
-        try (Cursor cursor = manager.query(
-                new DownloadManager.Query().setFilterById(id))) {
-            if (cursor != null && cursor.moveToFirst()) {
-                return cursor.getInt(cursor.getColumnIndexOrThrow(
-                        DownloadManager.COLUMN_STATUS));
-            }
-        } catch (RuntimeException ignored) {
-            // 下载记录被系统清理时按「没有下载」处理。
-        }
-        return -1;
     }
 
     @NonNull

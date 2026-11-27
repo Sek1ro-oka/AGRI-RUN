@@ -3,10 +3,14 @@ package org.localroute.app.ui;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -15,7 +19,9 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.lifecycle.Lifecycle;
 
+import org.localroute.app.BuildConfig;
 import org.localroute.app.R;
 import org.localroute.app.databinding.ActivityMainBinding;
 import org.localroute.app.databinding.ItemHomeAgendaBinding;
@@ -38,11 +44,17 @@ import org.localroute.app.study.StudySession;
 import org.localroute.app.study.StudySessionStore;
 import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
+import org.localroute.app.update.UpdateChecker;
+import org.localroute.app.update.UpdateManager;
+import org.localroute.app.update.UpdatePromptPolicy;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * 首页：纯色问候 + 当天日程时间轴 + 待交作业。
@@ -71,10 +83,23 @@ public class MainActivity extends AppCompatActivity {
     private int collapseRetries;
     private int homeworkTotal;
     private final Runnable collapsePass = this::applyCollapse;
+    /** 冷启动静默检查只跑一次；旋转重建或从别的页面返回都不重复。 */
+    private boolean updateCheckStarted;
+    /** 带 saved state 重建（旋转等）时不再触发更新检查。 */
+    private boolean restoredFromState;
+    /** 跟着进程走：旋转销毁 Activity 时不打断已经点下的下载线路探测。 */
+    private static final ExecutorService UPDATE_EXECUTOR =
+            Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "home-update");
+                thread.setDaemon(true);
+                return thread;
+            });
+    private final Handler updateHandler = new Handler(Looper.getMainLooper());
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         onboardingOpen = savedInstanceState != null && savedInstanceState.getBoolean("onboarding_open", false);
+        restoredFromState = savedInstanceState != null;
         DiagnosticLog.init(getApplicationContext());
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
@@ -120,10 +145,14 @@ public class MainActivity extends AppCompatActivity {
         }
         // 绑定、导入、抓作业都发生在别的页面，回来必须重读，否则首页还挂着旧数据。
         render();
-        if (pendingTarget == null) return;
-        HomeTarget target = pendingTarget;
-        pendingTarget = null;
-        target.open(this);
+        if (pendingTarget != null) {
+            // 快捷入口直接去目标页，不在跳转途中弹更新；回到首页后的这次 onResume 再静默检查。
+            HomeTarget target = pendingTarget;
+            pendingTarget = null;
+            target.open(this);
+            return;
+        }
+        startUpdateCheckIfNeeded();
     }
 
     @Override protected void onSaveInstanceState(Bundle outState) {
@@ -136,6 +165,87 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         pendingTarget = HomeTarget.from(intent.getStringExtra(HomeTarget.EXTRA_TARGET));
+    }
+
+    @Override protected void onDestroy() {
+        updateHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
+    }
+
+    /** 冷启动静默查一次：不转圈、不挡首页，失败只进诊断日志。 */
+    private void startUpdateCheckIfNeeded() {
+        if (updateCheckStarted || restoredFromState) {
+            return;
+        }
+        updateCheckStarted = true;
+        UPDATE_EXECUTOR.execute(() -> {
+            try {
+                UpdateChecker.Release release = UpdateChecker.fetchLatest();
+                updateHandler.post(() -> onUpdateChecked(release));
+            } catch (IOException | RuntimeException error) {
+                DiagnosticLog.warn("启动更新检查失败："
+                        + (error.getMessage() == null ? error.getClass().getSimpleName()
+                        : error.getMessage()));
+            }
+        });
+    }
+
+    private void onUpdateChecked(@NonNull UpdateChecker.Release release) {
+        if (isFinishing() || isDestroyed() || !hasWindowFocus()
+                || !getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)
+                || onboardingOpen || pendingTarget != null) {
+            // 用户已经离开首页（或页面正在交接）：不打扰，下次冷启动重新检查。
+            return;
+        }
+        if (!UpdatePromptPolicy.shouldPrompt(release.versionName(), BuildConfig.VERSION_NAME,
+                UpdateManager.promptedVersion(this))) {
+            return;
+        }
+        if (UpdateManager.isDownloadActive(this)) {
+            // 正在下载时别叠加第二个任务；这次结果留给下载结束后的下一次冷启动。
+            return;
+        }
+        String pendingVersion = UpdateManager.pendingVersion(this);
+        if (!pendingVersion.isEmpty()
+                && !UpdateChecker.isNewer(release.versionName(), pendingVersion)) {
+            // 同一版本已经在下载/下载过：用户已经做过选择，不再自动提醒。
+            UpdateManager.markPrompted(this, release.versionName());
+            return;
+        }
+        DiagnosticLog.info("启动更新检查：发现新版本 " + release.versionName());
+        UpdateDialogs.showFound(this, release, true, () -> downloadFromPrompt(release));
+    }
+
+    /** 启动弹窗里的「下载并安装」：直接交给系统下载器，进度在通知与更新页看。 */
+    private void downloadFromPrompt(@NonNull UpdateChecker.Release release) {
+        Toast.makeText(this, R.string.home_update_preparing, Toast.LENGTH_SHORT).show();
+        UPDATE_EXECUTOR.execute(() -> {
+            try {
+                if (UpdateManager.isDownloadActive(getApplicationContext())) {
+                    return;
+                }
+                UpdateManager.startDownload(getApplicationContext(), release);
+                updateHandler.post(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    Toast.makeText(this, R.string.home_update_started,
+                            Toast.LENGTH_LONG).show();
+                });
+            } catch (IOException | RuntimeException error) {
+                updateHandler.post(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    String detail = error.getMessage();
+                    if (detail == null || detail.isEmpty()) {
+                        detail = "—";
+                    }
+                    Toast.makeText(this, getString(R.string.home_update_start_failed, detail),
+                            Toast.LENGTH_LONG).show();
+                });
+            }
+        });
     }
 
     private void render() {
