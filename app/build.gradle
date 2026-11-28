@@ -123,6 +123,8 @@ dependencies {
     implementation libs.androidx.lifecycle.livedata
     implementation libs.google.material
     implementation libs.maplibre.android
+    // 教务课表页面离线导入（另存的 HTML）用的宽容解析器。
+    implementation libs.jsoup
     // Google Play services FLP：第二条模拟位置输出通道（可选、默认关闭，设备没有 GMS 时自动跳过）。
     implementation "com.google.android.gms:play-services-location:21.3.0"
     // 高德官方 3D SDK：只有 Key + arm 架构时才真正启用（MapBackendPolicy 判定），否则走栅格瓦片。
