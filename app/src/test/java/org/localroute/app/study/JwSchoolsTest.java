@@ -49,15 +49,15 @@ public class JwSchoolsTest {
 
     @Test
     public void keepsWebVpnStyleEntryUntouched() {
-        // 实测中南林业科技大学的 webvpn 改写域名：不含 /jwglxt 的完整地址不能被改坏。
+        // webvpn 改写域名的形状（把真实地址编码进子域标签）：不含 /jwglxt 的完整地址不能被改坏。
         JwSchools.School school = JwSchools.normalizeCustom(
-                "https://https-jwxt-csuft-edu-cn-443.webvpn.csuft.edu.cn/xtgl/index_initMenu.html");
+                "https://https-jwxt-example-univ-cn-443.webvpn.example-univ.cn/xtgl/index_initMenu.html");
         assertNotNull(school);
-        assertEquals("https-jwxt-csuft-edu-cn-443.webvpn.csuft.edu.cn", school.name());
-        assertEquals("https://https-jwxt-csuft-edu-cn-443.webvpn.csuft.edu.cn"
+        assertEquals("https-jwxt-example-univ-cn-443.webvpn.example-univ.cn", school.name());
+        assertEquals("https://https-jwxt-example-univ-cn-443.webvpn.example-univ.cn"
                 + "/xtgl/index_initMenu.html", school.loginUrl());
         // 非正方入口按站点根清理 Cookie，而不是补一个没访问过的 /jwglxt。
-        assertEquals("https://https-jwxt-csuft-edu-cn-443.webvpn.csuft.edu.cn/",
+        assertEquals("https://https-jwxt-example-univ-cn-443.webvpn.example-univ.cn/",
                 JwSchools.baseUrl(school));
     }
 

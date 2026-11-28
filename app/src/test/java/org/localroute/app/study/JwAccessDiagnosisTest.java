@@ -8,24 +8,24 @@ import org.junit.Test;
 /** 学校网关拦截页的识别，文案取自实测页面。 */
 public class JwAccessDiagnosisTest {
 
-    /** 石家庄铁道大学 jw.stdu.edu.cn 实测返回 HTTP 483 + 这段正文。 */
-    private static final String STDU_BLOCK_PAGE =
+    /** 按来源 IP/网段拦截的网关实测返回 HTTP 483 + 这段正文。 */
+    private static final String GATEWAY_BLOCK_PAGE =
             "访问出错 - 403 出错啦！访问策略禁止您访问该网站，可能的原因为 (错误代码：403) "
-                    + "您(IP：106.117.79.246)，没有权限访问相应的资源，请联系管理员以获取相应的访问权限";
+                    + "您(IP：…)，没有权限访问相应的资源，请联系管理员以获取相应的访问权限";
 
-    /** 中南林业科技大学 webvpn 入口实测的拦截页。 */
-    private static final String CSUFT_WEBVPN_PAGE = "出错了 未被授权的应用请求!";
+    /** webvpn 网关判定请求来源未被授权时的实测拦截页。 */
+    private static final String WEBVPN_DENY_PAGE = "出错了 未被授权的应用请求!";
 
     @Test
     public void detectsIpPolicyBlockPage() {
         assertEquals(JwAccessDiagnosis.ACCESS_BLOCKED,
-                JwAccessDiagnosis.classifyText(STDU_BLOCK_PAGE));
+                JwAccessDiagnosis.classifyText(GATEWAY_BLOCK_PAGE));
     }
 
     @Test
     public void detectsUnauthorizedAppPage() {
         assertEquals(JwAccessDiagnosis.UNAUTHORIZED_APP,
-                JwAccessDiagnosis.classifyText(CSUFT_WEBVPN_PAGE));
+                JwAccessDiagnosis.classifyText(WEBVPN_DENY_PAGE));
     }
 
     @Test
@@ -62,7 +62,7 @@ public class JwAccessDiagnosisTest {
     public void pageTextWinsOverStatus() {
         // 网关用 200 返回拦截页时仍要识别出来。
         assertEquals(JwAccessDiagnosis.UNAUTHORIZED_APP,
-                JwAccessDiagnosis.classify(200, CSUFT_WEBVPN_PAGE));
+                JwAccessDiagnosis.classify(200, WEBVPN_DENY_PAGE));
         assertEquals(JwAccessDiagnosis.ACCESS_BLOCKED, JwAccessDiagnosis.classify(483, ""));
         assertNull(JwAccessDiagnosis.classify(200, "正方教务系统 用户登录"));
     }
