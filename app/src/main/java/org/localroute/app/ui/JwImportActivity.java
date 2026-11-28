@@ -45,6 +45,7 @@ import org.localroute.app.study.JwSemesterInfo;
 import org.localroute.app.study.JwTimetableJavascript;
 import org.localroute.app.study.JwTimetableParser;
 import org.localroute.app.study.TimetableCourse;
+import org.localroute.app.study.TimetableOfflineImport;
 
 import java.util.List;
 import java.util.Locale;
@@ -64,12 +65,17 @@ public class JwImportActivity extends AppCompatActivity {
 
     private static final long FETCH_TIMEOUT_MS = 25_000L;
 
+    /** 抓取脚本发现当前页面不在 /jwglxt 下：多半是强智一类把课表画在页面上的教务。 */
+    private static final String NOT_ON_ZHENG_FANG = "NOT_ON_JWGLXT";
+
     private ActivityJwImportBinding binding;
     private JwSchools.School school;
     private boolean pageLoaded;
     private boolean fetching;
     /** 当前状态栏显示的是「学校侧拦截」提示，页面恢复正常时自动清掉。 */
     private boolean blockNoticeShown;
+    /** 正方接口这条路的原话，页面表格也读不出课程时就说这句。 */
+    private String pendingFetchMessage = "";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable timeout = () -> {
@@ -332,6 +338,7 @@ public class JwImportActivity extends AppCompatActivity {
             return;
         }
         fetching = true;
+        pendingFetchMessage = "";
         showStatus(null);
         setFetching(true);
         mainHandler.postDelayed(timeout, FETCH_TIMEOUT_MS);
@@ -353,21 +360,24 @@ public class JwImportActivity extends AppCompatActivity {
             return;
         }
         if (!root.optBoolean("ok", false)) {
+            if (NOT_ON_ZHENG_FANG.equalsIgnoreCase(root.optString("kind", ""))) {
+                // 强智等教务没有 /jwglxt 这条接口路径，改读页面上画出来的那张课表表。
+                fallbackToPageTable(getString(R.string.study_jw_table_missing));
+                return;
+            }
             finishFetch();
             showFetchError(root);
             return;
         }
         JSONArray kbList = root.optJSONArray("kbList");
         if (kbList == null || kbList.length() == 0) {
-            finishFetch();
-            showStatus(getString(R.string.study_jw_no_courses));
+            fallbackToPageTable(getString(R.string.study_jw_no_courses));
             return;
         }
         JwTimetableParser.Result result = JwTimetableParser.parse(kbList.toString());
         List<TimetableCourse> courses = result.courses();
         if (courses.isEmpty()) {
-            finishFetch();
-            showStatus(result.unparsedCourses().isEmpty()
+            fallbackToPageTable(result.unparsedCourses().isEmpty()
                     ? getString(R.string.study_jw_error_format)
                     : getString(R.string.study_jw_sections_unparsed,
                             String.join("、", result.unparsedCourses())));
@@ -381,6 +391,30 @@ public class JwImportActivity extends AppCompatActivity {
                 courses.size());
         StudyDialogs.showImportPreview(this, courses, source, result.unparsedCourses(),
                 JwSemesterInfo.read(root), () -> {
+                    setResult(RESULT_OK);
+                    finish();
+                });
+    }
+
+    /** 正方接口这条路读不出课程：把同一页面上的课表表格 HTML 取回来再试一次。 */
+    private void fallbackToPageTable(String originalMessage) {
+        pendingFetchMessage = originalMessage;
+        binding.jwWebView.evaluateJavascript(JwTimetableJavascript.PAGE_TABLE_JS, null);
+    }
+
+    /** 页面表格也读不出课程时，说回正方那条路的原话，不编一句「解析失败」糊弄。 */
+    private void onPageTable(@Nullable String html) {
+        TimetableOfflineImport.Result result = TimetableOfflineImport.parse(html, null);
+        if (!result.ok()) {
+            finishFetch();
+            showStatus(pendingFetchMessage);
+            return;
+        }
+        finishFetch();
+        String source = getString(R.string.study_jw_table_source,
+                school == null ? "" : school.name(), result.courses().size());
+        StudyDialogs.showImportPreview(this, result.courses(), source, List.of(),
+                JwSemesterInfo.read(null), () -> {
                     setResult(RESULT_OK);
                     finish();
                 });
@@ -485,6 +519,15 @@ public class JwImportActivity extends AppCompatActivity {
             mainHandler.post(() -> {
                 if (!isFinishing() && !isDestroyed()) {
                     onPageSample(pageText);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void onTable(String html) {
+            mainHandler.post(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    onPageTable(html);
                 }
             });
         }
