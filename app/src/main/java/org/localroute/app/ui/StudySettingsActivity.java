@@ -51,9 +51,13 @@ import org.localroute.app.study.StudyTimetableStore;
 import org.localroute.app.study.TimetableCourse;
 import org.localroute.app.study.TimetableDay;
 import org.localroute.app.study.TimetableImportPlan;
+import org.localroute.app.study.TimetableOfflineImport;
 import org.localroute.app.study.TimetableShareCodec;
 import org.localroute.app.widget.TimetableWidgetProvider;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -71,6 +75,9 @@ public class StudySettingsActivity extends AppCompatActivity {
 
     /** 系统保存面板只看 MIME，写 .ics 用 text/calendar 才不会被改名成 .txt。 */
     private static final String ICS_MIME = "text/calendar";
+
+    /** 教务课表页另存也就几百 KB，再大就不是课表了，读到一半直接停。 */
+    private static final int MAX_IMPORT_FILE_BYTES = 16 * 1024 * 1024;
 
     private ActivityStudySettingsBinding binding;
     private StudySession session;
@@ -98,8 +105,10 @@ public class StudySettingsActivity extends AppCompatActivity {
     /** 点「导出」时生成的日历文本，等系统保存面板回来后再写。 */
     private String pendingIcsText = "";
     private int pendingIcsEvents;
-    /** 分享码解出来的课程，冲突预演确认后才写本机课表。 */
-    private List<TimetableCourse> pendingShare = Collections.emptyList();
+    /** 分享码或课表文件解出来的课程，冲突预演确认后才写本机课表。 */
+    private List<TimetableCourse> pendingImport = Collections.emptyList();
+    /** 预演对话框上要写明这批课从哪来；分享码不需要说，留空串。 */
+    private String pendingImportSource = "";
 
     /** 导出 .ics 用的保存面板：文本在点「导出」时就生成好，等用户选完落点再写。 */
     private final ActivityResultLauncher<Intent> icsLauncher =
@@ -125,6 +134,17 @@ public class StudySettingsActivity extends AppCompatActivity {
                         });
                     });
 
+    /** 课表文件由用户自己从能打开教务的设备上另存，这里只读他选中的那一个。 */
+    private final ActivityResultLauncher<Intent> timetableFileLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        Uri picked = result.getData() == null ? null : result.getData().getData();
+                        if (result.getResultCode() != RESULT_OK || picked == null) {
+                            return; // 用户在系统面板里取消，不再多提示一次。
+                        }
+                        importTimetableFile(picked);
+                    });
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -142,6 +162,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         binding.rowExportIcs.setOnClickListener(view -> confirmExportIcs());
         binding.rowCopyShareCode.setOnClickListener(view -> copyShareCode());
         binding.rowImportShareCode.setOnClickListener(view -> showShareCodeDialog());
+        binding.rowImportTimetableFile.setOnClickListener(view -> confirmTimetableFilePick());
         binding.rowSemesters.setOnClickListener(view -> showSemesters());
         binding.rowAdjustments.setOnClickListener(view -> showAdjustments());
 
@@ -823,17 +844,23 @@ public class StudySettingsActivity extends AppCompatActivity {
             toast(getString(R.string.study_timetable_import_failed, result.error()));
             return;
         }
+        pendingImportSource = "";
+        previewImport(result.courses(), result.skipped());
+    }
+
+    /** 先说清「会撞在哪」再让用户挑追加还是替换，分享码与课表文件共用这一条路。 */
+    private void previewImport(List<TimetableCourse> incoming, int skipped) {
         List<TimetableCourse> existing = StudyTimetableStore.loadCourses(this);
-        TimetableImportPlan plan = TimetableImportPlan.of(result.courses(), existing);
+        TimetableImportPlan plan = TimetableImportPlan.of(incoming, existing);
         if (plan.toAdd().isEmpty()) {
             toast(getString(R.string.study_timetable_import_nothing));
             return;
         }
-        pendingShare = result.courses();
+        pendingImport = incoming;
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.study_timetable_import_preview_title,
                         plan.toAdd().size()))
-                .setMessage(importPreviewMessage(plan, result.skipped()))
+                .setMessage(importPreviewMessage(plan, skipped))
                 .setNeutralButton(R.string.campus_cancel, null)
                 .setNegativeButton(R.string.study_timetable_import_replace,
                         (dialog, which) -> confirmReplace())
@@ -842,9 +869,74 @@ public class StudySettingsActivity extends AppCompatActivity {
                 .show();
     }
 
+    /** 说明文件从哪来、本机不联网，再开系统选择器——避免用户以为这里能代登教务。 */
+    private void confirmTimetableFilePick() {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.study_timetable_import_file)
+                .setMessage(R.string.study_timetable_import_file_hint)
+                .setNegativeButton(R.string.campus_cancel, null)
+                .setPositiveButton(R.string.study_timetable_import_file_action,
+                        (dialog, which) -> launchTimetableFileChooser())
+                .show();
+    }
+
+    private void launchTimetableFileChooser() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        // 教务另存的网页在各单位 MIME 五花八门（text/html、octet-stream…），按后缀让人自己挑。
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"text/html", "text/plain",
+                "text/csv", "application/octet-stream"});
+        timetableFileLauncher.launch(intent);
+    }
+
+    private void importTimetableFile(Uri uri) {
+        byte[] raw = readPickedFile(uri);
+        if (raw == null) {
+            toast(getString(R.string.study_timetable_import_file_unreadable));
+            return;
+        }
+        TimetableOfflineImport.Result result = TimetableOfflineImport.parseBytes(raw);
+        if (!result.ok()) {
+            toast(getString(R.string.study_timetable_import_file_failed, result.error()));
+            return;
+        }
+        pendingImportSource = result.sourceLabel(
+                getString(R.string.study_timetable_source_zhengfang),
+                getString(R.string.study_timetable_source_qiangzhi),
+                getString(R.string.study_timetable_source_csv));
+        previewImport(result.courses(), 0);
+    }
+
+    /** 读到上限就当作读不到：教务课表页不会上百 MB，那样的人为失误不必分两种提示。 */
+    @Nullable
+    private byte[] readPickedFile(Uri uri) {
+        try (InputStream input = getContentResolver().openInputStream(uri)) {
+            if (input == null) {
+                return null;
+            }
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) > 0) {
+                bytes.write(buffer, 0, read);
+                if (bytes.size() > MAX_IMPORT_FILE_BYTES) {
+                    return null;
+                }
+            }
+            return bytes.toByteArray();
+        } catch (IOException | SecurityException e) {
+            return null;
+        }
+    }
+
     /** 冲突一行一条，最多列 4 条，剩下的报个数——对话框不是课表全览。 */
     private String importPreviewMessage(TimetableImportPlan plan, int skipped) {
         StringBuilder text = new StringBuilder();
+        if (!pendingImportSource.isEmpty()) {
+            text.append(getString(R.string.study_timetable_import_source, pendingImportSource))
+                    .append('\n');
+        }
         text.append(getString(R.string.study_timetable_import_preview,
                 plan.toAdd().size(), plan.duplicates()));
         if (skipped > 0) {
@@ -877,7 +969,7 @@ public class StudySettingsActivity extends AppCompatActivity {
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.study_timetable_import_replace)
                 .setMessage(getString(R.string.study_timetable_import_replace_confirm,
-                        kept, pendingShare.size()))
+                        kept, pendingImport.size()))
                 .setNegativeButton(R.string.campus_cancel, null)
                 .setPositiveButton(R.string.study_timetable_import_replace,
                         (dialog, which) -> applyImport(true))
@@ -886,11 +978,12 @@ public class StudySettingsActivity extends AppCompatActivity {
 
     private void applyImport(boolean replace) {
         List<TimetableCourse> courses = StudyTimetableStore.loadCourses(this);
-        List<TimetableCourse> merged = replace ? pendingShare
-                : TimetableImportPlan.appendTo(courses, pendingShare);
+        List<TimetableCourse> merged = replace ? pendingImport
+                : TimetableImportPlan.appendTo(courses, pendingImport);
         int added = merged.size() - courses.size();
         StudyTimetableStore.saveCourses(this, merged);
-        pendingShare = Collections.emptyList();
+        pendingImport = Collections.emptyList();
+        pendingImportSource = "";
         onTimetableChanged();
         // 替换后「多了几门」没有意义（课变少也是正常的），报最终门数。
         toast(replace ? getString(R.string.study_timetable_import_replaced, merged.size())

@@ -371,6 +371,58 @@ public final class JwTimetableJavascript {
             })();
             """;
 
+    /**
+     * 把页面上已经渲染出来的课表表格 HTML 取回本机，交给 {@link TimetableHtmlParser}。
+     *
+     * <p>正方没有 JSON 接口可用（或返回空）时试一次；强智教务本来就是把课表画在
+     * {@code #kbtable} 里，走这条就能导入。只取那两张表格自身的 outerHTML，
+     * 不读表单、不读 cookie，也不碰任何访问控制——能看到这一页是用户自己登录的结果。
+     */
+    public static final String PAGE_TABLE_JS = """
+            (function () {
+              var SELECTORS = ['#kbtable', '#table1'];
+              // WebView 的回调是字符串，几百 KB 足够装下一份课表，再多就不是课表了。
+              var LIMIT = 600000;
+              function report(html) {
+                try {
+                  window.LegionJw.onTable(html || '');
+                } catch (ignored) {
+                }
+              }
+              function collect(doc, depth, out) {
+                for (var i = 0; i < SELECTORS.length; i++) {
+                  try {
+                    var hit = doc.querySelector(SELECTORS[i]);
+                    if (hit) out.push(hit);
+                  } catch (ignored) {
+                  }
+                }
+                if (depth >= 2) return;
+                var frames = doc.getElementsByTagName('iframe');
+                for (var j = 0; j < frames.length; j++) {
+                  try {
+                    // 跨域 iframe 取不到 contentDocument，读不到就跳过。
+                    if (frames[j].contentDocument) {
+                      collect(frames[j].contentDocument, depth + 1, out);
+                    }
+                  } catch (ignored) {
+                  }
+                }
+              }
+              try {
+                var tables = [];
+                collect(document, 0, tables);
+                var html = '';
+                for (var i = 0; i < tables.length && html.length < LIMIT; i++) {
+                  html += String(tables[i].outerHTML).slice(0, LIMIT - html.length);
+                }
+                report(html);
+              } catch (ignored) {
+                report('');
+              }
+            })();
+            """;
+
     private JwTimetableJavascript() {
     }
 }
