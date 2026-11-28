@@ -326,6 +326,39 @@
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="@color/campus_card_stroke" />
+                <!-- 教务页面访问不了的学校，用户自己另存课表页/填 CSV 交给本机解析。 -->
+                <LinearLayout
+                    android:id="@+id/rowImportTimetableFile"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingVertical="@dimen/space_xl">
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_study_import" />
+                    <TextView
+                        style="@style/Text.Unloop.Body"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_xl"
+                        android:layout_weight="1"
+                        android:text="@string/study_timetable_import_file" />
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_campus_chevron_right" />
+                </LinearLayout>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/campus_card_stroke" />
                 <!-- 学期是课表的容器：切换=换一整份数据，所以放在「调课与节假日」之前。 -->
                 <LinearLayout
                     android:id="@+id/rowSemesters"

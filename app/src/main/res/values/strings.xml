@@ -587,9 +587,19 @@
     <string name="study_timetable_import_skipped">另有 %1$d 条课程信息不完整，已跳过</string>
     <string name="study_timetable_import_append">追加</string>
     <string name="study_timetable_import_replace">替换全部</string>
-    <string name="study_timetable_import_replace_confirm">替换会删掉本机 %1$d 门课，只留下分享码里的 %2$d 门。确定替换？</string>
+    <string name="study_timetable_import_replace_confirm">替换会删掉本机 %1$d 门课，只留下这次导入的 %2$d 门。确定替换？</string>
     <string name="study_timetable_import_failed">分享码读不了：%1$s</string>
-    <string name="study_timetable_import_nothing">分享码里的课本机都已经有了</string>
+    <string name="study_timetable_import_nothing">这份课表里的课程本机都已经有了</string>
+    <!-- 教务系统访问不了的学校：用户自己另存课表页或填 CSV，本机解析，不代登录。 -->
+    <string name="study_timetable_import_file">从课表文件导入</string>
+    <string name="study_timetable_import_file_hint">选教务系统「课表浏览」页另存的网页（.html/.htm），或按七列模板填好的表格（.csv）。文件只在这台手机上读取，不联网、不上传。</string>
+    <string name="study_timetable_import_file_action">选择文件</string>
+    <string name="study_timetable_import_file_unreadable">读不到这个文件（可能太大），换一份试试</string>
+    <string name="study_timetable_import_file_failed">课表文件读不了：%1$s</string>
+    <string name="study_timetable_import_source">识别为：%1$s</string>
+    <string name="study_timetable_source_zhengfang">正方教务的课表页</string>
+    <string name="study_timetable_source_qiangzhi">强智教务的课表页</string>
+    <string name="study_timetable_source_csv">七列课程表格</string>
     <string name="study_timetable_import_done">已追加 %1$d 门课</string>
     <string name="study_timetable_import_replaced">课表已替换为 %1$d 门课</string>
 
@@ -685,7 +695,9 @@
     <string name="study_jw_web_error">无法打开教务系统页面。请确认已连接校园网或学校 VPN，然后重新登录。</string>
     <string name="study_jw_timeout">读取课表超时，请检查网络后重试；校外访问需要先连接学校 VPN。</string>
     <string name="study_jw_no_courses">教务系统没有返回当前学期的课程。请确认学期与课表已在网页中显示。</string>
+    <string name="study_jw_table_missing">当前页面里没有找到课表表格。请在教务系统里打开「课表浏览 / 本周课表」这一页再点「读取课表」；也可以改用「从课表文件导入」。</string>
     <string name="study_jw_source">%1$s · %2$s · 共 %3$d 门</string>
+    <string name="study_jw_table_source">%1$s · 页面课表表格 · 共 %2$d 门</string>
     <string name="study_jw_error_session">还没有登录或登录已失效，请先在页面上完成登录，再点「读取课表」。</string>
     <string name="study_jw_error_page">当前页面不是教务系统。请回到教务系统登录页后再读取。</string>
     <string name="study_jw_error_term">没有识别到学年学期，请先在教务系统课表页选择学期。</string>
